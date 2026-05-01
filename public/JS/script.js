@@ -102,47 +102,47 @@ const servicesData = [
 
 const galleryData = [
 	{
-		img: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?w=600&q=80",
+		img: "IMG/box-braids-hairstyles-1x1-1.jpg",
 		title: "Box Braids",
 		stylist: "Fatima Hassan",
 		tall: true,
 		beforeAfter: false,
 	},
 	{
-		img: "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=600&q=80",
+		img: "IMG/knotless braids.jpg",
 		title: "Knotless Braids",
 		stylist: "Zainab Mohamed",
 		beforeAfter: true,
 	},
 	{
-		img: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&q=80",
+		img: "IMG/black-cornrows.webp",
 		title: "Cornrows Design",
 		stylist: "Grace Wanjiku",
 	},
 	{
-		img: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=600&q=80",
+		img: "IMG/fulan-braids.jpg",
 		title: "Fulani Braids",
 		stylist: "Amina Diallo",
 		wide: true,
 	},
 	{
-		img: "https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=600&q=80",
+		img: "IMG/Senegalese_Twist.webp",
 		title: "Senegalese Twists",
 		stylist: "Fatima Hassan",
 	},
 	{
-		img: "https://images.unsplash.com/photo-1582293845599-6ad38b6b29b0?w=600&q=80",
+		img: "IMG/passion-twists.webp",
 		title: "Passion Twists",
 		stylist: "Zainab Mohamed",
 		beforeAfter: true,
 	},
 	{
-		img: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=600&q=80",
+		img: "IMG/goddess-braids.webp",
 		title: "Goddess Braids",
 		stylist: "Grace Wanjiku",
 	},
 	{
-		img: "https://images.unsplash.com/photo-1620331311520-246422fd82f9?w=600&q=80",
+		img: "IMG/Lemonade_Braids.webp",
 		title: "Lemonade Braids",
 		stylist: "Amina Diallo",
 	},
