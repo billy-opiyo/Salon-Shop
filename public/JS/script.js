@@ -105,7 +105,6 @@ const galleryData = [
 		img: "IMG/box-braids-hairstyles-1x1-1.jpg",
 		title: "Box Braids",
 		stylist: "Fatima Hassan",
-		tall: true,
 		beforeAfter: false,
 	},
 	{
@@ -123,7 +122,6 @@ const galleryData = [
 		img: "IMG/fulan-braids.jpg",
 		title: "Fulani Braids",
 		stylist: "Amina Diallo",
-		wide: true,
 	},
 	{
 		img: "IMG/Senegalese_Twist.webp",
@@ -146,7 +144,33 @@ const galleryData = [
 		title: "Lemonade Braids",
 		stylist: "Amina Diallo",
 	},
+	{
+		img: "IMG/braiding trends.jpg",
+		title: "Braiding Trends",
+		stylist: "Fatima Hassan",
+		beforeAfter: false,
+	},
+	{
+		img: "IMG/keeping box braids.jpg",
+		title: "Box Braids Care",
+		stylist: "Zainab Mohamed",
+		beforeAfter: false,
+	},
+	{
+		img: "IMG/natural hair care.webp",
+		title: "Natural Hair Care",
+		stylist: "Grace Wanjiku",
+		beforeAfter: false,
+	},
+	{
+		img: "IMG/twist-braids.jpg",
+		title: "Twist Braids",
+		stylist: "Amina Diallo",
+		beforeAfter: false,
+	},
 ]
+
+let showAllGallery = false
 
 const testimonialsData = [
 	{
@@ -252,7 +276,10 @@ function renderServices(filter = "all") {
 	grid.innerHTML = filtered
 		.map(
 			(s, i) => `
-    <div class="service-card animate-on-scroll visible delay-${(i % 4) + 1}">
+    <div class="service-card animate-on-scroll visible delay-${(i % 4) + 1}" id="service-${s.name
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-|-$/g, "")}">
       <div class="service-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPaths[s.icon] || iconPaths.scissors}</svg>
       </div>
@@ -274,10 +301,11 @@ function renderServices(filter = "all") {
 
 function renderGallery() {
 	const grid = document.getElementById("galleryGrid")
-	grid.innerHTML = galleryData
+	const dataToShow = showAllGallery ? galleryData : galleryData.slice(0, 8)
+	grid.innerHTML = dataToShow
 		.map(
 			(g, i) => `
-    <div class="gallery-item ${g.tall ? "tall" : ""} ${g.wide ? "wide" : ""}" onclick="openLightbox(${i})">
+    <div class="gallery-item" onclick="openLightbox(${i})" style="animation-delay: ${i * 0.1}s">
       <img src="${g.img}" alt="${g.title}" loading="lazy">
       <div class="gallery-overlay">
         <h4>${g.title}</h4>
@@ -288,6 +316,13 @@ function renderGallery() {
   `,
 		)
 		.join("")
+}
+
+function toggleGalleryView() {
+	showAllGallery = !showAllGallery
+	renderGallery()
+	const button = document.getElementById("viewAllGallery")
+	button.textContent = showAllGallery ? "View Less Braids" : "View All Braids"
 }
 
 function renderTestimonials() {
@@ -610,6 +645,9 @@ mutationObserver.observe(document.body, { childList: true, subtree: true })
 // ============ INITIALIZE ============
 renderServices()
 renderGallery()
+document
+	.getElementById("viewAllGallery")
+	.addEventListener("click", toggleGalleryView)
 renderTestimonials()
 populateServiceSelect()
 populateTimeSlots()

@@ -397,8 +397,8 @@ h6 {
 }
 
 .logo-icon {
-    width: 40px;
-    height: 40px;
+    width: 65px;
+    height: 65px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1131,14 +1131,8 @@ h6 {
     overflow: hidden;
     cursor: pointer;
     aspect-ratio: 1;
-}
-
-.gallery-item.tall {
-    grid-row: span 2;
-}
-
-.gallery-item.wide {
-    grid-column: span 2;
+    animation: fadeIn 0.6s ease forwards;
+    opacity: 0;
 }
 
 .gallery-item img {
@@ -1146,6 +1140,18 @@ h6 {
     height: 100%;
     object-fit: cover;
     transition: var(--transition);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .gallery-overlay {
@@ -1192,15 +1198,14 @@ h6 {
     margin-top: 8px;
 }
 
+.gallery-actions {
+    text-align: center;
+    margin-top: 2rem;
+}
+
 @media (max-width: 900px) {
     .gallery-grid {
         grid-template-columns: repeat(2, 1fr);
-    }
-
-    .gallery-item.tall,
-    .gallery-item.wide {
-        grid-row: auto;
-        grid-column: auto;
     }
 }
 
@@ -1639,6 +1644,12 @@ h6 {
     transition: var(--transition);
 }
 
+.social-link i {
+    font-size: 20px;
+    color: var(--text-secondary);
+    transition: var(--transition-fast);
+}
+
 .social-link svg {
     width: 20px;
     height: 20px;
@@ -1650,6 +1661,10 @@ h6 {
 .social-link:hover {
     background: var(--primary);
     border-color: var(--primary);
+}
+
+.social-link:hover i {
+    color: #0A0A0A;
 }
 
 .social-link:hover svg {
