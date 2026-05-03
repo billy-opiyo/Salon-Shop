@@ -600,23 +600,24 @@ document.addEventListener("keydown", (e) => {
 	}
 })
 
-// ============ NEWSLETTER ============
-document
-	.getElementById("newsletterForm")
-	.addEventListener("submit", function (e) {
-		e.preventDefault()
-		const msg = document.getElementById("newsletterMessage")
-		const input = this.querySelector("input")
+// ============ CONTACT FORM ============
+document.getElementById("contactForm").addEventListener("submit", function (e) {
+	e.preventDefault()
+	const msg = document.getElementById("contactMessage")
+	const inputs = this.querySelectorAll("input, textarea")
 
-		msg.className = "form-message success"
-		msg.textContent = "🎉 Welcome aboard! Check your inbox for a welcome email."
-		msg.style.display = "block"
-		input.value = ""
+	msg.className = "form-message success"
+	msg.textContent =
+		"✅ Thank you! Your message has been sent. We'll get back to you within 24 hours."
+	msg.style.display = "block"
 
-		setTimeout(() => {
-			msg.style.display = "none"
-		}, 5000)
-	})
+	// Clear form
+	inputs.forEach((input) => (input.value = ""))
+
+	setTimeout(() => {
+		msg.style.display = "none"
+	}, 5000)
+})
 
 // ============ SMOOTH SCROLL FOR ALL ANCHOR LINKS ============
 document.querySelectorAll('a[href^="#"]').forEach((anchor) => {

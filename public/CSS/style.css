@@ -1471,11 +1471,57 @@ h6 {
 }
 
 .newsletter-form {
-    display: flex;
-    gap: 12px;
     max-width: 500px;
     margin: 0 auto;
     position: relative;
+}
+
+.contact-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.contact-form-grid .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.contact-form-grid .form-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.contact-form-grid .form-group.full {
+    grid-column: 1 / -1;
+}
+
+.contact-form-grid input,
+.contact-form-grid textarea {
+    font-family: inherit;
+    font-size: 1rem;
+    border: 2px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 14px 18px;
+    border-radius: var(--radius-sm);
+    transition: var(--transition-fast);
+    width: 100%;
+}
+
+.contact-form-grid input:focus,
+.contact-form-grid textarea:focus {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow: 0 0 0 4px var(--shadow);
+}
+
+.contact-form-grid textarea {
+    resize: vertical;
+    min-height: 100px;
 }
 
 .newsletter-form input {
@@ -1484,6 +1530,10 @@ h6 {
 
 .newsletter-form button {
     white-space: nowrap;
+    width: auto;
+    max-width: 200px;
+    margin: 0 auto;
+    display: block;
 }
 
 @media (max-width: 600px) {
@@ -1491,8 +1541,8 @@ h6 {
         padding: 40px 20px;
     }
 
-    .newsletter-form {
-        flex-direction: column;
+    .contact-form-grid {
+        grid-template-columns: 1fr;
     }
 }
 
