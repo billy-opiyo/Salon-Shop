@@ -603,21 +603,68 @@ document.addEventListener("keydown", (e) => {
 // ============ CONTACT FORM ============
 document.getElementById("contactForm").addEventListener("submit", function (e) {
 	e.preventDefault()
-	const msg = document.getElementById("contactMessage")
-	const inputs = this.querySelectorAll("input, textarea")
 
-	msg.className = "form-message success"
-	msg.textContent =
-		"✅ Thank you! Your message has been sent. We'll get back to you within 24 hours."
-	msg.style.display = "block"
+	const form = this
+	const submitBtn = this.querySelector('button[type="submit"]')
+	if (submitBtn) {
+		submitBtn.disabled = true
+		submitBtn.textContent = "Sending..."
+	}
 
-	// Clear form
-	inputs.forEach((input) => (input.value = ""))
+	const formData = new FormData(form)
 
-	setTimeout(() => {
-		msg.style.display = "none"
-	}, 5000)
+	fetch(form.action, {
+		method: "POST",
+		body: formData,
+		headers: {
+			Accept: "application/json",
+		},
+	})
+		.then((response) => {
+			if (!response.ok) throw new Error("Failed to send message")
+			form.reset()
+			showContactSuccessPopup()
+		})
+		.catch(() => {
+			// Keep the user on the same page even if sending fails.
+		})
+		.finally(() => {
+			if (submitBtn) {
+				submitBtn.disabled = false
+				submitBtn.textContent = "Send Message"
+			}
+		})
 })
+
+const contactSuccessPopup = document.getElementById("contactSuccessPopup")
+const contactSuccessPopupClose = document.getElementById(
+	"contactSuccessPopupClose",
+)
+let contactPopupTimeout
+
+function hideContactSuccessPopup() {
+	if (!contactSuccessPopup) return
+	contactSuccessPopup.classList.remove("show")
+	if (contactPopupTimeout) {
+		clearTimeout(contactPopupTimeout)
+		contactPopupTimeout = null
+	}
+}
+
+function showContactSuccessPopup() {
+	if (!contactSuccessPopup) return
+	contactSuccessPopup.classList.add("show")
+	if (contactPopupTimeout) {
+		clearTimeout(contactPopupTimeout)
+	}
+	contactPopupTimeout = setTimeout(() => {
+		hideContactSuccessPopup()
+	}, 5000)
+}
+
+if (contactSuccessPopupClose) {
+	contactSuccessPopupClose.addEventListener("click", hideContactSuccessPopup)
+}
 
 // ============ SMOOTH SCROLL FOR ALL ANCHOR LINKS ============
 document.querySelectorAll('a[href^="#"]').forEach((anchor) => {

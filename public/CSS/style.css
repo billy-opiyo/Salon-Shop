@@ -2017,6 +2017,123 @@ body.light-mode input[type="datetime-local"]::-webkit-calendar-picker-indicator 
     display: block;
 }
 
+/* ============ CONTACT SUCCESS POPUP ============ */
+.contact-success-popup {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 1500;
+    width: min(420px, calc(100vw - 32px));
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: var(--radius);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(200, 150, 62, 0.08);
+    padding: 16px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-14px) translateX(12px);
+    pointer-events: none;
+    transition: opacity 0.35s ease, transform 0.35s ease, visibility 0.35s ease;
+    overflow: hidden;
+}
+
+.contact-success-popup__close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    line-height: 1;
+    transition: var(--transition-fast);
+}
+
+.contact-success-popup__close:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+    transform: scale(1.05);
+}
+
+.contact-success-popup.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) translateX(0);
+}
+
+.contact-success-popup::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--gradient-gold);
+    transform-origin: left;
+    transform: scaleX(0);
+}
+
+.contact-success-popup.show::after {
+    animation: popupTimer 5s linear forwards;
+}
+
+.contact-success-popup__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(200, 150, 62, 0.16);
+    border: 1px solid rgba(200, 150, 62, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.contact-success-popup__icon svg {
+    width: 18px;
+    height: 18px;
+    stroke: var(--primary);
+}
+
+.contact-success-popup__content h4 {
+    font-size: 1rem;
+    margin-bottom: 2px;
+    color: var(--text-primary);
+    padding-right: 24px;
+}
+
+.contact-success-popup__content p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+@keyframes popupTimer {
+    from {
+        transform: scaleX(1);
+    }
+
+    to {
+        transform: scaleX(0);
+    }
+}
+
+@media (max-width: 600px) {
+    .contact-success-popup {
+        top: 14px;
+        right: 8px;
+    }
+}
+
 select option {
     background: var(--bg-card);
     color: var(--text-primary);

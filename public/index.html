@@ -697,8 +697,16 @@
 							</div>
 							<div class="contact-item-text">
 								<h4>Phone</h4>
-								<p><a href="tel:+254700123456">+254 700 123 456</a></p>
-								<p><a href="tel:+254711987654">+254 711 987 654</a></p>
+								<p>
+									<a href="tel:+254700123456" target="_blank"
+										>+254 700 123 456</a
+									>
+								</p>
+								<p>
+									<a href="tel:+254711987654" target="_blank"
+										>+254 711 987 654</a
+									>
+								</p>
 							</div>
 						</div>
 						<div class="contact-item">
@@ -719,10 +727,12 @@
 							<div class="contact-item-text">
 								<h4>Email</h4>
 								<p>
-									<a href="mailto:info@royalbraids.ke">info@royalbraids.ke</a>
+									<a href="mailto:info@royalbraids.ke" target="_blank"
+										>info@royalbraids.ke</a
+									>
 								</p>
 								<p>
-									<a href="mailto:bookings@royalbraids.ke"
+									<a href="mailto:bookings@royalbraids.ke" target="_blank"
 										>bookings@royalbraids.ke</a
 									>
 								</p>
@@ -784,7 +794,19 @@
 						Have questions about our services or need assistance? Send us a
 						message and we'll get back to you soon.
 					</p>
-					<form class="newsletter-form" id="contactForm">
+					<form
+						class="newsletter-form"
+						id="contactForm"
+						action="https://formsubmit.co/halishiram@gmail.com"
+						method="POST"
+					>
+						<input
+							type="hidden"
+							name="_subject"
+							value="New Contact Message - Royal Braids"
+						/>
+						<input type="hidden" name="_template" value="table" />
+						<input type="hidden" name="_captcha" value="false" />
 						<div class="contact-form-grid">
 							<div class="form-group">
 								<label for="contactName">Name *</label>
@@ -831,7 +853,7 @@
 					</form>
 					<div
 						class="form-message"
-						id="contactMessage"
+						id="contactFormMessage"
 						style="margin-top: 16px"
 					></div>
 				</div>
@@ -925,9 +947,15 @@
 						<h4>Contact Info</h4>
 						<ul class="footer-links">
 							<li>📍 Westlands, Nairobi</li>
-							<li><a href="tel:+254700123456">📞 +254 700 123 456</a></li>
 							<li>
-								<a href="mailto:info@royalcuts.ke">✉ info@royalbraids.ke</a>
+								<a href="tel:+254700123456" target="_blank"
+									>📞 +254 700 123 456</a
+								>
+							</li>
+							<li>
+								<a href="mailto:info@royalcuts.ke" target="_blank"
+									>📧 info@royalbraids.ke</a
+								>
 							</li>
 							<li>🕐 Mon-Fri: 8AM - 8PM</li>
 							<li>🕐 Sat-Sun: 9AM - 7PM</li>
@@ -948,6 +976,37 @@
 			<button class="lightbox-nav lightbox-next" id="lightboxNext">❯</button>
 			<img src="" alt="" id="lightboxImg" />
 			<div class="lightbox-caption" id="lightboxCaption"></div>
+		</div>
+
+		<!-- ========== CONTACT SUCCESS POPUP ========== -->
+		<div
+			class="contact-success-popup"
+			id="contactSuccessPopup"
+			role="status"
+			aria-live="polite"
+		>
+			<button
+				class="contact-success-popup__close"
+				id="contactSuccessPopupClose"
+				aria-label="Close notification"
+			>
+				✕
+			</button>
+			<div class="contact-success-popup__icon" aria-hidden="true">
+				<svg
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke-width="2.4"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M22 11.08V12a10 10 0 11-5.93-9.14"></path>
+					<polyline points="22 4 12 14.01 9 11.01"></polyline>
+				</svg>
+			</div>
+			<div class="contact-success-popup__content">
+				<h4>Message was sent successfully.</h4>
+			</div>
 		</div>
 
 		<!-- ========== BACK TO TOP ========== -->
