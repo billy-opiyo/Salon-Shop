@@ -85,6 +85,48 @@ textarea {
     width: 100%;
 }
 
+select {
+    cursor: pointer;
+}
+
+input[type="color"] {
+    cursor: pointer;
+}
+
+input[type="date"],
+input[type="time"],
+input[type="month"],
+input[type="week"],
+input[type="datetime-local"] {
+    cursor: pointer;
+    color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 1;
+    filter: invert(1);
+}
+
+body:not(.light-mode) input[type="date"]::-webkit-calendar-picker-indicator,
+body:not(.light-mode) input[type="time"]::-webkit-calendar-picker-indicator,
+body:not(.light-mode) input[type="month"]::-webkit-calendar-picker-indicator,
+body:not(.light-mode) input[type="week"]::-webkit-calendar-picker-indicator,
+body:not(.light-mode) input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) brightness(1.8) !important;
+    opacity: 1 !important;
+}
+
+input[type="color"]::-webkit-color-swatch,
+input[type="color"]::-webkit-color-swatch,
+input[type="color"]::-webkit-color-swatch-wrapper {
+    cursor: pointer;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -1806,6 +1848,23 @@ body.light-mode .header-inner .logo span,
 body.light-mode .header-inner .logo {
     -webkit-text-fill-color: var(--accent-brown);
     background: none;
+}
+
+body.light-mode input[type="date"],
+body.light-mode input[type="time"],
+body.light-mode input[type="month"],
+body.light-mode input[type="week"],
+body.light-mode input[type="datetime-local"] {
+    color-scheme: light;
+}
+
+body.light-mode input[type="date"]::-webkit-calendar-picker-indicator,
+body.light-mode input[type="time"]::-webkit-calendar-picker-indicator,
+body.light-mode input[type="month"]::-webkit-calendar-picker-indicator,
+body.light-mode input[type="week"]::-webkit-calendar-picker-indicator,
+body.light-mode input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: none !important;
+    opacity: 1 !important;
 }
 
 /* ============ LIGHTBOX ============ */
