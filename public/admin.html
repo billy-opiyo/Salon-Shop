@@ -15,18 +15,22 @@
 		<link rel="stylesheet" href="CSS/style.css" />
 		<link rel="icon" type="image/x-icon" href="IMG/Royal Braids logo.png" />
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 		<script>
 			window.APP_CONFIG = {
 				firebase: {
-					apiKey: "AIzaSyCMhKuG4pvzFPxmGiyyjM9haQlP7flTbl4",
+					apiKey: "AIzaSyAyVcRjG55o6nwaXpRzZyt2BtX2RamGEqg",
 					authDomain: "services-website-billydev.firebaseapp.com",
 					projectId: "services-website-billydev",
 					storageBucket: "services-website-billydev.firebasestorage.app",
 					messagingSenderId: "712913782427",
 					appId: "1:712913782427:web:e997553d71bd9a1f6a283e",
 					measurementId: "G-B6LVQBEN3G",
+				},
+				appCheck: {
+					siteKey: "6Lc4U9wsAAAAANRRyprzqkkNZ7iOI98qE0nb6hJO",
 				},
 				admin: {
 					allowedEmails: ["billyopiyo597@gmail.com"],
@@ -52,8 +56,14 @@
 
 				<div class="admin-auth-card">
 					<div class="admin-auth-actions">
-						<div class="admin-user-state" id="adminUserState">Not logged in</div>
-						<button class="btn btn-outline" id="adminLogoutBtn" style="display: none">
+						<div class="admin-user-state" id="adminUserState">
+							Not logged in
+						</div>
+						<button
+							class="btn btn-outline"
+							id="adminLogoutBtn"
+							style="display: none"
+						>
 							Log Out
 						</button>
 					</div>
@@ -82,8 +92,14 @@
 						</button>
 					</form>
 
-					<div class="form-message" id="adminAuthMessage" style="display: none"></div>
-					<p class="admin-auth-tip">Only authorized admin accounts can access this panel.</p>
+					<div
+						class="form-message"
+						id="adminAuthMessage"
+						style="display: none"
+					></div>
+					<p class="admin-auth-tip">
+						Only authorized admin accounts can access this panel.
+					</p>
 				</div>
 
 				<div class="admin-panel" id="adminPanel">
@@ -104,9 +120,17 @@
 							<div class="label">Completed</div>
 							<strong id="adminCompletedCount">0</strong>
 						</div>
+						<div class="admin-stat-card">
+							<div class="label">Cancelled</div>
+							<strong id="adminCancelledCount">0</strong>
+						</div>
 					</div>
 
-					<div class="form-message" id="adminActionMessage" style="display: none"></div>
+					<div
+						class="form-message"
+						id="adminActionMessage"
+						style="display: none"
+					></div>
 					<div class="admin-bookings-list" id="adminBookingsList"></div>
 				</div>
 			</div>

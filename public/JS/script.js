@@ -269,6 +269,7 @@ const timeSlots = [
 const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
 const cloudinaryConfig = appConfig.cloudinary || {}
+const appCheckConfig = appConfig.appCheck || {}
 
 let firebaseReady = false
 let db = null
@@ -302,6 +303,13 @@ async function initializeFirebaseServices() {
 
 	if (!firebase.apps.length) {
 		firebase.initializeApp(firebaseConfig)
+	}
+
+	if (
+		typeof firebase.appCheck === "function" &&
+		appCheckConfig.siteKey
+	) {
+		firebase.appCheck().activate(appCheckConfig.siteKey, true)
 	}
 
 	auth = firebase.auth()
@@ -673,12 +681,21 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 	btn.textContent = "Processing..."
 	;(async () => {
 		try {
-			if (!auth.currentUser) {
+			let activeUid = auth.currentUser?.uid || null
+
+			if (!activeUid) {
 				try {
-					await auth.signInAnonymously()
+					const userCredential = await auth.signInAnonymously()
+					activeUid = userCredential?.user?.uid || auth.currentUser?.uid || null
 				} catch (error) {
 					throw new Error(getFriendlyAuthError(error))
 				}
+			}
+
+			if (!activeUid) {
+				throw new Error(
+					"Unable to authenticate booking session. Please refresh and try again.",
+				)
 			}
 
 			let inspirationImageUrl = ""
@@ -704,7 +721,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 					time: data.time,
 					stylistKey,
 					bookingId: bookingRef.id,
-					uid: auth.currentUser?.uid || null,
+					uid: activeUid,
 					createdAt: firebase.firestore.FieldValue.serverTimestamp(),
 					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
 				})
@@ -723,7 +740,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 					notes: data.notes || "",
 					inspirationImageUrl,
 					status: "confirmed",
-					uid: auth.currentUser?.uid || null,
+					uid: activeUid,
 					createdAt: firebase.firestore.FieldValue.serverTimestamp(),
 					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
 				})

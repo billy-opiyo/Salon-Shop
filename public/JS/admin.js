@@ -1,6 +1,7 @@
 const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
 const adminConfig = appConfig.admin || {}
+const appCheckConfig = appConfig.appCheck || {}
 
 let firebaseReady = false
 let db = null
@@ -196,16 +197,21 @@ function renderAdminBookings(docs) {
 	const completed = normalizedDocs.filter(
 		(b) => b.status === "completed",
 	).length
+	const cancelled = normalizedDocs.filter(
+		(b) => b.status === "cancelled",
+	).length
 
 	const totalEl = document.getElementById("adminTotalCount")
 	const pendingEl = document.getElementById("adminPendingCount")
 	const confirmedEl = document.getElementById("adminConfirmedCount")
 	const completedEl = document.getElementById("adminCompletedCount")
+	const cancelledEl = document.getElementById("adminCancelledCount")
 
 	if (totalEl) totalEl.textContent = String(total)
 	if (pendingEl) pendingEl.textContent = String(pending)
 	if (confirmedEl) confirmedEl.textContent = String(confirmed)
 	if (completedEl) completedEl.textContent = String(completed)
+	if (cancelledEl) cancelledEl.textContent = String(cancelled)
 
 	if (!normalizedDocs.length) {
 		list.innerHTML =
@@ -477,6 +483,10 @@ async function initializeFirebaseServices() {
 
 	if (!firebase.apps.length) {
 		firebase.initializeApp(firebaseConfig)
+	}
+
+	if (typeof firebase.appCheck === "function" && appCheckConfig.siteKey) {
+		firebase.appCheck().activate(appCheckConfig.siteKey, true)
 	}
 
 	auth = firebase.auth()
