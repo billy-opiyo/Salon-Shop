@@ -265,6 +265,139 @@ const timeSlots = [
 	"7:00 PM",
 ]
 
+// ============ FIREBASE + CLOUDINARY CONFIG ============
+const appConfig = window.APP_CONFIG || {}
+const firebaseConfig = appConfig.firebase || {}
+const cloudinaryConfig = appConfig.cloudinary || {}
+
+let firebaseReady = false
+let db = null
+let auth = null
+let activeAvailabilityUnsubscribe = null
+
+function getFriendlyAuthError(error) {
+	if (error?.code === "auth/admin-restricted-operation") {
+		return "Anonymous sign-in is disabled. In Firebase Console, go to Authentication → Sign-in method and enable Anonymous provider."
+	}
+
+	if (error?.code === "auth/operation-not-allowed") {
+		return "This sign-in method is not enabled. Enable Anonymous provider in Firebase Authentication settings."
+	}
+
+	return error?.message || "Authentication failed"
+}
+
+function canInitializeFirebase() {
+	return (
+		typeof firebase !== "undefined" &&
+		firebaseConfig.apiKey &&
+		firebaseConfig.authDomain &&
+		firebaseConfig.projectId &&
+		firebaseConfig.appId
+	)
+}
+
+async function initializeFirebaseServices() {
+	if (!canInitializeFirebase()) return
+
+	if (!firebase.apps.length) {
+		firebase.initializeApp(firebaseConfig)
+	}
+
+	auth = firebase.auth()
+	db = firebase.firestore()
+
+
+	firebaseReady = true
+}
+
+function getSlotId(date, stylist, time) {
+	const stylistKey = stylist && stylist.trim() ? stylist : "any"
+	const normalizedTime = time.replace(/\s+/g, "").replace(/[:]/g, "")
+	return `${date}__${stylistKey}__${normalizedTime}`
+}
+
+async function uploadImageToCloudinary(file) {
+	if (!file) return ""
+	if (!cloudinaryConfig.cloudName || !cloudinaryConfig.uploadPreset) {
+		throw new Error("Cloudinary config is missing")
+	}
+
+	const endpoint = `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`
+	const body = new FormData()
+	body.append("file", file)
+	body.append("upload_preset", cloudinaryConfig.uploadPreset)
+	if (cloudinaryConfig.folder) {
+		body.append("folder", cloudinaryConfig.folder)
+	}
+
+	const response = await fetch(endpoint, {
+		method: "POST",
+		body,
+	})
+
+	if (!response.ok) {
+		throw new Error("Failed to upload image to Cloudinary")
+	}
+
+	const result = await response.json()
+	return result.secure_url || ""
+}
+
+function subscribeToAvailability(date, stylist) {
+	if (!firebaseReady || !db || !date) return
+
+	if (typeof activeAvailabilityUnsubscribe === "function") {
+		activeAvailabilityUnsubscribe()
+		activeAvailabilityUnsubscribe = null
+	}
+
+	const stylistKey = stylist && stylist.trim() ? stylist : "any"
+	const timeSelect = document.getElementById("timeSelect")
+	const startId = `${date}__${stylistKey}__`
+	const endId = `${date}__${stylistKey}__\uf8ff`
+
+	const query = db
+		.collection("bookingSlots")
+		.where(firebase.firestore.FieldPath.documentId(), ">=", startId)
+		.where(firebase.firestore.FieldPath.documentId(), "<=", endId)
+
+	activeAvailabilityUnsubscribe = query.onSnapshot(
+		(snapshot) => {
+			const taken = new Set()
+			snapshot.forEach((doc) => {
+				const data = doc.data()
+				if (data.taken && data.time) taken.add(data.time)
+			})
+
+			timeSelect.innerHTML = '<option value="">Select Time</option>'
+			timeSlots.forEach((slot) => {
+				if (taken.has(slot)) return
+				const opt = document.createElement("option")
+				opt.value = slot
+				opt.textContent = slot
+				timeSelect.appendChild(opt)
+			})
+		},
+		(error) => {
+			console.error("Realtime availability listener failed:", error)
+		},
+	)
+}
+
+function handleAvailabilityWatch() {
+	const dateValue = document.getElementById("datePicker").value
+	const stylistValue = document.getElementById("stylistSelect").value
+	if (!dateValue) {
+		populateTimeSlots()
+		return
+	}
+
+	if (firebaseReady) {
+		subscribeToAvailability(dateValue, stylistValue)
+	}
+}
+
 // ============ RENDER FUNCTIONS ============
 
 function renderServices(filter = "all") {
@@ -371,6 +504,7 @@ function populateServiceSelect() {
 
 function populateTimeSlots() {
 	const select = document.getElementById("timeSelect")
+	select.innerHTML = '<option value="">Select Time</option>'
 	timeSlots.forEach((t) => {
 		const opt = document.createElement("option")
 		opt.value = t
@@ -511,25 +645,113 @@ function selectService(name) {
 
 document.getElementById("bookingForm").addEventListener("submit", function (e) {
 	e.preventDefault()
+
+	const form = this
 	const btn = document.getElementById("submitBtn")
 	const msg = document.getElementById("bookingMessage")
+	const imageInput = document.getElementById("inspirationImage")
+
+	const data = Object.fromEntries(new FormData(form).entries())
+	const stylistKey = data.stylist && data.stylist.trim() ? data.stylist : "any"
+	const slotId = getSlotId(data.date, stylistKey, data.time)
+
+	msg.className = "form-message"
+	msg.textContent = ""
+	msg.style.display = "none"
+
+	if (!firebaseReady || !db || !auth) {
+		msg.className = "form-message error"
+		msg.textContent =
+			"⚠️ Booking service is not configured yet. Add Firebase keys in APP_CONFIG."
+		msg.style.display = "block"
+		return
+	}
+
 
 	btn.classList.add("loading")
+	btn.disabled = true
 	btn.textContent = "Processing..."
+	;(async () => {
+		try {
+			if (!auth.currentUser) {
+				try {
+					await auth.signInAnonymously()
+				} catch (error) {
+					throw new Error(getFriendlyAuthError(error))
+				}
+			}
 
-	setTimeout(() => {
-		btn.classList.remove("loading")
-		this.style.display = "none"
-		document.getElementById("bookingSuccess").style.display = "block"
+			let inspirationImageUrl = ""
+			const selectedFile = imageInput?.files?.[0]
+			if (selectedFile) {
+				inspirationImageUrl = await uploadImageToCloudinary(selectedFile)
+			}
 
-		msg.className = "form-message success"
-		msg.textContent = "✅ Booking confirmed! Check your email for details."
-		msg.style.display = "block"
-	}, 1500)
+			const bookingRef = db.collection("bookings").doc()
+			const slotRef = db.collection("bookingSlots").doc(slotId)
+
+			await db.runTransaction(async (transaction) => {
+				const slotDoc = await transaction.get(slotRef)
+				if (slotDoc.exists && slotDoc.data().taken) {
+					throw new Error(
+						"This time slot was just taken. Please choose another one.",
+					)
+				}
+
+				transaction.set(slotRef, {
+					taken: true,
+					date: data.date,
+					time: data.time,
+					stylistKey,
+					bookingId: bookingRef.id,
+					uid: auth.currentUser?.uid || null,
+					createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+				})
+
+				transaction.set(bookingRef, {
+					firstName: data.firstName || "",
+					lastName: data.lastName || "",
+					email: data.email || "",
+					phone: data.phone || "",
+					service: data.service || "",
+					stylist: data.stylist || "",
+					stylistKey,
+					date: data.date || "",
+					time: data.time || "",
+					slotId,
+					notes: data.notes || "",
+					inspirationImageUrl,
+					status: "confirmed",
+					uid: auth.currentUser?.uid || null,
+					createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+				})
+			})
+
+			form.style.display = "none"
+			document.getElementById("bookingSuccess").style.display = "block"
+			msg.className = "form-message success"
+			msg.textContent = "✅ Booking confirmed and saved in realtime!"
+			msg.style.display = "block"
+
+			handleAvailabilityWatch()
+		} catch (error) {
+			console.error("Booking failed:", error)
+			msg.className = "form-message error"
+			msg.textContent = `❌ ${error.message || "Booking failed. Please try again."}`
+			msg.style.display = "block"
+		} finally {
+			btn.classList.remove("loading")
+			btn.disabled = false
+			btn.textContent = "Confirm Booking"
+		}
+	})()
 })
 
 function resetBooking() {
 	document.getElementById("bookingForm").reset()
+	populateTimeSlots()
 	document.getElementById("bookingForm").style.display = "block"
 	document.getElementById("bookingSuccess").style.display = "none"
 	document.getElementById("bookingMessage").style.display = "none"
@@ -699,3 +921,16 @@ document
 renderTestimonials()
 populateServiceSelect()
 populateTimeSlots()
+
+// Initialize booking integrations
+initializeFirebaseServices().then(() => {
+	const stylistSelect = document.getElementById("stylistSelect")
+	const dateInput = document.getElementById("datePicker")
+
+	if (stylistSelect) {
+		stylistSelect.addEventListener("change", handleAvailabilityWatch)
+	}
+	if (dateInput) {
+		dateInput.addEventListener("change", handleAvailabilityWatch)
+	}
+})

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Royal Braids Admin</title>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700;800&display=swap"
+			rel="stylesheet"
+		/>
+		<link
+			rel="stylesheet"
+			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+		/>
+		<link rel="stylesheet" href="CSS/style.css" />
+		<link rel="icon" type="image/x-icon" href="IMG/Royal Braids logo.png" />
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+		<script>
+			window.APP_CONFIG = {
+				firebase: {
+					apiKey: "AIzaSyCMhKuG4pvzFPxmGiyyjM9haQlP7flTbl4",
+					authDomain: "services-website-billydev.firebaseapp.com",
+					projectId: "services-website-billydev",
+					storageBucket: "services-website-billydev.firebasestorage.app",
+					messagingSenderId: "712913782427",
+					appId: "1:712913782427:web:e997553d71bd9a1f6a283e",
+					measurementId: "G-B6LVQBEN3G",
+				},
+				admin: {
+					allowedEmails: ["billyopiyo597@gmail.com"],
+				},
+			}
+		</script>
+		<script src="JS/admin.js" defer></script>
+	</head>
+	<body>
+		<section class="admin-bookings" id="admin">
+			<div class="container">
+				<div class="admin-bookings-header">
+					<div class="section-subtitle">Admin Console</div>
+					<h1 class="section-title">Bookings Management</h1>
+					<p class="section-desc">
+						Sign in with your admin account to review and manage customer
+						bookings in realtime.
+					</p>
+					<p style="margin-top: 12px">
+						<a class="btn btn-outline" href="index.html">← Back to Homepage</a>
+					</p>
+				</div>
+
+				<div class="admin-auth-card">
+					<div class="admin-auth-actions">
+						<div class="admin-user-state" id="adminUserState">Not logged in</div>
+						<button class="btn btn-outline" id="adminLogoutBtn" style="display: none">
+							Log Out
+						</button>
+					</div>
+
+					<form class="admin-auth-form" id="adminLoginForm">
+						<div class="form-group">
+							<label for="adminEmail">Admin Email</label>
+							<input
+								type="email"
+								id="adminEmail"
+								placeholder="you@example.com"
+								required
+							/>
+						</div>
+						<div class="form-group">
+							<label for="adminPassword">Password</label>
+							<input
+								type="password"
+								id="adminPassword"
+								placeholder="••••••••"
+								required
+							/>
+						</div>
+						<button type="submit" class="btn btn-primary" id="adminLoginBtn">
+							Sign In
+						</button>
+					</form>
+
+					<div class="form-message" id="adminAuthMessage" style="display: none"></div>
+					<p class="admin-auth-tip">Only authorized admin accounts can access this panel.</p>
+				</div>
+
+				<div class="admin-panel" id="adminPanel">
+					<div class="admin-stats">
+						<div class="admin-stat-card">
+							<div class="label">Total</div>
+							<strong id="adminTotalCount">0</strong>
+						</div>
+						<div class="admin-stat-card">
+							<div class="label">Pending</div>
+							<strong id="adminPendingCount">0</strong>
+						</div>
+						<div class="admin-stat-card">
+							<div class="label">Confirmed</div>
+							<strong id="adminConfirmedCount">0</strong>
+						</div>
+						<div class="admin-stat-card">
+							<div class="label">Completed</div>
+							<strong id="adminCompletedCount">0</strong>
+						</div>
+					</div>
+
+					<div class="form-message" id="adminActionMessage" style="display: none"></div>
+					<div class="admin-bookings-list" id="adminBookingsList"></div>
+				</div>
+			</div>
+		</section>
+	</body>
+</html>

@@ -438,6 +438,15 @@
 									</select>
 								</div>
 								<div class="form-group full">
+									<label>Inspiration Photo (Optional)</label>
+									<input
+										type="file"
+										name="inspirationImage"
+										id="inspirationImage"
+										accept="image/*"
+									/>
+								</div>
+								<div class="form-group full">
 									<label>Special Requests</label>
 									<textarea
 										name="notes"
@@ -1024,5 +1033,30 @@
 				<polyline points="18 15 12 9 6 15"></polyline>
 			</svg>
 		</a>
+
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+		<script>
+			window.APP_CONFIG = {
+				firebase: {
+					apiKey: "AIzaSyCMhKuG4pvzFPxmGiyyjM9haQlP7flTbl4",
+					authDomain: "services-website-billydev.firebaseapp.com",
+					projectId: "services-website-billydev",
+					storageBucket: "services-website-billydev.firebasestorage.app",
+					messagingSenderId: "712913782427",
+					appId: "1:712913782427:web:e997553d71bd9a1f6a283e",
+					measurementId: "G-B6LVQBEN3G",
+				},
+				cloudinary: {
+					cloudName: "dil8nacay",
+					uploadPreset: "royal-braids",
+					folder: "royal-braids/bookings",
+				},
+				admin: {
+					allowedEmails: ["billyopiyo597@gmail.com"],
+				},
+			}
+		</script>
 	</body>
 </html>
