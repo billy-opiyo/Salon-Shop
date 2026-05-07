@@ -1272,6 +1272,81 @@ h6 {
     gap: 18px;
 }
 
+.admin-section-tabs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.admin-section-tab {
+    padding: 9px 16px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: var(--transition-fast);
+}
+
+.admin-section-tab:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.admin-section-tab.active {
+    background: var(--primary);
+    color: #0A0A0A;
+    border-color: var(--primary);
+}
+
+.admin-management-section {
+    display: none;
+}
+
+.admin-management-section.active {
+    display: block;
+    animation: fadeIn 0.25s ease;
+}
+
+.admin-section-card-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.admin-section-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    display: grid;
+    gap: 12px;
+}
+
+.admin-section-card h3 {
+    font-size: 1.05rem;
+}
+
+.admin-section-card p {
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+
+.admin-section-card ul {
+    display: grid;
+    gap: 8px;
+    list-style: none;
+    padding-left: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.admin-section-card .btn {
+    justify-self: start;
+}
+
 .admin-stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(120px, 1fr));
@@ -1462,6 +1537,15 @@ h6 {
 @media (max-width: 900px) {
     .admin-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-section-tabs {
+        width: 100%;
+    }
+
+    .admin-section-tab {
+        flex: 1;
+        justify-content: center;
     }
 
     .admin-auth-form {

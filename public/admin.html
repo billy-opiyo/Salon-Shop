@@ -44,10 +44,10 @@
 			<div class="container">
 				<div class="admin-bookings-header">
 					<div class="section-subtitle">Admin Console</div>
-					<h1 class="section-title">Bookings Management</h1>
+					<h1 class="section-title">Content & Booking Management</h1>
 					<p class="section-desc">
-						Sign in with your admin account to review and manage customer
-						bookings in realtime.
+						Sign in with your admin account to manage Bookings, Gallery, and
+						Reviews from one categorized control panel.
 					</p>
 					<p style="margin-top: 12px">
 						<a class="btn btn-outline" href="index.html">← Back to Homepage</a>
@@ -103,35 +103,133 @@
 				</div>
 
 				<div class="admin-panel" id="adminPanel">
-					<div class="admin-stats">
-						<div class="admin-stat-card">
-							<div class="label">Total</div>
-							<strong id="adminTotalCount">0</strong>
-						</div>
-						<div class="admin-stat-card">
-							<div class="label">Pending</div>
-							<strong id="adminPendingCount">0</strong>
-						</div>
-						<div class="admin-stat-card">
-							<div class="label">Confirmed</div>
-							<strong id="adminConfirmedCount">0</strong>
-						</div>
-						<div class="admin-stat-card">
-							<div class="label">Completed</div>
-							<strong id="adminCompletedCount">0</strong>
-						</div>
-						<div class="admin-stat-card">
-							<div class="label">Cancelled</div>
-							<strong id="adminCancelledCount">0</strong>
-						</div>
+					<div
+						class="admin-section-tabs"
+						role="tablist"
+						aria-label="Admin sections"
+					>
+						<button
+							type="button"
+							class="admin-section-tab active"
+							data-admin-section-tab="bookings"
+							role="tab"
+							aria-selected="true"
+						>
+							Bookings
+						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
+							data-admin-section-tab="gallery"
+							role="tab"
+							aria-selected="false"
+						>
+							Gallery
+						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
+							data-admin-section-tab="reviews"
+							role="tab"
+							aria-selected="false"
+						>
+							Reviews
+						</button>
 					</div>
 
-					<div
-						class="form-message"
-						id="adminActionMessage"
-						style="display: none"
-					></div>
-					<div class="admin-bookings-list" id="adminBookingsList"></div>
+					<section
+						class="admin-management-section active"
+						data-admin-section="bookings"
+						role="tabpanel"
+					>
+						<div class="admin-stats">
+							<div class="admin-stat-card">
+								<div class="label">Total</div>
+								<strong id="adminTotalCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Pending</div>
+								<strong id="adminPendingCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Confirmed</div>
+								<strong id="adminConfirmedCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Completed</div>
+								<strong id="adminCompletedCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Cancelled</div>
+								<strong id="adminCancelledCount">0</strong>
+							</div>
+						</div>
+
+						<div
+							class="form-message"
+							id="adminActionMessage"
+							style="display: none"
+						></div>
+						<div class="admin-bookings-list" id="adminBookingsList"></div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="gallery"
+						role="tabpanel"
+					>
+						<div class="admin-section-card-grid">
+							<article class="admin-section-card">
+								<h3>Gallery Content Control</h3>
+								<p>
+									Use this category to manage which hair styles and
+									transformation images are shown to clients.
+								</p>
+								<ul>
+									<li>✅ Review uploaded photos before publishing.</li>
+									<li>✅ Keep titles and style categories consistent.</li>
+									<li>✅ Remove any low quality or outdated examples.</li>
+								</ul>
+								<a
+									class="btn btn-outline"
+									href="index.html#gallery"
+									target="_blank"
+									rel="noopener"
+								>
+									Open Live Gallery
+								</a>
+							</article>
+						</div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="reviews"
+						role="tabpanel"
+					>
+						<div class="admin-section-card-grid">
+							<article class="admin-section-card">
+								<h3>Reviews Moderation</h3>
+								<p>
+									Use this category to monitor customer feedback and keep only
+									helpful, authentic testimonials visible.
+								</p>
+								<ul>
+									<li>✅ Highlight detailed and useful positive reviews.</li>
+									<li>✅ Remove spam and inappropriate comments.</li>
+									<li>✅ Follow up quickly on any negative feedback.</li>
+								</ul>
+								<a
+									class="btn btn-outline"
+									href="index.html#testimonials"
+									target="_blank"
+									rel="noopener"
+								>
+									Open Live Reviews
+								</a>
+							</article>
+						</div>
+					</section>
 				</div>
 			</div>
 		</section>

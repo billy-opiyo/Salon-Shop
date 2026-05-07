@@ -9,6 +9,42 @@ let auth = null
 let adminUnlocked = false
 let adminBookingsUnsubscribe = null
 const adminMessageTimers = new Map()
+const defaultAdminSection = "bookings"
+
+function setActiveAdminSection(sectionKey = defaultAdminSection) {
+	const tabs = document.querySelectorAll("[data-admin-section-tab]")
+	const sections = document.querySelectorAll("[data-admin-section]")
+	if (!tabs.length || !sections.length) return
+
+	const normalizedSection = String(
+		sectionKey || defaultAdminSection,
+	).toLowerCase()
+
+	tabs.forEach((tab) => {
+		const isActive = tab.dataset.adminSectionTab === normalizedSection
+		tab.classList.toggle("active", isActive)
+		tab.setAttribute("aria-selected", isActive ? "true" : "false")
+	})
+
+	sections.forEach((section) => {
+		const isActive = section.dataset.adminSection === normalizedSection
+		section.classList.toggle("active", isActive)
+		section.setAttribute("aria-hidden", isActive ? "false" : "true")
+	})
+}
+
+function initializeAdminSectionTabs() {
+	const tabList = document.querySelector(".admin-section-tabs")
+	if (!tabList) return
+
+	tabList.addEventListener("click", (event) => {
+		const tab = event.target.closest("[data-admin-section-tab]")
+		if (!tab) return
+		setActiveAdminSection(tab.dataset.adminSectionTab)
+	})
+
+	setActiveAdminSection(defaultAdminSection)
+}
 
 function canInitializeFirebase() {
 	return (
@@ -363,6 +399,8 @@ function initializeAdminPanel() {
 	const list = document.getElementById("adminBookingsList")
 
 	if (!loginForm || !logoutBtn || !list) return
+
+	initializeAdminSectionTabs()
 
 	loginForm.addEventListener("submit", async (event) => {
 		event.preventDefault()
