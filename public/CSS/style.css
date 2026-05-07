@@ -1911,6 +1911,30 @@ h6 {
     color: var(--primary);
 }
 
+.admin-action-btn[data-action="pending"]:hover {
+    border-color: #ecc94b;
+    color: #ecc94b;
+    background: rgba(236, 201, 75, 0.12);
+}
+
+.admin-action-btn[data-action="confirmed"]:hover {
+    border-color: #48bb78;
+    color: #48bb78;
+    background: rgba(72, 187, 120, 0.12);
+}
+
+.admin-action-btn[data-action="completed"]:hover {
+    border-color: #4299e1;
+    color: #4299e1;
+    background: rgba(66, 153, 225, 0.12);
+}
+
+.admin-action-btn[data-action="cancel-release"]:hover {
+    border-color: #f56565;
+    color: #f56565;
+    background: rgba(245, 101, 101, 0.12);
+}
+
 .admin-action-btn.danger:hover {
     border-color: #f56565;
     color: #f56565;
