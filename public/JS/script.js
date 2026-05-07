@@ -100,77 +100,161 @@ const servicesData = [
 	},
 ]
 
-const galleryData = [
+const fallbackGalleryData = [
 	{
-		img: "IMG/box-braids-hairstyles-1x1-1.jpg",
-		title: "Box Braids",
-		stylist: "Fatima Hassan",
-		beforeAfter: false,
+		imageUrl: "IMG/box-braids-hairstyles-1x1-1.jpg",
+		styleName: "Box Braids",
+		styleType: "Classic Box",
+		stylistName: "Fatima Hassan",
+		length: "Medium",
+		size: "Medium",
+		timeTaken: "4 hours",
+		priceRange: "KSh 3,500 - 5,000",
+		hairType: "18-inch synthetic blend",
+		featuredTrending: true,
+		featuredMostBooked: true,
 	},
 	{
-		img: "IMG/knotless braids.jpg",
-		title: "Knotless Braids",
-		stylist: "Zainab Mohamed",
-		beforeAfter: true,
+		imageUrl: "IMG/knotless braids.jpg",
+		beforeImageUrl: "IMG/keeping box braids.jpg",
+		hasBeforeAfter: true,
+		styleName: "Knotless Braids",
+		styleType: "Knotless",
+		stylistName: "Zainab Mohamed",
+		length: "Long",
+		size: "Small",
+		timeTaken: "5 hours",
+		priceRange: "KSh 4,500 - 6,500",
+		hairType: "22-inch human blend",
+		featuredTrending: true,
 	},
 	{
-		img: "IMG/black-cornrows.webp",
-		title: "Cornrows Design",
-		stylist: "Grace Wanjiku",
+		imageUrl: "IMG/black-cornrows.webp",
+		styleName: "Cornrows Design",
+		styleType: "Cornrows",
+		stylistName: "Grace Wanjiku",
+		length: "Short",
+		size: "Medium",
+		timeTaken: "2 hours",
+		priceRange: "KSh 2,000 - 3,000",
+		hairType: "Natural hair",
 	},
 	{
-		img: "IMG/fulan-braids.jpg",
-		title: "Fulani Braids",
-		stylist: "Amina Diallo",
+		imageUrl: "IMG/fulan-braids.jpg",
+		styleName: "Fulani Braids",
+		styleType: "Fulani",
+		stylistName: "Amina Diallo",
+		length: "Long",
+		size: "Small",
+		timeTaken: "4 hours",
+		priceRange: "KSh 4,000 - 5,500",
+		hairType: "20-inch synthetic blend",
+		featuredMostBooked: true,
 	},
 	{
-		img: "IMG/Senegalese_Twist.webp",
-		title: "Senegalese Twists",
-		stylist: "Fatima Hassan",
+		imageUrl: "IMG/Senegalese_Twist.webp",
+		styleName: "Senegalese Twists",
+		styleType: "Twists",
+		stylistName: "Fatima Hassan",
+		length: "Long",
+		size: "Medium",
+		timeTaken: "4.5 hours",
+		priceRange: "KSh 4,000 - 6,000",
+		hairType: "24-inch twist fiber",
 	},
 	{
-		img: "IMG/passion-twists.webp",
-		title: "Passion Twists",
-		stylist: "Zainab Mohamed",
-		beforeAfter: true,
+		imageUrl: "IMG/passion-twists.webp",
+		beforeImageUrl: "IMG/natural hair care.webp",
+		hasBeforeAfter: true,
+		styleName: "Passion Twists",
+		styleType: "Twists",
+		stylistName: "Zainab Mohamed",
+		length: "Medium",
+		size: "Large",
+		timeTaken: "3.5 hours",
+		priceRange: "KSh 3,800 - 5,000",
+		hairType: "Boho curl fiber",
 	},
 	{
-		img: "IMG/goddess-braids.webp",
-		title: "Goddess Braids",
-		stylist: "Grace Wanjiku",
+		imageUrl: "IMG/goddess-braids.webp",
+		styleName: "Goddess Braids",
+		styleType: "Goddess",
+		stylistName: "Grace Wanjiku",
+		length: "Long",
+		size: "Large",
+		timeTaken: "3 hours",
+		priceRange: "KSh 3,000 - 4,500",
+		hairType: "20-inch fiber",
 	},
 	{
-		img: "IMG/Lemonade_Braids.webp",
-		title: "Lemonade Braids",
-		stylist: "Amina Diallo",
+		imageUrl: "IMG/Lemonade_Braids.webp",
+		styleName: "Lemonade Braids",
+		styleType: "Side Cornrows",
+		stylistName: "Amina Diallo",
+		length: "Medium",
+		size: "Small",
+		timeTaken: "2.5 hours",
+		priceRange: "KSh 2,500 - 3,800",
+		hairType: "16-inch synthetic blend",
+		featuredTrending: true,
 	},
 	{
-		img: "IMG/braiding trends.jpg",
-		title: "Braiding Trends",
-		stylist: "Fatima Hassan",
-		beforeAfter: false,
+		imageUrl: "IMG/braiding trends.jpg",
+		styleName: "Braiding Trends",
+		styleType: "Creative Mix",
+		stylistName: "Fatima Hassan",
+		length: "Medium",
+		size: "Medium",
+		timeTaken: "3 hours",
+		priceRange: "KSh 3,000 - 4,500",
+		hairType: "Mixed extensions",
 	},
 	{
-		img: "IMG/keeping box braids.jpg",
-		title: "Box Braids Care",
-		stylist: "Zainab Mohamed",
-		beforeAfter: false,
+		imageUrl: "IMG/keeping box braids.jpg",
+		styleName: "Box Braids Care",
+		styleType: "Maintenance",
+		stylistName: "Zainab Mohamed",
+		length: "Medium",
+		size: "Small",
+		timeTaken: "1.5 hours",
+		priceRange: "KSh 1,500 - 2,500",
+		hairType: "Retouch service",
 	},
 	{
-		img: "IMG/natural hair care.webp",
-		title: "Natural Hair Care",
-		stylist: "Grace Wanjiku",
-		beforeAfter: false,
+		imageUrl: "IMG/natural hair care.webp",
+		styleName: "Natural Hair Care",
+		styleType: "Protective Prep",
+		stylistName: "Grace Wanjiku",
+		length: "Short",
+		size: "Medium",
+		timeTaken: "2 hours",
+		priceRange: "KSh 2,000 - 3,000",
+		hairType: "Natural afro texture",
 	},
 	{
-		img: "IMG/twist-braids.jpg",
-		title: "Twist Braids",
-		stylist: "Amina Diallo",
-		beforeAfter: false,
+		imageUrl: "IMG/twist-braids.jpg",
+		styleName: "Twist Braids",
+		styleType: "Two Strand Twists",
+		stylistName: "Amina Diallo",
+		length: "Long",
+		size: "Medium",
+		timeTaken: "4 hours",
+		priceRange: "KSh 3,500 - 5,000",
+		hairType: "22-inch twist fiber",
+		featuredMostBooked: true,
 	},
 ]
 
+let galleryData = [...fallbackGalleryData]
+let filteredGalleryData = [...galleryData]
 let showAllGallery = false
+let currentLightboxIndex = 0
+let galleryRealtimeUnsubscribe = null
+const galleryFiltersState = {
+	length: "all",
+	size: "all",
+	styleType: "all",
+}
 
 const testimonialsData = [
 	{
@@ -305,16 +389,12 @@ async function initializeFirebaseServices() {
 		firebase.initializeApp(firebaseConfig)
 	}
 
-	if (
-		typeof firebase.appCheck === "function" &&
-		appCheckConfig.siteKey
-	) {
+	if (typeof firebase.appCheck === "function" && appCheckConfig.siteKey) {
 		firebase.appCheck().activate(appCheckConfig.siteKey, true)
 	}
 
 	auth = firebase.auth()
 	db = firebase.firestore()
-
 
 	firebaseReady = true
 }
@@ -440,18 +520,159 @@ function renderServices(filter = "all") {
 		.join("")
 }
 
+function normalizeGalleryItem(item = {}) {
+	const styleName = item.styleName || item.title || "Untitled Style"
+	const styleType = item.styleType || "General"
+	const stylistName = item.stylistName || item.stylist || "Royal Braids Team"
+	const imageUrl = item.imageUrl || item.img || ""
+	const beforeImageUrl = item.beforeImageUrl || ""
+	const hasBeforeAfter =
+		item.hasBeforeAfter === true ||
+		item.beforeAfter === true ||
+		Boolean(beforeImageUrl)
+
+	return {
+		id: item.id || "",
+		styleName,
+		styleType,
+		stylistName,
+		length: item.length || "Medium",
+		size: item.size || "Medium",
+		timeTaken: item.timeTaken || "N/A",
+		priceRange: item.priceRange || "On request",
+		hairType: item.hairType || "N/A",
+		imageUrl,
+		beforeImageUrl,
+		hasBeforeAfter,
+		featuredTrending: item.featuredTrending === true,
+		featuredMostBooked: item.featuredMostBooked === true,
+	}
+}
+
+function getUniqueGalleryValues(key) {
+	const values = galleryData
+		.map((item) => item[key])
+		.filter((value) => Boolean(value && String(value).trim()))
+	return [...new Set(values)]
+}
+
+function renderGalleryFilterGroup(groupKey, mountId, prefixLabel) {
+	const mount = document.getElementById(mountId)
+	if (!mount) return
+
+	const activeValue = galleryFiltersState[groupKey] || "all"
+	const values = getUniqueGalleryValues(groupKey)
+
+	mount.innerHTML = `
+    <button class="gallery-filter-chip ${activeValue === "all" ? "active" : ""}" data-filter-group="${groupKey}" data-filter-value="all">
+      All ${prefixLabel}
+    </button>
+    ${values
+			.map(
+				(value) => `
+      <button class="gallery-filter-chip ${activeValue === value ? "active" : ""}" data-filter-group="${groupKey}" data-filter-value="${value}">
+        ${value}
+      </button>
+    `,
+			)
+			.join("")}
+  `
+}
+
+function renderGalleryFilters() {
+	renderGalleryFilterGroup("length", "galleryLengthFilters", "Lengths")
+	renderGalleryFilterGroup("size", "gallerySizeFilters", "Sizes")
+	renderGalleryFilterGroup(
+		"styleType",
+		"galleryStyleTypeFilters",
+		"Style Types",
+	)
+}
+
+function applyGalleryFilters() {
+	filteredGalleryData = galleryData.filter((item) => {
+		if (
+			galleryFiltersState.length !== "all" &&
+			item.length !== galleryFiltersState.length
+		) {
+			return false
+		}
+		if (
+			galleryFiltersState.size !== "all" &&
+			item.size !== galleryFiltersState.size
+		) {
+			return false
+		}
+		if (
+			galleryFiltersState.styleType !== "all" &&
+			item.styleType !== galleryFiltersState.styleType
+		) {
+			return false
+		}
+		return true
+	})
+}
+
+function renderFeaturedStyles() {
+	const trendingList = document.getElementById("trendingBraidsList")
+	const mostBookedList = document.getElementById("mostBookedStylesList")
+	if (!trendingList || !mostBookedList) return
+
+	const trending = galleryData
+		.filter((item) => item.featuredTrending)
+		.slice(0, 6)
+	const mostBooked = galleryData
+		.filter((item) => item.featuredMostBooked)
+		.slice(0, 6)
+
+	trendingList.innerHTML = trending.length
+		? trending
+				.map(
+					(item) =>
+						`<button class="gallery-feature-pill" data-feature-open="${item.id || item.styleName}">${item.styleName}</button>`,
+				)
+				.join("")
+		: '<span class="gallery-feature-empty">No trending styles yet.</span>'
+
+	mostBookedList.innerHTML = mostBooked.length
+		? mostBooked
+				.map(
+					(item) =>
+						`<button class="gallery-feature-pill" data-feature-open="${item.id || item.styleName}">${item.styleName}</button>`,
+				)
+				.join("")
+		: '<span class="gallery-feature-empty">No most booked styles yet.</span>'
+}
+
 function renderGallery() {
 	const grid = document.getElementById("galleryGrid")
-	const dataToShow = showAllGallery ? galleryData : galleryData.slice(0, 8)
+	const emptyState = document.getElementById("galleryEmptyState")
+	const actions = document.getElementById("galleryActions")
+	if (!grid) return
+
+	applyGalleryFilters()
+
+	const dataToShow = showAllGallery
+		? filteredGalleryData
+		: filteredGalleryData.slice(0, 8)
+
+	if (emptyState) {
+		emptyState.style.display = filteredGalleryData.length ? "none" : "block"
+	}
+
+	if (actions) {
+		actions.style.display = filteredGalleryData.length > 8 ? "block" : "none"
+	}
+
 	grid.innerHTML = dataToShow
 		.map(
-			(g, i) => `
+			(item, i) => `
     <div class="gallery-item" onclick="openLightbox(${i})" style="animation-delay: ${i * 0.1}s">
-      <img src="${g.img}" alt="${g.title}" loading="lazy">
+      <img src="${item.imageUrl}" alt="${item.styleName}" loading="lazy">
       <div class="gallery-overlay">
-        <h4>${g.title}</h4>
-        <p>by ${g.stylist}</p>
-        ${g.beforeAfter ? '<span class="before-after">Before & After</span>' : ""}
+        <h4>${item.styleName}</h4>
+        <p>${item.styleType} • by ${item.stylistName}</p>
+        ${item.hasBeforeAfter ? '<span class="before-after">Before & After</span>' : ""}
       </div>
     </div>
   `,
@@ -463,7 +684,133 @@ function toggleGalleryView() {
 	showAllGallery = !showAllGallery
 	renderGallery()
 	const button = document.getElementById("viewAllGallery")
-	button.textContent = showAllGallery ? "View Less Braids" : "View All Braids"
+	if (button) {
+		button.textContent = showAllGallery ? "View Less Braids" : "View All Braids"
+	}
+}
+
+function setGalleryFilter(group, value) {
+	galleryFiltersState[group] = value
+	showAllGallery = false
+	const button = document.getElementById("viewAllGallery")
+	if (button) button.textContent = "View All Braids"
+	renderGalleryFilters()
+	renderGallery()
+}
+
+function getVisibleGalleryData() {
+	return showAllGallery ? filteredGalleryData : filteredGalleryData.slice(0, 8)
+}
+
+function isMatchingGalleryItem(item, idOrName) {
+	return (item.id && item.id === idOrName) || item.styleName === idOrName
+}
+
+function resetGalleryFiltersState() {
+	galleryFiltersState.length = "all"
+	galleryFiltersState.size = "all"
+	galleryFiltersState.styleType = "all"
+}
+
+function openGalleryItemByIdOrName(idOrName) {
+	let visible = getVisibleGalleryData()
+	let index = visible.findIndex((item) => isMatchingGalleryItem(item, idOrName))
+	if (index >= 0) {
+		openLightbox(index)
+		return
+	}
+
+	const inFiltered = filteredGalleryData.some((item) =>
+		isMatchingGalleryItem(item, idOrName),
+	)
+	if (inFiltered && !showAllGallery) {
+		showAllGallery = true
+		renderGallery()
+		const button = document.getElementById("viewAllGallery")
+		if (button) button.textContent = "View Less Braids"
+
+		visible = getVisibleGalleryData()
+		index = visible.findIndex((item) => isMatchingGalleryItem(item, idOrName))
+		if (index >= 0) {
+			openLightbox(index)
+			return
+		}
+	}
+
+	resetGalleryFiltersState()
+	showAllGallery = true
+	renderGalleryFilters()
+	renderGallery()
+	const button = document.getElementById("viewAllGallery")
+	if (button) button.textContent = "View Less Braids"
+
+	visible = getVisibleGalleryData()
+	index = visible.findIndex((item) => isMatchingGalleryItem(item, idOrName))
+	openLightbox(index >= 0 ? index : 0)
+}
+
+function wireGalleryInteractions() {
+	const filtersRoot = document.getElementById("galleryFilters")
+	if (filtersRoot) {
+		filtersRoot.addEventListener("click", (event) => {
+			const chip = event.target.closest(".gallery-filter-chip")
+			if (!chip) return
+			const group = chip.dataset.filterGroup
+			const value = chip.dataset.filterValue
+			if (!group || typeof value === "undefined") return
+			setGalleryFilter(group, value)
+		})
+	}
+
+	const featuredWrap = document.querySelector(".gallery-featured-wrap")
+	if (featuredWrap) {
+		featuredWrap.addEventListener("click", (event) => {
+			const trigger = event.target.closest("[data-feature-open]")
+			if (!trigger) return
+			const key = trigger.dataset.featureOpen
+			openGalleryItemByIdOrName(key)
+		})
+	}
+}
+
+function startGalleryRealtimeListener() {
+	if (!firebaseReady || !db) return
+
+	if (typeof galleryRealtimeUnsubscribe === "function") {
+		galleryRealtimeUnsubscribe()
+		galleryRealtimeUnsubscribe = null
+	}
+
+	galleryRealtimeUnsubscribe = db
+		.collection("galleryStyles")
+		.limit(300)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) =>
+					normalizeGalleryItem({ id: doc.id, ...doc.data() }),
+				)
+				if (docs.length) {
+					galleryData = docs
+				} else {
+					galleryData = fallbackGalleryData.map((item, i) =>
+						normalizeGalleryItem({ id: `fallback-${i}`, ...item }),
+					)
+				}
+
+				renderGalleryFilters()
+				renderFeaturedStyles()
+				renderGallery()
+			},
+			(error) => {
+				console.error("Gallery realtime listener failed:", error)
+				galleryData = fallbackGalleryData.map((item, i) =>
+					normalizeGalleryItem({ id: `fallback-${i}`, ...item }),
+				)
+				renderGalleryFilters()
+				renderFeaturedStyles()
+				renderGallery()
+			},
+		)
 }
 
 function renderTestimonials() {
@@ -675,7 +1022,6 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 		return
 	}
 
-
 	btn.classList.add("loading")
 	btn.disabled = true
 	btn.textContent = "Processing..."
@@ -781,12 +1127,25 @@ if (datePicker) {
 }
 
 // ============ GALLERY LIGHTBOX ============
-let currentLightboxIndex = 0
 const lightbox = document.getElementById("lightbox")
 const lightboxImg = document.getElementById("lightboxImg")
-const lightboxCaption = document.getElementById("lightboxCaption")
+const lightboxBeforeAfter = document.getElementById("lightboxBeforeAfter")
+const lightboxBeforeImg = document.getElementById("lightboxBeforeImg")
+const lightboxAfterImg = document.getElementById("lightboxAfterImg")
+const lightboxStyleName = document.getElementById("lightboxStyleName")
+const lightboxStyleType = document.getElementById("lightboxStyleType")
+const lightboxTimeTaken = document.getElementById("lightboxTimeTaken")
+const lightboxPriceRange = document.getElementById("lightboxPriceRange")
+const lightboxLength = document.getElementById("lightboxLength")
+const lightboxSize = document.getElementById("lightboxSize")
+const lightboxHairType = document.getElementById("lightboxHairType")
+const lightboxStylist = document.getElementById("lightboxStylist")
+const lightboxBookNow = document.getElementById("lightboxBookNow")
 
 function openLightbox(index) {
+	const visible = getVisibleGalleryData()
+	if (!visible.length || !lightbox) return
+
 	currentLightboxIndex = index
 	updateLightbox()
 	lightbox.classList.add("active")
@@ -794,28 +1153,78 @@ function openLightbox(index) {
 }
 
 function updateLightbox() {
-	const item = galleryData[currentLightboxIndex]
-	lightboxImg.src = item.img.replace("w=600", "w=1200")
-	lightboxCaption.textContent = `${item.title} — by ${item.stylist}`
+	const visible = getVisibleGalleryData()
+	if (!visible.length) return
+
+	const safeIndex =
+		((currentLightboxIndex % visible.length) + visible.length) % visible.length
+	currentLightboxIndex = safeIndex
+
+	const item = visible[safeIndex]
+	if (!item) return
+
+	if (lightboxImg) {
+		lightboxImg.src = item.imageUrl || ""
+		lightboxImg.alt = item.styleName || "Gallery style"
+	}
+
+	if (lightboxStyleName) lightboxStyleName.textContent = item.styleName || "-"
+	if (lightboxStyleType) lightboxStyleType.textContent = item.styleType || "-"
+	if (lightboxTimeTaken) lightboxTimeTaken.textContent = item.timeTaken || "-"
+	if (lightboxPriceRange)
+		lightboxPriceRange.textContent = item.priceRange || "On request"
+	if (lightboxLength) lightboxLength.textContent = item.length || "-"
+	if (lightboxSize) lightboxSize.textContent = item.size || "-"
+	if (lightboxHairType) lightboxHairType.textContent = item.hairType || "-"
+	if (lightboxStylist) lightboxStylist.textContent = item.stylistName || "-"
+
+	if (lightboxBeforeAfter && lightboxBeforeImg && lightboxAfterImg) {
+		if (item.hasBeforeAfter && item.beforeImageUrl) {
+			lightboxBeforeAfter.style.display = "grid"
+			lightboxBeforeImg.src = item.beforeImageUrl
+			lightboxBeforeImg.alt = `${item.styleName} before`
+			lightboxAfterImg.src = item.imageUrl || ""
+			lightboxAfterImg.alt = `${item.styleName} after`
+			if (lightboxImg) lightboxImg.style.display = "none"
+		} else {
+			lightboxBeforeAfter.style.display = "none"
+			if (lightboxImg) lightboxImg.style.display = "block"
+		}
+	}
+
+	if (lightboxBookNow) {
+		lightboxBookNow.onclick = () => {
+			const serviceSelect = document.getElementById("serviceSelect")
+			if (serviceSelect) {
+				serviceSelect.value = item.styleName || item.styleType || ""
+			}
+			if (lightbox) lightbox.classList.remove("active")
+			document.body.style.overflow = ""
+		}
+	}
 }
 
-document.getElementById("lightboxClose").addEventListener("click", () => {
-	lightbox.classList.remove("active")
+document.getElementById("lightboxClose")?.addEventListener("click", () => {
+	if (lightbox) lightbox.classList.remove("active")
 	document.body.style.overflow = ""
 })
 
-document.getElementById("lightboxPrev").addEventListener("click", () => {
+document.getElementById("lightboxPrev")?.addEventListener("click", () => {
+	const visible = getVisibleGalleryData()
+	if (!visible.length) return
 	currentLightboxIndex =
-		(currentLightboxIndex - 1 + galleryData.length) % galleryData.length
+		(currentLightboxIndex - 1 + visible.length) % visible.length
 	updateLightbox()
 })
 
-document.getElementById("lightboxNext").addEventListener("click", () => {
-	currentLightboxIndex = (currentLightboxIndex + 1) % galleryData.length
+document.getElementById("lightboxNext")?.addEventListener("click", () => {
+	const visible = getVisibleGalleryData()
+	if (!visible.length) return
+	currentLightboxIndex = (currentLightboxIndex + 1) % visible.length
 	updateLightbox()
 })
 
-lightbox.addEventListener("click", (e) => {
+lightbox?.addEventListener("click", (e) => {
 	if (e.target === lightbox) {
 		lightbox.classList.remove("active")
 		document.body.style.overflow = ""
@@ -823,18 +1232,22 @@ lightbox.addEventListener("click", (e) => {
 })
 
 document.addEventListener("keydown", (e) => {
-	if (!lightbox.classList.contains("active")) return
+	if (!lightbox || !lightbox.classList.contains("active")) return
+
+	const visible = getVisibleGalleryData()
+	if (!visible.length) return
+
 	if (e.key === "Escape") {
 		lightbox.classList.remove("active")
 		document.body.style.overflow = ""
 	}
 	if (e.key === "ArrowLeft") {
 		currentLightboxIndex =
-			(currentLightboxIndex - 1 + galleryData.length) % galleryData.length
+			(currentLightboxIndex - 1 + visible.length) % visible.length
 		updateLightbox()
 	}
 	if (e.key === "ArrowRight") {
-		currentLightboxIndex = (currentLightboxIndex + 1) % galleryData.length
+		currentLightboxIndex = (currentLightboxIndex + 1) % visible.length
 		updateLightbox()
 	}
 })
@@ -931,10 +1344,16 @@ mutationObserver.observe(document.body, { childList: true, subtree: true })
 
 // ============ INITIALIZE ============
 renderServices()
+galleryData = fallbackGalleryData.map((item, i) =>
+	normalizeGalleryItem({ id: `fallback-${i}`, ...item }),
+)
+renderGalleryFilters()
+renderFeaturedStyles()
 renderGallery()
+wireGalleryInteractions()
 document
 	.getElementById("viewAllGallery")
-	.addEventListener("click", toggleGalleryView)
+	?.addEventListener("click", toggleGalleryView)
 renderTestimonials()
 populateServiceSelect()
 populateTimeSlots()
@@ -950,4 +1369,6 @@ initializeFirebaseServices().then(() => {
 	if (dateInput) {
 		dateInput.addEventListener("change", handleAvailabilityWatch)
 	}
+
+	startGalleryRealtimeListener()
 })

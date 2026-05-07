@@ -2,14 +2,62 @@ const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
 const adminConfig = appConfig.admin || {}
 const appCheckConfig = appConfig.appCheck || {}
+const cloudinaryConfig = appConfig.cloudinary || {}
 
 let firebaseReady = false
 let db = null
 let auth = null
 let adminUnlocked = false
 let adminBookingsUnsubscribe = null
+let adminGalleryUnsubscribe = null
+let adminGalleryDocs = []
 const adminMessageTimers = new Map()
+const adminMessageHideTimers = new Map()
 const defaultAdminSection = "bookings"
+let adminConfirmState = {
+	resolve: null,
+	isOpen: false,
+}
+
+function closeAdminConfirmModal(result = false) {
+	const modal = document.getElementById("adminConfirmModal")
+	if (!modal || !adminConfirmState.isOpen) return
+
+	modal.classList.remove("active")
+	modal.setAttribute("aria-hidden", "true")
+	document.body.style.overflow = ""
+
+	adminConfirmState.isOpen = false
+	const resolver = adminConfirmState.resolve
+	adminConfirmState.resolve = null
+	if (typeof resolver === "function") {
+		resolver(result)
+	}
+}
+
+function showAdminConfirmModal(
+	message = "Are you sure you want to continue?",
+	confirmLabel = "Confirm",
+) {
+	const modal = document.getElementById("adminConfirmModal")
+	const messageEl = document.getElementById("adminConfirmMessage")
+	const confirmBtn = document.getElementById("adminConfirmOk")
+	if (!modal || !messageEl || !confirmBtn) {
+		return Promise.resolve(window.confirm(message))
+	}
+
+	messageEl.textContent = message
+	confirmBtn.textContent = confirmLabel
+
+	modal.classList.add("active")
+	modal.setAttribute("aria-hidden", "false")
+	document.body.style.overflow = "hidden"
+	adminConfirmState.isOpen = true
+
+	return new Promise((resolve) => {
+		adminConfirmState.resolve = resolve
+	})
+}
 
 function setActiveAdminSection(sectionKey = defaultAdminSection) {
 	const tabs = document.querySelectorAll("[data-admin-section-tab]")
@@ -132,9 +180,17 @@ function stopAdminBookingsListener() {
 	}
 }
 
+function stopAdminGalleryListener() {
+	if (typeof adminGalleryUnsubscribe === "function") {
+		adminGalleryUnsubscribe()
+		adminGalleryUnsubscribe = null
+	}
+}
+
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
+	const isGalleryToast = targetId === "adminGalleryMessage"
 
 	const existingTimer = adminMessageTimers.get(targetId)
 	if (existingTimer) {
@@ -142,24 +198,54 @@ function setAdminMessage(type, text, targetId = "adminMessage") {
 		adminMessageTimers.delete(targetId)
 	}
 
-	if (!text) {
+	const existingHideTimer = adminMessageHideTimers.get(targetId)
+	if (existingHideTimer) {
+		clearTimeout(existingHideTimer)
+		adminMessageHideTimers.delete(targetId)
+	}
+
+	const hideMessage = (animated = false) => {
+		if (isGalleryToast && animated) {
+			msg.classList.remove("is-visible")
+			msg.classList.add("is-leaving")
+			const hideTimer = setTimeout(() => {
+				msg.className = "form-message"
+				msg.style.display = "none"
+				msg.textContent = ""
+				adminMessageHideTimers.delete(targetId)
+			}, 320)
+			adminMessageHideTimers.set(targetId, hideTimer)
+			return
+		}
+
 		msg.className = "form-message"
 		msg.style.display = "none"
 		msg.textContent = ""
+	}
+
+	if (!text) {
+		hideMessage(false)
 		return
 	}
 
-	msg.className = `form-message ${type}`
+	msg.className = isGalleryToast
+		? `form-message ${type} form-message--toast`
+		: `form-message ${type}`
 	msg.textContent = text
 	msg.style.display = "block"
+
+	if (isGalleryToast) {
+		msg.classList.remove("is-leaving")
+		requestAnimationFrame(() => {
+			msg.classList.add("is-visible")
+		})
+	}
 
 	const shouldAutoDismiss = type === "success" || type === "error"
 	if (!shouldAutoDismiss) return
 
 	const timer = setTimeout(() => {
-		msg.className = "form-message"
-		msg.style.display = "none"
-		msg.textContent = ""
+		hideMessage(isGalleryToast)
 		adminMessageTimers.delete(targetId)
 	}, 4200)
 
@@ -187,9 +273,12 @@ function setAdminUnlockedState(value) {
 
 	if (!value) {
 		stopAdminBookingsListener()
+		stopAdminGalleryListener()
 		setAdminMessage("", "")
+		setAdminMessage("", "", "adminGalleryMessage")
 	} else {
 		startAdminBookingsListener()
+		startAdminGalleryListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
 }
@@ -289,47 +378,308 @@ function renderAdminBookings(docs) {
             <div><span>Phone:</span> ${b.phone || "N/A"}</div>
           </div>
           <div class="admin-booking-actions">
-            <button
-              class="admin-action-btn"
-              data-action="pending"
-              data-id="${b.id}"
-              data-tooltip="Move booking back to pending review"
-              title="Move booking back to pending review"
-            >
-              Set Pending
-            </button>
-            <button
-              class="admin-action-btn"
-              data-action="confirmed"
-              data-id="${b.id}"
-              data-tooltip="Mark booking as approved and scheduled"
-              title="Mark booking as approved and scheduled"
-            >
-              Confirm
-            </button>
-            <button
-              class="admin-action-btn"
-              data-action="completed"
-              data-id="${b.id}"
-              data-tooltip="Mark booking as service completed"
-              title="Mark booking as service completed"
-            >
-              Complete
-            </button>
-            <button
-              class="admin-action-btn danger"
-              data-action="cancel-release"
-              data-id="${b.id}"
-              data-tooltip="Cancel booking and free that time slot"
-              title="Cancel booking and free that time slot"
-            >
-              Cancel + Release Slot
-            </button>
+            <button class="admin-action-btn" data-action="pending" data-id="${b.id}">Set Pending</button>
+            <button class="admin-action-btn" data-action="confirmed" data-id="${b.id}">Confirm</button>
+            <button class="admin-action-btn" data-action="completed" data-id="${b.id}">Complete</button>
+            <button class="admin-action-btn danger" data-action="cancel-release" data-id="${b.id}">Cancel + Release Slot</button>
           </div>
         </div>
       `
 		})
 		.join("")
+}
+
+function galleryDocToViewModel(doc) {
+	return {
+		id: doc.id,
+		styleName: doc.styleName || "Untitled Style",
+		styleType: doc.styleType || "N/A",
+		length: doc.length || "N/A",
+		size: doc.size || "N/A",
+		timeTaken: doc.timeTaken || "N/A",
+		priceRange: doc.priceRange || "",
+		hairType: doc.hairType || "N/A",
+		stylistName: doc.stylistName || "N/A",
+		imageUrl: doc.imageUrl || "",
+		beforeImageUrl: doc.beforeImageUrl || "",
+		hasBeforeAfter:
+			doc.hasBeforeAfter === true ||
+			Boolean(doc.beforeImageUrl && String(doc.beforeImageUrl).trim()),
+		featuredTrending: doc.featuredTrending === true,
+		featuredMostBooked: doc.featuredMostBooked === true,
+		createdAt: doc.createdAt,
+		updatedAt: doc.updatedAt,
+	}
+}
+
+function resetGalleryForm() {
+	const form = document.getElementById("adminGalleryForm")
+	if (!form) return
+
+	form.reset()
+	document.getElementById("galleryEditId").value = ""
+	document.getElementById("adminGalleryFormTitle").textContent =
+		"Add New Gallery Style"
+	document.getElementById("adminGallerySaveBtn").textContent =
+		"Save Gallery Style"
+	document.getElementById("adminGalleryCancelEdit").style.display = "none"
+}
+
+function loadGalleryItemForEditing(id) {
+	const item = adminGalleryDocs.find((g) => g.id === id)
+	if (!item) return
+
+	document.getElementById("galleryEditId").value = item.id
+	document.getElementById("galleryStyleName").value = item.styleName || ""
+	document.getElementById("galleryStyleType").value = item.styleType || ""
+	document.getElementById("galleryLength").value = item.length || ""
+	document.getElementById("gallerySize").value = item.size || ""
+	document.getElementById("galleryTimeTaken").value = item.timeTaken || ""
+	document.getElementById("galleryPriceRange").value = item.priceRange || ""
+	document.getElementById("galleryHairType").value = item.hairType || ""
+	document.getElementById("galleryStylistName").value = item.stylistName || ""
+	document.getElementById("galleryFeaturedTrending").checked =
+		item.featuredTrending === true
+	document.getElementById("galleryFeaturedMostBooked").checked =
+		item.featuredMostBooked === true
+
+	document.getElementById("adminGalleryFormTitle").textContent =
+		"Edit Gallery Style"
+	document.getElementById("adminGallerySaveBtn").textContent =
+		"Update Gallery Style"
+	document.getElementById("adminGalleryCancelEdit").style.display =
+		"inline-flex"
+
+	setAdminMessage("", "", "adminGalleryMessage")
+}
+
+function renderAdminGallery(docs) {
+	const list = document.getElementById("adminGalleryList")
+	if (!list) return
+
+	const items = docs.map(galleryDocToViewModel).sort((a, b) => {
+		const aUpdated = toTimestampMs(a.updatedAt)
+		const bUpdated = toTimestampMs(b.updatedAt)
+		if (aUpdated !== bUpdated) return bUpdated - aUpdated
+		return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+	})
+
+	adminGalleryDocs = items
+
+	if (!items.length) {
+		list.innerHTML =
+			'<div class="admin-empty-state">No gallery styles yet. Add your first style above.</div>'
+		return
+	}
+
+	list.innerHTML = items
+		.map(
+			(item) => `
+      <article class="admin-gallery-item">
+        <div class="admin-gallery-thumb-wrap">
+          ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.styleName}" class="admin-gallery-thumb" />` : '<div class="admin-gallery-thumb admin-gallery-thumb--empty">No Image</div>'}
+          ${item.hasBeforeAfter ? '<span class="admin-gallery-badge">Before & After</span>' : ""}
+        </div>
+        <div class="admin-gallery-content">
+          <h4>${item.styleName}</h4>
+          <p>${item.styleType} • ${item.length} • ${item.size}</p>
+          <p>Stylist: ${item.stylistName} • Time: ${item.timeTaken}</p>
+          <div class="admin-gallery-tags">
+            ${item.featuredTrending ? "<span>Trending</span>" : ""}
+            ${item.featuredMostBooked ? "<span>Most Booked</span>" : ""}
+            ${item.priceRange ? `<span>${item.priceRange}</span>` : ""}
+          </div>
+        </div>
+        <div class="admin-gallery-actions">
+          <button class="admin-action-btn" data-gallery-action="edit" data-id="${item.id}">Edit</button>
+          <button class="admin-action-btn danger" data-gallery-action="delete" data-id="${item.id}">Delete</button>
+        </div>
+      </article>
+    `,
+		)
+		.join("")
+}
+
+async function uploadImageToCloudinary(file) {
+	if (!file) return ""
+	if (!cloudinaryConfig.cloudName || !cloudinaryConfig.uploadPreset) {
+		throw new Error("Cloudinary config is missing")
+	}
+
+	const endpoint = `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`
+	const body = new FormData()
+	body.append("file", file)
+	body.append("upload_preset", cloudinaryConfig.uploadPreset)
+	if (cloudinaryConfig.folder) {
+		body.append("folder", cloudinaryConfig.folder)
+	}
+
+	const response = await fetch(endpoint, {
+		method: "POST",
+		body,
+	})
+
+	if (!response.ok) {
+		throw new Error("Failed to upload image to Cloudinary")
+	}
+
+	const result = await response.json()
+	return result.secure_url || ""
+}
+
+async function saveGalleryItem(event) {
+	event.preventDefault()
+	if (!adminUnlocked || !db || !auth?.currentUser) return
+
+	const saveBtn = document.getElementById("adminGallerySaveBtn")
+	const editId = document.getElementById("galleryEditId").value.trim()
+
+	const styleName = document.getElementById("galleryStyleName").value.trim()
+	const styleType = document.getElementById("galleryStyleType").value.trim()
+	const length = document.getElementById("galleryLength").value
+	const size = document.getElementById("gallerySize").value
+	const timeTaken = document.getElementById("galleryTimeTaken").value.trim()
+	const priceRange = document.getElementById("galleryPriceRange").value.trim()
+	const hairType = document.getElementById("galleryHairType").value.trim()
+	const stylistName = document.getElementById("galleryStylistName").value.trim()
+	const featuredTrending = document.getElementById(
+		"galleryFeaturedTrending",
+	).checked
+	const featuredMostBooked = document.getElementById(
+		"galleryFeaturedMostBooked",
+	).checked
+
+	const mainImageFile = document.getElementById("galleryMainImage").files?.[0]
+	const beforeImageFile =
+		document.getElementById("galleryBeforeImage").files?.[0]
+
+	if (
+		!styleName ||
+		!styleType ||
+		!length ||
+		!size ||
+		!timeTaken ||
+		!hairType ||
+		!stylistName
+	) {
+		setAdminMessage(
+			"error",
+			"❌ Please complete all required fields.",
+			"adminGalleryMessage",
+		)
+		return
+	}
+
+	if (!editId && !mainImageFile) {
+		setAdminMessage(
+			"error",
+			"❌ After/final style image is required for new entries.",
+			"adminGalleryMessage",
+		)
+		return
+	}
+
+	const currentItem = adminGalleryDocs.find((g) => g.id === editId)
+
+	try {
+		if (saveBtn) {
+			saveBtn.disabled = true
+			saveBtn.textContent = editId ? "Updating..." : "Saving..."
+		}
+
+		let imageUrl = currentItem?.imageUrl || ""
+		let beforeImageUrl = currentItem?.beforeImageUrl || ""
+
+		if (mainImageFile) {
+			imageUrl = await uploadImageToCloudinary(mainImageFile)
+		}
+		if (beforeImageFile) {
+			beforeImageUrl = await uploadImageToCloudinary(beforeImageFile)
+		}
+
+		const payload = {
+			styleName,
+			styleType,
+			length,
+			size,
+			timeTaken,
+			priceRange,
+			hairType,
+			stylistName,
+			imageUrl,
+			beforeImageUrl,
+			hasBeforeAfter: Boolean(beforeImageUrl),
+			featuredTrending,
+			featuredMostBooked,
+			updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+		}
+
+		if (editId) {
+			await db
+				.collection("galleryStyles")
+				.doc(editId)
+				.set(payload, { merge: true })
+			setAdminMessage(
+				"success",
+				"✅ Gallery style updated successfully.",
+				"adminGalleryMessage",
+			)
+		} else {
+			await db.collection("galleryStyles").add({
+				...payload,
+				createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+			})
+			setAdminMessage(
+				"success",
+				"✅ Gallery style created successfully.",
+				"adminGalleryMessage",
+			)
+		}
+
+		resetGalleryForm()
+	} catch (error) {
+		console.error("Saving gallery style failed:", error)
+		setAdminMessage(
+			"error",
+			`❌ Failed to save gallery style: ${error.message || "unknown error"}`,
+			"adminGalleryMessage",
+		)
+	} finally {
+		if (saveBtn) {
+			saveBtn.disabled = false
+			saveBtn.textContent = document.getElementById("galleryEditId").value
+				? "Update Gallery Style"
+				: "Save Gallery Style"
+		}
+	}
+}
+
+async function deleteGalleryItem(id) {
+	if (!id) return
+	const confirmed = await showAdminConfirmModal(
+		"Delete this gallery style permanently? This action cannot be undone.",
+		"Delete Style",
+	)
+	if (!confirmed) return
+
+	try {
+		await db.collection("galleryStyles").doc(id).delete()
+		setAdminMessage(
+			"success",
+			"✅ Gallery style deleted.",
+			"adminGalleryMessage",
+		)
+		if (document.getElementById("galleryEditId").value === id) {
+			resetGalleryForm()
+		}
+	} catch (error) {
+		console.error("Delete gallery style failed:", error)
+		setAdminMessage(
+			"error",
+			`❌ Failed to delete style: ${error.message || "unknown error"}`,
+			"adminGalleryMessage",
+		)
+	}
 }
 
 async function updateBookingStatus(bookingId, status) {
@@ -392,13 +742,43 @@ function startAdminBookingsListener() {
 		)
 }
 
+function startAdminGalleryListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminGalleryListener()
+
+	adminGalleryUnsubscribe = db
+		.collection("galleryStyles")
+		.limit(200)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminGallery(docs)
+			},
+			(error) => {
+				console.error("Admin gallery listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch gallery in realtime: ${error.message || "unknown error"}`,
+					"adminGalleryMessage",
+				)
+			},
+		)
+}
+
 function initializeAdminPanel() {
 	const loginForm = document.getElementById("adminLoginForm")
 	const logoutBtn = document.getElementById("adminLogoutBtn")
 	const loginBtn = document.getElementById("adminLoginBtn")
-	const list = document.getElementById("adminBookingsList")
+	const bookingList = document.getElementById("adminBookingsList")
+	const galleryForm = document.getElementById("adminGalleryForm")
+	const galleryList = document.getElementById("adminGalleryList")
+	const cancelEditBtn = document.getElementById("adminGalleryCancelEdit")
+	const confirmModal = document.getElementById("adminConfirmModal")
+	const confirmCancelBtn = document.getElementById("adminConfirmCancel")
+	const confirmOkBtn = document.getElementById("adminConfirmOk")
 
-	if (!loginForm || !logoutBtn || !list) return
+	if (!loginForm || !logoutBtn || !bookingList) return
 
 	initializeAdminSectionTabs()
 
@@ -469,7 +849,7 @@ function initializeAdminPanel() {
 		}
 	})
 
-	list.addEventListener("click", async (event) => {
+	bookingList.addEventListener("click", async (event) => {
 		const button = event.target.closest("button[data-action]")
 		if (!button || !adminUnlocked || !auth?.currentUser) return
 
@@ -503,6 +883,65 @@ function initializeAdminPanel() {
 			)
 		} finally {
 			button.disabled = false
+		}
+	})
+
+	if (galleryForm) {
+		// Defensive: always block native form navigation/reload on gallery save
+		galleryForm.setAttribute("action", "javascript:void(0)")
+		galleryForm.addEventListener("submit", (event) => {
+			event.preventDefault()
+			event.stopPropagation()
+			void saveGalleryItem(event)
+		})
+	}
+
+	if (cancelEditBtn) {
+		cancelEditBtn.addEventListener("click", resetGalleryForm)
+	}
+
+	if (galleryList) {
+		galleryList.addEventListener("click", (event) => {
+			const actionBtn = event.target.closest("button[data-gallery-action]")
+			if (!actionBtn || !adminUnlocked || !auth?.currentUser) return
+
+			const action = actionBtn.dataset.galleryAction
+			const id = actionBtn.dataset.id
+			if (!action || !id) return
+
+			if (action === "edit") {
+				loadGalleryItemForEditing(id)
+				return
+			}
+			if (action === "delete") {
+				deleteGalleryItem(id)
+			}
+		})
+	}
+
+	if (confirmCancelBtn) {
+		confirmCancelBtn.addEventListener("click", () => {
+			closeAdminConfirmModal(false)
+		})
+	}
+
+	if (confirmOkBtn) {
+		confirmOkBtn.addEventListener("click", () => {
+			closeAdminConfirmModal(true)
+		})
+	}
+
+	if (confirmModal) {
+		confirmModal.addEventListener("click", (event) => {
+			if (event.target === confirmModal) {
+				closeAdminConfirmModal(false)
+			}
+		})
+	}
+
+	document.addEventListener("keydown", (event) => {
+		if (event.key === "Escape" && adminConfirmState.isOpen) {
+			closeAdminConfirmModal(false)
 		}
 	})
 

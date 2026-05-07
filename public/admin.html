@@ -29,6 +29,11 @@
 					appId: "1:712913782427:web:e997553d71bd9a1f6a283e",
 					measurementId: "G-B6LVQBEN3G",
 				},
+				cloudinary: {
+					cloudName: "dil8nacay",
+					uploadPreset: "royal-braids",
+					folder: "royal-braids/gallery",
+				},
 				appCheck: {
 					siteKey: "6Lc4U9wsAAAAANRRyprzqkkNZ7iOI98qE0nb6hJO",
 				},
@@ -178,27 +183,149 @@
 						data-admin-section="gallery"
 						role="tabpanel"
 					>
-						<div class="admin-section-card-grid">
-							<article class="admin-section-card">
-								<h3>Gallery Content Control</h3>
-								<p>
-									Use this category to manage which hair styles and
-									transformation images are shown to clients.
-								</p>
-								<ul>
-									<li>✅ Review uploaded photos before publishing.</li>
-									<li>✅ Keep titles and style categories consistent.</li>
-									<li>✅ Remove any low quality or outdated examples.</li>
-								</ul>
-								<a
-									class="btn btn-outline"
-									href="index.html#gallery"
-									target="_blank"
-									rel="noopener"
+						<div class="admin-gallery-wrap">
+							<div
+								class="form-message"
+								id="adminGalleryMessage"
+								style="display: none"
+							></div>
+
+							<form class="admin-gallery-form" id="adminGalleryForm">
+								<input type="hidden" id="galleryEditId" />
+								<div class="admin-gallery-form-head">
+									<h3 id="adminGalleryFormTitle">Add New Gallery Style</h3>
+									<button
+										type="button"
+										class="btn btn-outline"
+										id="adminGalleryCancelEdit"
+										style="display: none"
+									>
+										Cancel Edit
+									</button>
+								</div>
+								<div class="admin-gallery-grid">
+									<div class="form-group">
+										<label for="galleryStyleName">Style Name *</label>
+										<input
+											type="text"
+											id="galleryStyleName"
+											placeholder="e.g. Boho Knotless Braids"
+											required
+										/>
+									</div>
+									<div class="form-group">
+										<label for="galleryStyleType">Style Type *</label>
+										<input
+											type="text"
+											id="galleryStyleType"
+											placeholder="e.g. Knotless"
+											required
+										/>
+									</div>
+									<div class="form-group">
+										<label for="galleryLength">Length *</label>
+										<select id="galleryLength" required>
+											<option value="">Select length</option>
+											<option value="Short">Short</option>
+											<option value="Medium">Medium</option>
+											<option value="Long">Long</option>
+										</select>
+									</div>
+									<div class="form-group">
+										<label for="gallerySize">Size *</label>
+										<select id="gallerySize" required>
+											<option value="">Select size</option>
+											<option value="Small">Small</option>
+											<option value="Medium">Medium</option>
+											<option value="Large">Large</option>
+										</select>
+									</div>
+									<div class="form-group">
+										<label for="galleryTimeTaken">Time Taken *</label>
+										<input
+											type="text"
+											id="galleryTimeTaken"
+											placeholder="e.g. 4 hours"
+											required
+										/>
+									</div>
+									<div class="form-group">
+										<label for="galleryPriceRange">Price Range</label>
+										<input
+											type="text"
+											id="galleryPriceRange"
+											placeholder="e.g. KSh 4,000 - 6,000"
+										/>
+									</div>
+									<div class="form-group">
+										<label for="galleryHairType">Hair Length/Type Used *</label>
+										<input
+											type="text"
+											id="galleryHairType"
+											placeholder="e.g. 20-inch human blend"
+											required
+										/>
+									</div>
+									<div class="form-group">
+										<label for="galleryStylistName">Stylist Name *</label>
+										<input
+											type="text"
+											id="galleryStylistName"
+											placeholder="e.g. Zainab Mohamed"
+											required
+										/>
+									</div>
+									<div class="form-group full">
+										<label for="galleryMainImage">After (Final Style) Image *</label>
+										<input type="file" id="galleryMainImage" accept="image/*" />
+										<small class="admin-field-help"
+											>This is the final/after result image. Required for new entries; optional while editing.</small
+										>
+									</div>
+									<div class="form-group full">
+										<label for="galleryBeforeImage"
+											>Before Image (Optional)</label
+										>
+										<input
+											type="file"
+											id="galleryBeforeImage"
+											accept="image/*"
+										/>
+									</div>
+									<div class="form-group full admin-checkbox-group">
+										<label>
+											<input type="checkbox" id="galleryFeaturedTrending" />
+											Trending Braids
+										</label>
+										<label>
+											<input type="checkbox" id="galleryFeaturedMostBooked" />
+											Most Booked Style
+										</label>
+									</div>
+								</div>
+								<button
+									type="submit"
+									class="btn btn-primary"
+									id="adminGallerySaveBtn"
 								>
-									Open Live Gallery
-								</a>
-							</article>
+									Save Gallery Style
+								</button>
+							</form>
+
+							<div class="admin-gallery-list-wrap">
+								<div class="admin-gallery-list-head">
+									<h3>Existing Gallery Styles</h3>
+									<a
+										class="btn btn-outline"
+										href="index.html#gallery"
+										target="_blank"
+										rel="noopener"
+									>
+										Open Live Gallery
+									</a>
+								</div>
+								<div class="admin-gallery-list" id="adminGalleryList"></div>
+							</div>
 						</div>
 					</section>
 
@@ -233,5 +360,16 @@
 				</div>
 			</div>
 		</section>
+
+		<div class="admin-confirm-modal" id="adminConfirmModal" aria-hidden="true">
+			<div class="admin-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="adminConfirmTitle">
+				<h3 id="adminConfirmTitle">Confirm Action</h3>
+				<p id="adminConfirmMessage">Are you sure you want to continue?</p>
+				<div class="admin-confirm-actions">
+					<button type="button" class="btn btn-outline" id="adminConfirmCancel">Cancel</button>
+					<button type="button" class="btn btn-primary" id="adminConfirmOk">Confirm</button>
+				</div>
+			</div>
+		</div>
 	</body>
 </html>
