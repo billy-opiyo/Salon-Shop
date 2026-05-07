@@ -306,6 +306,73 @@
 										</label>
 									</div>
 								</div>
+
+								<div class="admin-gallery-helper-panel">
+									<div class="admin-gallery-live-preview">
+										<h4>Live Preview</h4>
+										<div class="admin-gallery-preview-card">
+											<div class="admin-gallery-preview-media-wrap">
+												<img
+													id="adminGalleryPreviewImage"
+													class="admin-gallery-preview-media"
+													alt="Gallery preview"
+													style="display: none"
+												/>
+												<div
+													class="admin-gallery-preview-placeholder"
+													id="adminGalleryPreviewPlaceholder"
+												>
+													No image selected
+												</div>
+												<span
+													class="admin-gallery-badge"
+													id="adminGalleryPreviewBeforeAfterBadge"
+													style="display: none"
+												>
+													Before & After
+												</span>
+											</div>
+											<div class="admin-gallery-preview-content">
+												<h5 id="adminGalleryPreviewName">Style name preview</h5>
+												<p id="adminGalleryPreviewMeta">Type • Length • Size</p>
+												<p id="adminGalleryPreviewDetails">
+													Stylist: N/A • Time: N/A
+												</p>
+												<div
+													class="admin-gallery-preview-tags"
+													id="adminGalleryPreviewTags"
+												>
+													<span class="admin-gallery-preview-tag is-empty">No tags yet</span>
+												</div>
+											</div>
+										</div>
+									</div>
+
+									<div class="admin-gallery-checklist">
+										<h4>Publish Checklist</h4>
+										<div class="admin-gallery-checklist-progress">
+											<div
+												class="admin-gallery-checklist-progress-text"
+												id="adminGalleryChecklistProgressText"
+											>
+												0/5 completed
+											</div>
+											<div class="admin-gallery-checklist-progress-track">
+												<span
+													class="admin-gallery-checklist-progress-fill"
+													id="adminGalleryChecklistProgressFill"
+												></span>
+											</div>
+										</div>
+										<ul>
+											<li data-check="styleName"><span class="check-dot"></span> Style name entered</li>
+											<li data-check="styleType"><span class="check-dot"></span> Style type entered</li>
+											<li data-check="stylistName"><span class="check-dot"></span> Stylist name entered</li>
+											<li data-check="timeTaken"><span class="check-dot"></span> Time taken entered</li>
+											<li data-check="mainImage"><span class="check-dot"></span> Final image selected</li>
+										</ul>
+									</div>
+								</div>
 								<button
 									type="submit"
 									class="btn btn-primary"

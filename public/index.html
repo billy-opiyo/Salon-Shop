@@ -246,6 +246,23 @@
 					class="gallery-filters animate-on-scroll delay-1"
 					id="galleryFilters"
 				>
+					<div class="gallery-sort-row">
+						<label class="gallery-sort-label" for="gallerySortSelect"
+							>Sort By:</label
+						>
+						<select id="gallerySortSelect" class="gallery-sort-select">
+							<option value="recommended">Recommended</option>
+							<option value="name-asc">Name A-Z</option>
+							<option value="name-desc">Name Z-A</option>
+							<option value="date-modified-desc">Date Modified (Newest)</option>
+							<option value="date-modified-asc">Date Modified (Oldest)</option>
+							<option value="date-created-desc">Date Created (Newest)</option>
+							<option value="date-created-asc">Date Created (Oldest)</option>
+							<option value="new">New</option>
+							<option value="old">Old</option>
+						</select>
+					</div>
+
 					<div class="gallery-filter-group" id="galleryLengthFilters">
 						<button
 							class="gallery-filter-chip active"

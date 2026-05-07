@@ -11,6 +11,7 @@ let adminUnlocked = false
 let adminBookingsUnsubscribe = null
 let adminGalleryUnsubscribe = null
 let adminGalleryDocs = []
+let adminGalleryPreviewObjectUrl = ""
 const adminMessageTimers = new Map()
 const adminMessageHideTimers = new Map()
 const defaultAdminSection = "bookings"
@@ -412,6 +413,175 @@ function galleryDocToViewModel(doc) {
 	}
 }
 
+function escapeHtml(value) {
+	return String(value ?? "")
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;")
+}
+
+function setGalleryPreviewImage(src = "") {
+	const previewImage = document.getElementById("adminGalleryPreviewImage")
+	const placeholder = document.getElementById("adminGalleryPreviewPlaceholder")
+	if (!previewImage || !placeholder) return
+
+	if (src) {
+		previewImage.src = src
+		previewImage.style.display = "block"
+		placeholder.style.display = "none"
+		return
+	}
+
+	previewImage.removeAttribute("src")
+	previewImage.style.display = "none"
+	placeholder.style.display = "grid"
+}
+
+function setChecklistState(key, done) {
+	const item = document.querySelector(`.admin-gallery-checklist li[data-check="${key}"]`)
+	if (!item) return
+	item.classList.toggle("completed", Boolean(done))
+}
+
+function updateChecklistProgressMeter() {
+	const checklistItems = document.querySelectorAll(".admin-gallery-checklist li[data-check]")
+	const progressText = document.getElementById("adminGalleryChecklistProgressText")
+	const progressFill = document.getElementById("adminGalleryChecklistProgressFill")
+	if (!checklistItems.length) return
+
+	let completed = 0
+	checklistItems.forEach((item) => {
+		if (item.classList.contains("completed")) completed += 1
+	})
+
+	const total = checklistItems.length
+	const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+
+	if (progressText) {
+		progressText.textContent = `${completed}/${total} completed`
+	}
+
+	if (progressFill) {
+		progressFill.style.width = `${percent}%`
+	}
+}
+
+function updateGalleryPreview() {
+	const styleName = document.getElementById("galleryStyleName")?.value?.trim() || ""
+	const styleType = document.getElementById("galleryStyleType")?.value?.trim() || ""
+	const length = document.getElementById("galleryLength")?.value || ""
+	const size = document.getElementById("gallerySize")?.value || ""
+	const timeTaken = document.getElementById("galleryTimeTaken")?.value?.trim() || ""
+	const priceRange = document.getElementById("galleryPriceRange")?.value?.trim() || ""
+	const stylistName = document.getElementById("galleryStylistName")?.value?.trim() || ""
+	const hasTrending = document.getElementById("galleryFeaturedTrending")?.checked === true
+	const hasMostBooked =
+		document.getElementById("galleryFeaturedMostBooked")?.checked === true
+	const beforeImageSelected =
+		(document.getElementById("galleryBeforeImage")?.files?.length || 0) > 0
+
+	const previewName = document.getElementById("adminGalleryPreviewName")
+	const previewMeta = document.getElementById("adminGalleryPreviewMeta")
+	const previewDetails = document.getElementById("adminGalleryPreviewDetails")
+	const previewTags = document.getElementById("adminGalleryPreviewTags")
+	const beforeAfterBadge = document.getElementById("adminGalleryPreviewBeforeAfterBadge")
+
+	if (previewName) {
+		previewName.textContent = styleName || "Style name preview"
+	}
+
+	if (previewMeta) {
+		previewMeta.textContent = `${styleType || "Type"} • ${length || "Length"} • ${size || "Size"}`
+	}
+
+	if (previewDetails) {
+		previewDetails.textContent = `Stylist: ${stylistName || "N/A"} • Time: ${timeTaken || "N/A"}`
+	}
+
+	if (beforeAfterBadge) {
+		beforeAfterBadge.style.display = beforeImageSelected ? "inline-flex" : "none"
+	}
+
+	if (previewTags) {
+		const tags = []
+		if (hasTrending) tags.push("Trending")
+		if (hasMostBooked) tags.push("Most Booked")
+		if (priceRange) tags.push(priceRange)
+
+		if (!tags.length) {
+			previewTags.innerHTML =
+				'<span class="admin-gallery-preview-tag is-empty">No tags yet</span>'
+		} else {
+			previewTags.innerHTML = tags
+				.map((tag) => `<span class="admin-gallery-preview-tag">${escapeHtml(tag)}</span>`)
+				.join("")
+		}
+	}
+
+	setChecklistState("styleName", Boolean(styleName))
+	setChecklistState("styleType", Boolean(styleType))
+	setChecklistState("stylistName", Boolean(stylistName))
+	setChecklistState("timeTaken", Boolean(timeTaken))
+	setChecklistState(
+		"mainImage",
+		(document.getElementById("galleryMainImage")?.files?.length || 0) > 0,
+	)
+
+	updateChecklistProgressMeter()
+}
+
+function syncGalleryPreviewImageFromFile() {
+	const mainImageInput = document.getElementById("galleryMainImage")
+	if (!mainImageInput) return
+
+	const file = mainImageInput.files?.[0]
+	if (adminGalleryPreviewObjectUrl) {
+		URL.revokeObjectURL(adminGalleryPreviewObjectUrl)
+		adminGalleryPreviewObjectUrl = ""
+	}
+
+	if (!file) {
+		setGalleryPreviewImage("")
+		updateGalleryPreview()
+		return
+	}
+
+	adminGalleryPreviewObjectUrl = URL.createObjectURL(file)
+	setGalleryPreviewImage(adminGalleryPreviewObjectUrl)
+	updateGalleryPreview()
+}
+
+function bindGalleryPreviewEvents() {
+	const ids = [
+		"galleryStyleName",
+		"galleryStyleType",
+		"galleryLength",
+		"gallerySize",
+		"galleryTimeTaken",
+		"galleryPriceRange",
+		"galleryStylistName",
+		"galleryFeaturedTrending",
+		"galleryFeaturedMostBooked",
+		"galleryBeforeImage",
+	]
+
+	ids.forEach((id) => {
+		const el = document.getElementById(id)
+		if (!el) return
+		el.addEventListener("input", updateGalleryPreview)
+		el.addEventListener("change", updateGalleryPreview)
+	})
+
+	const mainImageInput = document.getElementById("galleryMainImage")
+	if (mainImageInput) {
+		mainImageInput.addEventListener("change", syncGalleryPreviewImageFromFile)
+	}
+
+	updateGalleryPreview()
+}
+
 function resetGalleryForm() {
 	const form = document.getElementById("adminGalleryForm")
 	if (!form) return
@@ -423,6 +593,13 @@ function resetGalleryForm() {
 	document.getElementById("adminGallerySaveBtn").textContent =
 		"Save Gallery Style"
 	document.getElementById("adminGalleryCancelEdit").style.display = "none"
+
+	if (adminGalleryPreviewObjectUrl) {
+		URL.revokeObjectURL(adminGalleryPreviewObjectUrl)
+		adminGalleryPreviewObjectUrl = ""
+	}
+	setGalleryPreviewImage("")
+	updateGalleryPreview()
 }
 
 function loadGalleryItemForEditing(id) {
@@ -451,6 +628,13 @@ function loadGalleryItemForEditing(id) {
 		"inline-flex"
 
 	setAdminMessage("", "", "adminGalleryMessage")
+
+	if (adminGalleryPreviewObjectUrl) {
+		URL.revokeObjectURL(adminGalleryPreviewObjectUrl)
+		adminGalleryPreviewObjectUrl = ""
+	}
+	setGalleryPreviewImage(item.imageUrl || "")
+	updateGalleryPreview()
 }
 
 function renderAdminGallery(docs) {
@@ -781,6 +965,7 @@ function initializeAdminPanel() {
 	if (!loginForm || !logoutBtn || !bookingList) return
 
 	initializeAdminSectionTabs()
+	bindGalleryPreviewEvents()
 
 	loginForm.addEventListener("submit", async (event) => {
 		event.preventDefault()

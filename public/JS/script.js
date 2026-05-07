@@ -250,6 +250,7 @@ let filteredGalleryData = [...galleryData]
 let showAllGallery = false
 let currentLightboxIndex = 0
 let galleryRealtimeUnsubscribe = null
+let gallerySortBy = "recommended"
 const galleryFiltersState = {
 	length: "all",
 	size: "all",
@@ -546,6 +547,8 @@ function normalizeGalleryItem(item = {}) {
 		hasBeforeAfter,
 		featuredTrending: item.featuredTrending === true,
 		featuredMostBooked: item.featuredMostBooked === true,
+		createdAt: item.createdAt || item.created_at || item.createdOn || null,
+		updatedAt: item.updatedAt || item.updated_at || item.updatedOn || null,
 	}
 }
 
@@ -611,6 +614,98 @@ function applyGalleryFilters() {
 		}
 		return true
 	})
+
+	filteredGalleryData = sortGalleryItems(filteredGalleryData, gallerySortBy)
+}
+
+function parseItemTimeValue(item, keys = ["updatedAt", "createdAt"]) {
+	for (const key of keys) {
+		const raw = item?.[key]
+		if (!raw) continue
+		if (typeof raw?.toMillis === "function") return raw.toMillis()
+		if (typeof raw === "number" && Number.isFinite(raw)) return raw
+		if (raw?.seconds && Number.isFinite(raw.seconds)) return raw.seconds * 1000
+		const parsed = Date.parse(String(raw))
+		if (!Number.isNaN(parsed)) return parsed
+	}
+	return 0
+}
+
+function sortGalleryItems(items = [], sortBy = "recommended") {
+	const data = [...items]
+
+	const byNameAsc = (a, b) =>
+		String(a.styleName || "").localeCompare(String(b.styleName || ""), undefined, {
+			sensitivity: "base",
+		})
+
+	if (sortBy === "name-asc") {
+		return data.sort(byNameAsc)
+	}
+
+	if (sortBy === "name-desc") {
+		return data.sort((a, b) => byNameAsc(b, a))
+	}
+
+	if (sortBy === "date-modified-desc" || sortBy === "new") {
+		return data.sort(
+			(a, b) =>
+				parseItemTimeValue(b, ["updatedAt", "createdAt"]) -
+				parseItemTimeValue(a, ["updatedAt", "createdAt"]),
+		)
+	}
+
+	if (sortBy === "date-modified-asc" || sortBy === "old") {
+		return data.sort(
+			(a, b) =>
+				parseItemTimeValue(a, ["updatedAt", "createdAt"]) -
+				parseItemTimeValue(b, ["updatedAt", "createdAt"]),
+		)
+	}
+
+	if (sortBy === "date-created-desc") {
+		return data.sort(
+			(a, b) =>
+				parseItemTimeValue(b, ["createdAt", "updatedAt"]) -
+				parseItemTimeValue(a, ["createdAt", "updatedAt"]),
+		)
+	}
+
+	if (sortBy === "date-created-asc") {
+		return data.sort(
+			(a, b) =>
+				parseItemTimeValue(a, ["createdAt", "updatedAt"]) -
+				parseItemTimeValue(b, ["createdAt", "updatedAt"]),
+		)
+	}
+
+	return data.sort((a, b) => {
+		const scoreA =
+			(a.featuredTrending ? 2 : 0) +
+			(a.featuredMostBooked ? 2 : 0) +
+			(a.hasBeforeAfter ? 1 : 0)
+		const scoreB =
+			(b.featuredTrending ? 2 : 0) +
+			(b.featuredMostBooked ? 2 : 0) +
+			(b.hasBeforeAfter ? 1 : 0)
+
+		if (scoreA !== scoreB) return scoreB - scoreA
+
+		const updatedDiff =
+			parseItemTimeValue(b, ["updatedAt", "createdAt"]) -
+			parseItemTimeValue(a, ["updatedAt", "createdAt"])
+		if (updatedDiff !== 0) return updatedDiff
+
+		return byNameAsc(a, b)
+	})
+}
+
+function setGallerySort(sortValue = "recommended") {
+	gallerySortBy = sortValue
+	showAllGallery = false
+	const button = document.getElementById("viewAllGallery")
+	if (button) button.textContent = "View All Braids"
+	renderGallery()
 }
 
 function renderFeaturedStyles() {
@@ -769,6 +864,14 @@ function wireGalleryInteractions() {
 			if (!trigger) return
 			const key = trigger.dataset.featureOpen
 			openGalleryItemByIdOrName(key)
+		})
+	}
+
+	const sortSelect = document.getElementById("gallerySortSelect")
+	if (sortSelect) {
+		sortSelect.value = gallerySortBy
+		sortSelect.addEventListener("change", (event) => {
+			setGallerySort(event.target.value || "recommended")
 		})
 	}
 }
