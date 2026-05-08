@@ -257,7 +257,7 @@ const galleryFiltersState = {
 	styleType: "all",
 }
 
-const testimonialsData = [
+const fallbackTestimonialsData = [
 	{
 		name: "Fatuma Ali",
 		avatar: "FA",
@@ -307,6 +307,47 @@ const testimonialsData = [
 		source: "Google",
 	},
 ]
+
+let testimonialsData = [...fallbackTestimonialsData]
+let testimonialsRealtimeUnsubscribe = null
+const DEFAULT_VISIBLE_REVIEWS = 6
+let showAllReviews = false
+let reviewsSortMode = "featured"
+let reviewMessageTimer = null
+let reviewsToggleAnimationTimer = null
+
+function showFormMessage(msg, type, text) {
+	if (!msg) return
+	msg.className = `form-message ${type}`
+	msg.textContent = text
+	msg.style.display = "block"
+	msg.classList.remove("is-leaving")
+	requestAnimationFrame(() => {
+		msg.classList.add("is-visible")
+	})
+}
+
+function clearFormMessage(msg) {
+	if (!msg) return
+	msg.className = "form-message"
+	msg.textContent = ""
+	msg.style.display = "none"
+}
+
+function hideReviewMessage(msg, animated = false) {
+	if (!msg) return
+
+	if (!animated) {
+		clearFormMessage(msg)
+		return
+	}
+
+	msg.classList.remove("is-visible")
+	msg.classList.add("is-leaving")
+	setTimeout(() => {
+		clearFormMessage(msg)
+	}, 300)
+}
 
 const iconPaths = {
 	scissors:
@@ -635,9 +676,13 @@ function sortGalleryItems(items = [], sortBy = "recommended") {
 	const data = [...items]
 
 	const byNameAsc = (a, b) =>
-		String(a.styleName || "").localeCompare(String(b.styleName || ""), undefined, {
-			sensitivity: "base",
-		})
+		String(a.styleName || "").localeCompare(
+			String(b.styleName || ""),
+			undefined,
+			{
+				sensitivity: "base",
+			},
+		)
 
 	if (sortBy === "name-asc") {
 		return data.sort(byNameAsc)
@@ -916,9 +961,123 @@ function startGalleryRealtimeListener() {
 		)
 }
 
-function renderTestimonials() {
+function normalizeReviewItem(item = {}) {
+	const name =
+		String(item.name || "Anonymous Client").trim() || "Anonymous Client"
+	const text = String(item.text || "").trim()
+	const ratingRaw = Number(item.rating)
+	const rating = Number.isFinite(ratingRaw)
+		? Math.max(1, Math.min(5, Math.round(ratingRaw)))
+		: 5
+	const source = String(item.source || "Website").trim() || "Website"
+	const service = String(item.service || "").trim()
+	const role = service ? `${service} Client` : item.role || "Verified Client"
+	const avatar =
+		String(item.avatar || "").trim() ||
+		name
+			.split(" ")
+			.map((part) => part[0])
+			.join("")
+			.slice(0, 2)
+			.toUpperCase()
+
+	return {
+		id: item.id || "",
+		name,
+		avatar,
+		role,
+		text,
+		rating,
+		source,
+		service,
+		featured: item.featured === true,
+		status: item.status || "approved",
+		createdAt: item.createdAt || null,
+	}
+}
+
+function getReviewSourceIcon(source = "") {
+	if (source === "Instagram") {
+		return '<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/>'
+	}
+	if (source === "Facebook") {
+		return '<path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/>'
+	}
+	if (source === "Google") {
+		return '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>'
+	}
+	return '<path d="M22 12h-4"/><path d="M6 12H2"/><path d="M12 6V2"/><path d="M12 22v-4"/><circle cx="12" cy="12" r="6"/>'
+}
+
+function parseReviewTime(value) {
+	if (!value) return 0
+	if (typeof value?.toMillis === "function") return value.toMillis()
+	if (typeof value === "number" && Number.isFinite(value)) return value
+	if (value?.seconds && Number.isFinite(value.seconds))
+		return value.seconds * 1000
+	const parsed = Date.parse(String(value))
+	return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function sortReviewsList(list = [], mode = reviewsSortMode) {
+	const items = [...list]
+
+	if (mode === "newest") {
+		return items.sort(
+			(a, b) => parseReviewTime(b.createdAt) - parseReviewTime(a.createdAt),
+		)
+	}
+
+	if (mode === "highest-rated") {
+		return items.sort((a, b) => {
+			const ratingDiff = Number(b.rating || 0) - Number(a.rating || 0)
+			if (ratingDiff !== 0) return ratingDiff
+			if (a.featured !== b.featured) return a.featured ? -1 : 1
+			return parseReviewTime(b.createdAt) - parseReviewTime(a.createdAt)
+		})
+	}
+
+	return items.sort((a, b) => {
+		if (a.featured !== b.featured) return a.featured ? -1 : 1
+		return parseReviewTime(b.createdAt) - parseReviewTime(a.createdAt)
+	})
+}
+
+function renderReviewsSummary() {
+	const summary = document.getElementById("reviewsSummary")
+	if (!summary) return
+
+	const total = testimonialsData.length
+	if (!total) {
+		summary.textContent = "No approved reviews yet."
+		return
+	}
+
+	const average =
+		testimonialsData.reduce(
+			(sum, review) => sum + Number(review.rating || 0),
+			0,
+		) / total
+	summary.textContent = `★ ${average.toFixed(1)} average from ${total} review${total === 1 ? "" : "s"}`
+}
+
+function renderTestimonials(list = testimonialsData) {
 	const grid = document.getElementById("testimonialsGrid")
-	grid.innerHTML = testimonialsData
+	const viewAllBtn = document.getElementById("viewAllReviewsBtn")
+	const viewLessBtn = document.getElementById("viewLessReviewsBtn")
+	const controls = document.getElementById("reviewsToggleControls")
+	if (!grid) return
+
+	const safeList =
+		Array.isArray(list) && list.length ? list : fallbackTestimonialsData
+	const sortedList = sortReviewsList(safeList)
+	const shouldCollapse = sortedList.length > DEFAULT_VISIBLE_REVIEWS
+	const visibleList =
+		shouldCollapse && !showAllReviews
+			? sortedList.slice(0, DEFAULT_VISIBLE_REVIEWS)
+			: sortedList
+
+	grid.innerHTML = visibleList
 		.map(
 			(t) => `
     <div class="testimonial-card">
@@ -934,12 +1093,271 @@ function renderTestimonials() {
         </div>
       </div>
       <div class="testimonial-social">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${t.source === "Instagram" ? '<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/>' : t.source === "Facebook" ? '<path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/>' : '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>'}</svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${getReviewSourceIcon(t.source)}</svg>
       </div>
     </div>
   `,
 		)
 		.join("")
+
+	if (controls && viewAllBtn && viewLessBtn) {
+		if (!shouldCollapse) {
+			controls.classList.add("hidden")
+			viewAllBtn.classList.add("hidden")
+			viewLessBtn.classList.add("hidden")
+		} else {
+			controls.classList.remove("hidden")
+			if (showAllReviews) {
+				viewAllBtn.classList.add("hidden")
+				viewLessBtn.classList.remove("hidden")
+			} else {
+				viewAllBtn.classList.remove("hidden")
+				viewLessBtn.classList.add("hidden")
+			}
+		}
+	}
+
+	renderReviewsSummary()
+}
+
+function bindReviewToggleControls() {
+	const viewAllBtn = document.getElementById("viewAllReviewsBtn")
+	const viewLessBtn = document.getElementById("viewLessReviewsBtn")
+
+	const animateReviewsToggle = (nextShowAll, scrollToTop = false) => {
+		if (showAllReviews === nextShowAll) return
+
+		const grid = document.getElementById("testimonialsGrid")
+
+		const commitSwitch = () => {
+			showAllReviews = nextShowAll
+			renderTestimonials(testimonialsData)
+			if (scrollToTop) {
+				document
+					.getElementById("testimonials")
+					?.scrollIntoView({ behavior: "smooth", block: "start" })
+			}
+		}
+
+		if (!grid) {
+			commitSwitch()
+			return
+		}
+
+		if (reviewsToggleAnimationTimer) {
+			clearTimeout(reviewsToggleAnimationTimer)
+			reviewsToggleAnimationTimer = null
+		}
+
+		grid.classList.add("is-switching")
+		reviewsToggleAnimationTimer = setTimeout(() => {
+			commitSwitch()
+			requestAnimationFrame(() => {
+				grid.classList.remove("is-switching")
+			})
+			reviewsToggleAnimationTimer = null
+		}, 220)
+	}
+
+	if (viewAllBtn) {
+		viewAllBtn.addEventListener("click", () => {
+			animateReviewsToggle(true)
+		})
+	}
+
+	if (viewLessBtn) {
+		viewLessBtn.addEventListener("click", () => {
+			animateReviewsToggle(false, true)
+		})
+	}
+}
+
+function bindReviewsSortControls() {
+	const reviewsSortSelect = document.getElementById("reviewsSortSelect")
+	if (!reviewsSortSelect) return
+
+	reviewsSortSelect.value = reviewsSortMode
+	reviewsSortSelect.addEventListener("change", (event) => {
+		reviewsSortMode = event.target.value || "featured"
+		showAllReviews = false
+		renderTestimonials(testimonialsData)
+	})
+}
+
+async function submitReview(event) {
+	event.preventDefault()
+
+	const form = event.currentTarget
+	const submitBtn = form?.querySelector('button[type="submit"]')
+	const msg = document.getElementById("reviewMessage")
+
+	if (!form || !submitBtn || !msg) return
+
+	const name = document.getElementById("reviewName")?.value?.trim() || ""
+	const ratingValue = Number(
+		document.getElementById("reviewRating")?.value || 0,
+	)
+	const service = document.getElementById("reviewService")?.value?.trim() || ""
+	const text = document.getElementById("reviewText")?.value?.trim() || ""
+
+	clearFormMessage(msg)
+	msg.classList.remove("is-leaving")
+	if (reviewMessageTimer) {
+		clearTimeout(reviewMessageTimer)
+		reviewMessageTimer = null
+	}
+
+	if (
+		!name ||
+		!text ||
+		!Number.isFinite(ratingValue) ||
+		ratingValue < 1 ||
+		ratingValue > 5
+	) {
+		showFormMessage(
+			msg,
+			"error",
+			"❌ Please provide your name, rating, and review message.",
+		)
+		return
+	}
+
+	if (text.length < 10) {
+		showFormMessage(
+			msg,
+			"error",
+			"❌ Please write at least 10 characters so your feedback is useful.",
+		)
+		return
+	}
+
+	if (!firebaseReady || !db || !auth) {
+		showFormMessage(
+			msg,
+			"error",
+			"⚠️ Reviews service is not configured yet. Add Firebase keys in APP_CONFIG.",
+		)
+		return
+	}
+
+	submitBtn.disabled = true
+	submitBtn.textContent = "Submitting..."
+
+	try {
+		let activeUid = auth.currentUser?.uid || null
+
+		if (!activeUid) {
+			try {
+				const userCredential = await auth.signInAnonymously()
+				activeUid = userCredential?.user?.uid || auth.currentUser?.uid || null
+			} catch (error) {
+				throw new Error(getFriendlyAuthError(error))
+			}
+		}
+
+		if (!activeUid) {
+			throw new Error(
+				"Unable to authenticate review session. Please refresh and try again.",
+			)
+		}
+
+		await db.collection("reviews").add({
+			name,
+			avatar: name
+				.split(" ")
+				.map((part) => part[0])
+				.join("")
+				.slice(0, 2)
+				.toUpperCase(),
+			text,
+			rating: Math.round(ratingValue),
+			source: "Website",
+			service,
+			status: "pending",
+			featured: false,
+			uid: activeUid,
+			createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+			updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+		})
+
+		form.reset()
+		showFormMessage(
+			msg,
+			"success",
+			"✅ Thank you! Your review was submitted and is pending approval.",
+		)
+		reviewMessageTimer = setTimeout(() => {
+			hideReviewMessage(msg, true)
+			reviewMessageTimer = null
+		}, 5000)
+	} catch (error) {
+		console.error("Review submit failed:", error)
+		showFormMessage(
+			msg,
+			"error",
+			`❌ ${error.message || "Failed to submit review. Please try again."}`,
+		)
+	} finally {
+		submitBtn.disabled = false
+		submitBtn.textContent = "Submit Review"
+	}
+}
+
+function bindReviewForm() {
+	const reviewForm = document.getElementById("reviewForm")
+	if (!reviewForm) return
+
+	reviewForm.addEventListener("input", () => {
+		const msg = document.getElementById("reviewMessage")
+		if (!msg) return
+		if (reviewMessageTimer) {
+			clearTimeout(reviewMessageTimer)
+			reviewMessageTimer = null
+		}
+		hideReviewMessage(msg, false)
+	})
+
+	reviewForm.addEventListener("submit", (event) => {
+		event.preventDefault()
+		event.stopPropagation()
+		void submitReview(event)
+	})
+}
+
+function startTestimonialsRealtimeListener() {
+	if (!firebaseReady || !db) return
+
+	if (typeof testimonialsRealtimeUnsubscribe === "function") {
+		testimonialsRealtimeUnsubscribe()
+		testimonialsRealtimeUnsubscribe = null
+	}
+
+	testimonialsRealtimeUnsubscribe = db
+		.collection("reviews")
+		.where("status", "==", "approved")
+		.limit(120)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) =>
+					normalizeReviewItem({ id: doc.id, ...doc.data() }),
+				)
+
+				testimonialsData = docs.length
+					? docs
+					: fallbackTestimonialsData.map((item, i) =>
+							normalizeReviewItem({ id: `fallback-review-${i}`, ...item }),
+						)
+
+				renderTestimonials(testimonialsData)
+			},
+			(error) => {
+				console.error("Reviews realtime listener failed:", error)
+				testimonialsData = fallbackTestimonialsData.map((item, i) =>
+					normalizeReviewItem({ id: `fallback-review-${i}`, ...item }),
+				)
+				renderTestimonials(testimonialsData)
+			},
+		)
 }
 
 function populateServiceSelect() {
@@ -1113,15 +1531,14 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 	const stylistKey = data.stylist && data.stylist.trim() ? data.stylist : "any"
 	const slotId = getSlotId(data.date, stylistKey, data.time)
 
-	msg.className = "form-message"
-	msg.textContent = ""
-	msg.style.display = "none"
+	clearFormMessage(msg)
 
 	if (!firebaseReady || !db || !auth) {
-		msg.className = "form-message error"
-		msg.textContent =
-			"⚠️ Booking service is not configured yet. Add Firebase keys in APP_CONFIG."
-		msg.style.display = "block"
+		showFormMessage(
+			msg,
+			"error",
+			"⚠️ Booking service is not configured yet. Add Firebase keys in APP_CONFIG.",
+		)
 		return
 	}
 
@@ -1197,16 +1614,20 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 
 			form.style.display = "none"
 			document.getElementById("bookingSuccess").style.display = "block"
-			msg.className = "form-message success"
-			msg.textContent = "✅ Booking confirmed and saved in realtime!"
-			msg.style.display = "block"
+			showFormMessage(
+				msg,
+				"success",
+				"✅ Booking confirmed and saved in realtime!",
+			)
 
 			handleAvailabilityWatch()
 		} catch (error) {
 			console.error("Booking failed:", error)
-			msg.className = "form-message error"
-			msg.textContent = `❌ ${error.message || "Booking failed. Please try again."}`
-			msg.style.display = "block"
+			showFormMessage(
+				msg,
+				"error",
+				`❌ ${error.message || "Booking failed. Please try again."}`,
+			)
 		} finally {
 			btn.classList.remove("loading")
 			btn.disabled = false
@@ -1220,7 +1641,7 @@ function resetBooking() {
 	populateTimeSlots()
 	document.getElementById("bookingForm").style.display = "block"
 	document.getElementById("bookingSuccess").style.display = "none"
-	document.getElementById("bookingMessage").style.display = "none"
+	clearFormMessage(document.getElementById("bookingMessage"))
 }
 
 // Set min date for booking
@@ -1457,7 +1878,10 @@ wireGalleryInteractions()
 document
 	.getElementById("viewAllGallery")
 	?.addEventListener("click", toggleGalleryView)
-renderTestimonials()
+renderTestimonials(testimonialsData.map((item) => normalizeReviewItem(item)))
+bindReviewsSortControls()
+bindReviewToggleControls()
+bindReviewForm()
 populateServiceSelect()
 populateTimeSlots()
 
@@ -1474,4 +1898,5 @@ initializeFirebaseServices().then(() => {
 	}
 
 	startGalleryRealtimeListener()
+	startTestimonialsRealtimeListener()
 })

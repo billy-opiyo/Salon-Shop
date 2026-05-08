@@ -108,5 +108,55 @@ service cloud.firestore {
       // Only admin can create/update/delete gallery content.
       allow create, update, delete: if isAdmin();
     }
+
+    match /reviews/{reviewId} {
+      // Public can only see approved reviews; admins can see all.
+      allow read: if (
+        resource.data.status == 'approved'
+      ) || isAdmin();
+
+      // Public users can submit reviews, but only as pending.
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          'name',
+          'avatar',
+          'text',
+          'rating',
+          'source',
+          'service',
+          'status',
+          'featured',
+          'uid',
+          'bookingId',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.text is string
+        && request.resource.data.source is string
+        && request.resource.data.status == 'pending'
+        && request.resource.data.featured == false
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.text.size() >= 10
+        && request.resource.data.text.size() <= 800
+        && request.resource.data.rating in [1, 2, 3, 4, 5]
+        && (
+          !request.resource.data.keys().hasAny(['avatar'])
+          || request.resource.data.avatar is string
+        )
+        && (
+          !request.resource.data.keys().hasAny(['service'])
+          || request.resource.data['service'] is string
+        )
+        && (
+          !request.resource.data.keys().hasAny(['bookingId'])
+          || request.resource.data.bookingId is string
+        );
+
+      // Only admins can moderate/update/delete.
+      allow update, delete: if isAdmin();
+    }
   }
 }

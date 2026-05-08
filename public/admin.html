@@ -427,18 +427,52 @@
 						data-admin-section="reviews"
 						role="tabpanel"
 					>
-						<div class="admin-section-card-grid">
+						<div class="admin-stats">
+							<div class="admin-stat-card">
+								<div class="label">Total</div>
+								<strong id="adminReviewsTotalCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Pending</div>
+								<strong id="adminReviewsPendingCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Approved</div>
+								<strong id="adminReviewsApprovedCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Rejected</div>
+								<strong id="adminReviewsRejectedCount">0</strong>
+							</div>
+						</div>
+
+						<div
+							class="form-message"
+							id="adminReviewsMessage"
+							style="display: none"
+						></div>
+
+						<div class="admin-review-list-head">
+							<label for="adminReviewsSortSelect">Sort Reviews:</label>
+							<select
+								id="adminReviewsSortSelect"
+								class="admin-review-sort-select"
+							>
+								<option value="featured">Featured</option>
+								<option value="newest">Newest</option>
+								<option value="highest-rated">Highest Rated</option>
+							</select>
+						</div>
+
+						<div class="admin-review-list" id="adminReviewsList"></div>
+
+						<div class="admin-section-card-grid" style="margin-top: 14px">
 							<article class="admin-section-card">
-								<h3>Reviews Moderation</h3>
+								<h3>Review Moderation Tips</h3>
 								<p>
-									Use this category to monitor customer feedback and keep only
-									helpful, authentic testimonials visible.
+									Approve helpful reviews, reject spam/inappropriate feedback,
+									and feature standout testimonials.
 								</p>
-								<ul>
-									<li>✅ Highlight detailed and useful positive reviews.</li>
-									<li>✅ Remove spam and inappropriate comments.</li>
-									<li>✅ Follow up quickly on any negative feedback.</li>
-								</ul>
 								<a
 									class="btn btn-outline"
 									href="index.html#testimonials"

@@ -10,7 +10,11 @@ let auth = null
 let adminUnlocked = false
 let adminBookingsUnsubscribe = null
 let adminGalleryUnsubscribe = null
+let adminReviewsUnsubscribe = null
 let adminGalleryDocs = []
+let adminReviewDocs = []
+let adminReviewRawDocs = []
+let adminReviewsSortMode = "featured"
 let adminGalleryPreviewObjectUrl = ""
 const adminMessageTimers = new Map()
 const adminMessageHideTimers = new Map()
@@ -208,6 +212,13 @@ function stopAdminGalleryListener() {
 	}
 }
 
+function stopAdminReviewsListener() {
+	if (typeof adminReviewsUnsubscribe === "function") {
+		adminReviewsUnsubscribe()
+		adminReviewsUnsubscribe = null
+	}
+}
+
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
@@ -226,7 +237,7 @@ function setAdminMessage(type, text, targetId = "adminMessage") {
 	}
 
 	const hideMessage = (animated = false) => {
-		if (isGalleryToast && animated) {
+		if (animated) {
 			msg.classList.remove("is-visible")
 			msg.classList.add("is-leaving")
 			const hideTimer = setTimeout(() => {
@@ -254,19 +265,16 @@ function setAdminMessage(type, text, targetId = "adminMessage") {
 		: `form-message ${type}`
 	msg.textContent = text
 	msg.style.display = "block"
-
-	if (isGalleryToast) {
-		msg.classList.remove("is-leaving")
-		requestAnimationFrame(() => {
-			msg.classList.add("is-visible")
-		})
-	}
+	msg.classList.remove("is-leaving")
+	requestAnimationFrame(() => {
+		msg.classList.add("is-visible")
+	})
 
 	const shouldAutoDismiss = type === "success" || type === "error"
 	if (!shouldAutoDismiss) return
 
 	const timer = setTimeout(() => {
-		hideMessage(isGalleryToast)
+		hideMessage(true)
 		adminMessageTimers.delete(targetId)
 	}, 4200)
 
@@ -295,13 +303,190 @@ function setAdminUnlockedState(value) {
 	if (!value) {
 		stopAdminBookingsListener()
 		stopAdminGalleryListener()
+		stopAdminReviewsListener()
 		setAdminMessage("", "")
 		setAdminMessage("", "", "adminGalleryMessage")
+		setAdminMessage("", "", "adminReviewsMessage")
 	} else {
 		startAdminBookingsListener()
 		startAdminGalleryListener()
+		startAdminReviewsListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
+}
+
+function normalizeReviewStatus(status) {
+	const raw = String(status || "pending")
+		.trim()
+		.toLowerCase()
+	if (["pending", "approved", "rejected"].includes(raw)) return raw
+	return "pending"
+}
+
+function extractReviewStatus(review = {}) {
+	return review.status ?? review.reviewStatus ?? "pending"
+}
+
+function getReviewStatusClass(status) {
+	switch (normalizeReviewStatus(status)) {
+		case "approved":
+			return "admin-status-confirmed"
+		case "rejected":
+			return "admin-status-cancelled"
+		default:
+			return "admin-status-pending"
+	}
+}
+
+function normalizeReviewDoc(doc = {}) {
+	const name =
+		String(doc.name || "Anonymous Client").trim() || "Anonymous Client"
+	const text = String(doc.text || "").trim()
+	const source = String(doc.source || "Website").trim() || "Website"
+	const service = String(doc.service || "").trim()
+	const ratingRaw = Number(doc.rating)
+	const rating = Number.isFinite(ratingRaw)
+		? Math.max(1, Math.min(5, Math.round(ratingRaw)))
+		: 5
+
+	return {
+		id: doc.id,
+		name,
+		text,
+		source,
+		service,
+		rating,
+		status: normalizeReviewStatus(extractReviewStatus(doc)),
+		featured: doc.featured === true,
+		uid: doc.uid || "",
+		createdAt: doc.createdAt,
+		updatedAt: doc.updatedAt,
+	}
+}
+
+function sortAdminReviewsList(items = [], mode = adminReviewsSortMode) {
+	const data = [...items]
+
+	if (mode === "newest") {
+		return data.sort((a, b) => {
+			const updatedDiff =
+				toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
+			if (updatedDiff !== 0) return updatedDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	if (mode === "highest-rated") {
+		return data.sort((a, b) => {
+			const ratingDiff = Number(b.rating || 0) - Number(a.rating || 0)
+			if (ratingDiff !== 0) return ratingDiff
+			if (a.featured !== b.featured) return a.featured ? -1 : 1
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	return data.sort((a, b) => {
+		if (a.featured !== b.featured) return a.featured ? -1 : 1
+		const aUpdated = toTimestampMs(a.updatedAt)
+		const bUpdated = toTimestampMs(b.updatedAt)
+		if (aUpdated !== bUpdated) return bUpdated - aUpdated
+		return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+	})
+}
+
+function renderAdminReviews(docs) {
+	const list = document.getElementById("adminReviewsList")
+	if (!list) return
+
+	adminReviewRawDocs = Array.isArray(docs) ? [...docs] : []
+	const items = sortAdminReviewsList(docs.map(normalizeReviewDoc))
+
+	adminReviewDocs = items
+
+	const total = items.length
+	const pending = items.filter((r) => r.status === "pending").length
+	const approved = items.filter((r) => r.status === "approved").length
+	const rejected = items.filter((r) => r.status === "rejected").length
+
+	const totalEl = document.getElementById("adminReviewsTotalCount")
+	const pendingEl = document.getElementById("adminReviewsPendingCount")
+	const approvedEl = document.getElementById("adminReviewsApprovedCount")
+	const rejectedEl = document.getElementById("adminReviewsRejectedCount")
+
+	if (totalEl) totalEl.textContent = String(total)
+	if (pendingEl) pendingEl.textContent = String(pending)
+	if (approvedEl) approvedEl.textContent = String(approved)
+	if (rejectedEl) rejectedEl.textContent = String(rejected)
+
+	if (!items.length) {
+		list.innerHTML =
+			'<div class="admin-empty-state">No reviews yet. New review submissions will appear in realtime.</div>'
+		return
+	}
+
+	list.innerHTML = items
+		.map((item) => {
+			const stars = "★".repeat(item.rating) + "☆".repeat(5 - item.rating)
+			return `
+      <article class="admin-review-item">
+        <div class="admin-review-item-head">
+          <div>
+            <div class="admin-booking-name">${escapeHtml(item.name)}</div>
+            <div class="admin-booking-id">Review ID: ${escapeHtml(item.id)} • ${escapeHtml(item.source)}</div>
+          </div>
+          <span class="admin-status-badge ${getReviewStatusClass(item.status)}">${item.status}</span>
+        </div>
+        <div class="admin-review-meta">
+          <div><span>Rating:</span> ${stars}</div>
+          <div><span>Service:</span> ${escapeHtml(item.service || "N/A")}</div>
+          <div><span>Featured:</span> ${item.featured ? "Yes" : "No"}</div>
+        </div>
+        <p class="admin-review-text">"${escapeHtml(item.text || "")}"</p>
+        <div class="admin-booking-actions">
+          <button class="admin-action-btn" data-review-action="pending" data-id="${item.id}">Set Pending</button>
+          <button class="admin-action-btn" data-review-action="approved" data-id="${item.id}">Approve</button>
+          <button class="admin-action-btn danger" data-review-action="rejected" data-id="${item.id}">Reject</button>
+          <button class="admin-action-btn" data-review-action="toggle-featured" data-id="${item.id}">${item.featured ? "Unfeature" : "Feature"}</button>
+          <button class="admin-action-btn danger" data-review-action="delete" data-id="${item.id}">Delete</button>
+        </div>
+      </article>
+    `
+		})
+		.join("")
+}
+
+async function updateReviewStatus(reviewId, status) {
+	await db
+		.collection("reviews")
+		.doc(reviewId)
+		.set(
+			{
+				status: normalizeReviewStatus(status),
+				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		)
+}
+
+async function toggleReviewFeatured(reviewId) {
+	const review = adminReviewDocs.find((r) => r.id === reviewId)
+	const nextFeatured = !(review?.featured === true)
+	await db.collection("reviews").doc(reviewId).set(
+		{
+			featured: nextFeatured,
+			updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+		},
+		{ merge: true },
+	)
+}
+
+async function deleteReview(reviewId) {
+	const confirmed = await showAdminConfirmModal(
+		"Delete this review permanently? This action cannot be undone.",
+		"Delete Review",
+	)
+	if (!confirmed) return
+	await db.collection("reviews").doc(reviewId).delete()
 }
 
 function handleAuthStateChange(user) {
@@ -460,15 +645,23 @@ function setGalleryPreviewImage(src = "") {
 }
 
 function setChecklistState(key, done) {
-	const item = document.querySelector(`.admin-gallery-checklist li[data-check="${key}"]`)
+	const item = document.querySelector(
+		`.admin-gallery-checklist li[data-check="${key}"]`,
+	)
 	if (!item) return
 	item.classList.toggle("completed", Boolean(done))
 }
 
 function updateChecklistProgressMeter() {
-	const checklistItems = document.querySelectorAll(".admin-gallery-checklist li[data-check]")
-	const progressText = document.getElementById("adminGalleryChecklistProgressText")
-	const progressFill = document.getElementById("adminGalleryChecklistProgressFill")
+	const checklistItems = document.querySelectorAll(
+		".admin-gallery-checklist li[data-check]",
+	)
+	const progressText = document.getElementById(
+		"adminGalleryChecklistProgressText",
+	)
+	const progressFill = document.getElementById(
+		"adminGalleryChecklistProgressFill",
+	)
 	if (!checklistItems.length) return
 
 	let completed = 0
@@ -489,14 +682,20 @@ function updateChecklistProgressMeter() {
 }
 
 function updateGalleryPreview() {
-	const styleName = document.getElementById("galleryStyleName")?.value?.trim() || ""
-	const styleType = document.getElementById("galleryStyleType")?.value?.trim() || ""
+	const styleName =
+		document.getElementById("galleryStyleName")?.value?.trim() || ""
+	const styleType =
+		document.getElementById("galleryStyleType")?.value?.trim() || ""
 	const length = document.getElementById("galleryLength")?.value || ""
 	const size = document.getElementById("gallerySize")?.value || ""
-	const timeTaken = document.getElementById("galleryTimeTaken")?.value?.trim() || ""
-	const priceRange = document.getElementById("galleryPriceRange")?.value?.trim() || ""
-	const stylistName = document.getElementById("galleryStylistName")?.value?.trim() || ""
-	const hasTrending = document.getElementById("galleryFeaturedTrending")?.checked === true
+	const timeTaken =
+		document.getElementById("galleryTimeTaken")?.value?.trim() || ""
+	const priceRange =
+		document.getElementById("galleryPriceRange")?.value?.trim() || ""
+	const stylistName =
+		document.getElementById("galleryStylistName")?.value?.trim() || ""
+	const hasTrending =
+		document.getElementById("galleryFeaturedTrending")?.checked === true
 	const hasMostBooked =
 		document.getElementById("galleryFeaturedMostBooked")?.checked === true
 	const beforeImageSelected =
@@ -506,7 +705,9 @@ function updateGalleryPreview() {
 	const previewMeta = document.getElementById("adminGalleryPreviewMeta")
 	const previewDetails = document.getElementById("adminGalleryPreviewDetails")
 	const previewTags = document.getElementById("adminGalleryPreviewTags")
-	const beforeAfterBadge = document.getElementById("adminGalleryPreviewBeforeAfterBadge")
+	const beforeAfterBadge = document.getElementById(
+		"adminGalleryPreviewBeforeAfterBadge",
+	)
 
 	if (previewName) {
 		previewName.textContent = styleName || "Style name preview"
@@ -521,7 +722,9 @@ function updateGalleryPreview() {
 	}
 
 	if (beforeAfterBadge) {
-		beforeAfterBadge.style.display = beforeImageSelected ? "inline-flex" : "none"
+		beforeAfterBadge.style.display = beforeImageSelected
+			? "inline-flex"
+			: "none"
 	}
 
 	if (previewTags) {
@@ -535,7 +738,10 @@ function updateGalleryPreview() {
 				'<span class="admin-gallery-preview-tag is-empty">No tags yet</span>'
 		} else {
 			previewTags.innerHTML = tags
-				.map((tag) => `<span class="admin-gallery-preview-tag">${escapeHtml(tag)}</span>`)
+				.map(
+					(tag) =>
+						`<span class="admin-gallery-preview-tag">${escapeHtml(tag)}</span>`,
+				)
 				.join("")
 		}
 	}
@@ -970,6 +1176,30 @@ function startAdminGalleryListener() {
 		)
 }
 
+function startAdminReviewsListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminReviewsListener()
+
+	adminReviewsUnsubscribe = db
+		.collection("reviews")
+		.limit(300)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminReviews(docs)
+			},
+			(error) => {
+				console.error("Admin reviews listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch reviews in realtime: ${error.message || "unknown error"}`,
+					"adminReviewsMessage",
+				)
+			},
+		)
+}
+
 function initializeAdminPanel() {
 	const loginForm = document.getElementById("adminLoginForm")
 	const logoutBtn = document.getElementById("adminLogoutBtn")
@@ -978,6 +1208,8 @@ function initializeAdminPanel() {
 	const bookingList = document.getElementById("adminBookingsList")
 	const galleryForm = document.getElementById("adminGalleryForm")
 	const galleryList = document.getElementById("adminGalleryList")
+	const reviewsList = document.getElementById("adminReviewsList")
+	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
 	const cancelEditBtn = document.getElementById("adminGalleryCancelEdit")
 	const confirmModal = document.getElementById("adminConfirmModal")
 	const confirmCancelBtn = document.getElementById("adminConfirmCancel")
@@ -1134,6 +1366,60 @@ function initializeAdminPanel() {
 			if (action === "delete") {
 				deleteGalleryItem(id)
 			}
+		})
+	}
+
+	if (reviewsList) {
+		reviewsList.addEventListener("click", async (event) => {
+			const actionBtn = event.target.closest("button[data-review-action]")
+			if (!actionBtn || !adminUnlocked || !auth?.currentUser) return
+
+			const action = actionBtn.dataset.reviewAction
+			const reviewId = actionBtn.dataset.id
+			if (!action || !reviewId) return
+
+			actionBtn.disabled = true
+			try {
+				if (action === "toggle-featured") {
+					await toggleReviewFeatured(reviewId)
+					setAdminMessage(
+						"success",
+						"✅ Review featured state updated.",
+						"adminReviewsMessage",
+					)
+				} else if (action === "delete") {
+					await deleteReview(reviewId)
+					setAdminMessage(
+						"success",
+						"✅ Review deleted successfully.",
+						"adminReviewsMessage",
+					)
+				} else {
+					await updateReviewStatus(reviewId, action)
+					setAdminMessage(
+						"success",
+						`✅ Review marked as ${normalizeReviewStatus(action)}.`,
+						"adminReviewsMessage",
+					)
+				}
+			} catch (error) {
+				console.error("Review moderation action failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Review action failed: ${error.message || "unknown error"}`,
+					"adminReviewsMessage",
+				)
+			} finally {
+				actionBtn.disabled = false
+			}
+		})
+	}
+
+	if (reviewsSortSelect) {
+		reviewsSortSelect.value = adminReviewsSortMode
+		reviewsSortSelect.addEventListener("change", (event) => {
+			adminReviewsSortMode = event.target.value || "featured"
+			renderAdminReviews(adminReviewRawDocs)
 		})
 	}
 
