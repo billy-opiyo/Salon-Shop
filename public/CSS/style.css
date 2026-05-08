@@ -2001,6 +2001,53 @@ h6 {
     color: var(--text-secondary);
 }
 
+.admin-booking-inspiration {
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+.admin-booking-special-request {
+    margin-top: 10px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(200, 150, 62, 0.28);
+    background: linear-gradient(180deg, rgba(200, 150, 62, 0.1), rgba(200, 150, 62, 0.04));
+}
+
+.admin-booking-special-request>span {
+    display: inline-block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--primary-light);
+    margin-bottom: 6px;
+}
+
+.admin-booking-special-request p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.admin-booking-inspiration-link {
+    display: inline-block;
+    margin-top: 8px;
+}
+
+.admin-booking-inspiration-image {
+    width: 180px;
+    height: 180px;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    object-fit: cover;
+    object-position: center;
+}
+
 .admin-booking-actions {
     display: flex;
     gap: 8px;
@@ -2016,6 +2063,18 @@ h6 {
     background: var(--bg-card);
     color: var(--text-primary);
     position: relative;
+}
+
+.admin-action-btn.review-report-btn {
+    background: #f4a261;
+    border-color: #f4a261;
+    color: #2b1a10;
+}
+
+.admin-action-btn.review-report-btn:hover {
+    background: var(--bg-card);
+    border-color: var(--primary);
+    color: var(--primary);
 }
 
 .admin-action-btn:hover {
@@ -2414,6 +2473,19 @@ h6 {
         gap: 7px 10px;
         font-size: 0.82rem;
         margin-bottom: 10px;
+    }
+
+    .admin-booking-special-request {
+        padding: 9px 10px;
+    }
+
+    .admin-booking-special-request p {
+        font-size: 0.84rem;
+    }
+
+    .admin-booking-inspiration-image {
+        width: 140px;
+        height: 140px;
     }
 
     .admin-booking-actions {
@@ -2833,6 +2905,20 @@ h6 {
     background: linear-gradient(180deg, #f2d08a, var(--primary), var(--primary-dark));
 }
 
+.testimonial-review-photo-wrap {
+    margin: 10px 0;
+}
+
+.testimonial-review-photo {
+    width: 120px;
+    height: 120px;
+    display: block;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    object-fit: cover;
+    object-position: center;
+}
+
 .testimonial-author {
     display: flex;
     align-items: center;
@@ -2914,6 +3000,11 @@ h6 {
 @media (max-width: 600px) {
     .testimonials-grid {
         grid-template-columns: 1fr;
+    }
+
+    .testimonial-review-photo {
+        width: 96px;
+        height: 96px;
     }
 
     .reviews-toggle-controls .btn {

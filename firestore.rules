@@ -71,7 +71,7 @@ service cloud.firestore {
 
       allow delete: if false;
     }
-
+ 
     match /bookingSlots/{slotId} {
       allow create: if isSignedIn()
         && request.resource.data.keys().hasOnly([
@@ -124,11 +124,17 @@ service cloud.firestore {
           'rating',
           'source',
           'service',
+          'photoUrl',
+          'adminReply',
+          'reportsCount',
+          'verifiedBooking',
           'status',
           'featured',
           'uid',
           'bookingId',
           'createdAt',
+          'approvedBy',
+          'approvedAt',
           'updatedAt'
         ])
         && request.resource.data.name is string
@@ -136,6 +142,8 @@ service cloud.firestore {
         && request.resource.data.source is string
         && request.resource.data.status == 'pending'
         && request.resource.data.featured == false
+        && request.resource.data.adminReply == ''
+        && request.resource.data.reportsCount == 0
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.name.size() >= 2
         && request.resource.data.name.size() <= 80
@@ -151,12 +159,49 @@ service cloud.firestore {
           || request.resource.data['service'] is string
         )
         && (
+          !request.resource.data.keys().hasAny(['photoUrl'])
+          || request.resource.data.photoUrl is string
+        )
+        && (
+          !request.resource.data.keys().hasAny(['verifiedBooking'])
+          || request.resource.data.verifiedBooking is bool
+        )
+        && (
           !request.resource.data.keys().hasAny(['bookingId'])
           || request.resource.data.bookingId is string
         );
 
-      // Only admins can moderate/update/delete.
-      allow update, delete: if isAdmin();
+      // Admins can fully moderate reviews.
+      allow update: if isAdmin()
+        // Owners can edit their own pending reviews (typo fixes UX).
+        || (
+          isSignedIn()
+          && resource.data.uid == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.featured == false
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'name',
+            'text',
+            'rating',
+            'service',
+            'photoUrl',
+            'updatedAt'
+          ])
+        )
+        // Lightweight moderation: signed-in users can report abuse.
+        || (
+          isSignedIn()
+          && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            'reportsCount',
+            'updatedAt'
+          ])
+          && request.resource.data.reportsCount == resource.data.reportsCount + 1
+        );
+
+      // Only admins may delete reviews.
+      allow delete: if isAdmin();
     }
   }
 }

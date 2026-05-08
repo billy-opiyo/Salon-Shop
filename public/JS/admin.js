@@ -19,6 +19,17 @@ let adminGalleryPreviewObjectUrl = ""
 const adminMessageTimers = new Map()
 const adminMessageHideTimers = new Map()
 const defaultAdminSection = "bookings"
+const ADMIN_REVIEW_KEYS = {
+	profanityWords: "rb_admin_profanity_words",
+}
+const DEFAULT_ADMIN_PROFANITY_WORDS = [
+	"fuck",
+	"shit",
+	"bitch",
+	"asshole",
+	"idiot",
+	"scam",
+]
 let adminConfirmState = {
 	resolve: null,
 	isOpen: false,
@@ -195,7 +206,9 @@ function toTimestampMs(value) {
 
 function formatAdminDate(value) {
 	if (!value) return "N/A"
-	return value
+	const ms = toTimestampMs(value)
+	if (!ms) return String(value)
+	return new Date(ms).toLocaleString()
 }
 
 function stopAdminBookingsListener() {
@@ -356,12 +369,57 @@ function normalizeReviewDoc(doc = {}) {
 		source,
 		service,
 		rating,
+		photoUrl: String(doc.photoUrl || "").trim(),
+		adminReply: String(doc.adminReply || "").trim(),
+		reportsCount: Number(doc.reportsCount || 0),
+		verifiedBooking: doc.verifiedBooking === true,
+		approvedBy: String(doc.approvedBy || "").trim(),
+		approvedAt: doc.approvedAt || null,
 		status: normalizeReviewStatus(extractReviewStatus(doc)),
 		featured: doc.featured === true,
 		uid: doc.uid || "",
 		createdAt: doc.createdAt,
 		updatedAt: doc.updatedAt,
 	}
+}
+
+function getAdminProfanityWords() {
+	try {
+		const raw = localStorage.getItem(ADMIN_REVIEW_KEYS.profanityWords)
+		if (!raw) return [...DEFAULT_ADMIN_PROFANITY_WORDS]
+		const parsed = JSON.parse(raw)
+		if (!Array.isArray(parsed)) return [...DEFAULT_ADMIN_PROFANITY_WORDS]
+		const cleaned = parsed
+			.map((w) =>
+				String(w || "")
+					.trim()
+					.toLowerCase(),
+			)
+			.filter(Boolean)
+		return cleaned.length ? cleaned : [...DEFAULT_ADMIN_PROFANITY_WORDS]
+	} catch (_error) {
+		return [...DEFAULT_ADMIN_PROFANITY_WORDS]
+	}
+}
+
+function setAdminProfanityWords(words = []) {
+	const cleaned = words
+		.map((w) =>
+			String(w || "")
+				.trim()
+				.toLowerCase(),
+		)
+		.filter(Boolean)
+	localStorage.setItem(
+		ADMIN_REVIEW_KEYS.profanityWords,
+		JSON.stringify(cleaned.length ? cleaned : DEFAULT_ADMIN_PROFANITY_WORDS),
+	)
+}
+
+function getFlaggedWordsInText(text = "") {
+	const normalized = String(text || "").toLowerCase()
+	if (!normalized) return []
+	return getAdminProfanityWords().filter((word) => normalized.includes(word))
 }
 
 function sortAdminReviewsList(items = [], mode = adminReviewsSortMode) {
@@ -427,6 +485,7 @@ function renderAdminReviews(docs) {
 	list.innerHTML = items
 		.map((item) => {
 			const stars = "★".repeat(item.rating) + "☆".repeat(5 - item.rating)
+			const isNegative = item.rating <= 3
 			return `
       <article class="admin-review-item">
         <div class="admin-review-item-head">
@@ -440,9 +499,18 @@ function renderAdminReviews(docs) {
           <div><span>Rating:</span> ${stars}</div>
           <div><span>Service:</span> ${escapeHtml(item.service || "N/A")}</div>
           <div><span>Featured:</span> ${item.featured ? "Yes" : "No"}</div>
+          <div><span>Verified Booking:</span> ${item.verifiedBooking ? "Yes" : "No"}</div>
+          <div><span>Reports:</span> ${item.reportsCount}</div>
+          <div><span>Approved By:</span> ${escapeHtml(item.approvedBy || "N/A")}</div>
+          <div><span>Approved At:</span> ${item.approvedAt ? formatAdminDate(item.approvedAt) : "N/A"}</div>
         </div>
         <p class="admin-review-text">"${escapeHtml(item.text || "")}"</p>
+        <textarea class="form-control" data-review-edit-text="${item.id}" rows="3">${escapeHtml(item.text || "")}</textarea>
+        ${item.photoUrl ? `<div style="margin:8px 0"><img src="${escapeHtml(item.photoUrl)}" alt="Review Photo" style="max-width:180px;border-radius:8px"/></div>` : ""}
+        ${isNegative ? `<textarea class="form-control" data-review-reply-text="${item.id}" rows="2" placeholder="Admin reply for negative feedback...">${escapeHtml(item.adminReply || "")}</textarea>` : ""}
         <div class="admin-booking-actions">
+          <button class="admin-action-btn" data-review-action="save-edit" data-id="${item.id}">Save Edit</button>
+          ${isNegative ? `<button class="admin-action-btn" data-review-action="save-reply" data-id="${item.id}">Save Reply</button>` : ""}
           <button class="admin-action-btn" data-review-action="pending" data-id="${item.id}">Set Pending</button>
           <button class="admin-action-btn" data-review-action="approved" data-id="${item.id}">Approve</button>
           <button class="admin-action-btn danger" data-review-action="rejected" data-id="${item.id}">Reject</button>
@@ -456,12 +524,51 @@ function renderAdminReviews(docs) {
 }
 
 async function updateReviewStatus(reviewId, status) {
+	const normalizedStatus = normalizeReviewStatus(status)
+	const review = adminReviewDocs.find((r) => r.id === reviewId)
+	if (normalizedStatus === "approved") {
+		const flagged = getFlaggedWordsInText(review?.text || "")
+		if (flagged.length) {
+			throw new Error(
+				`Cannot approve: flagged content found (${flagged.join(", ")}). Edit review text first.`,
+			)
+		}
+	}
+
+	const payload = {
+		status: normalizedStatus,
+		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+	}
+
+	if (normalizedStatus === "approved") {
+		payload.approvedBy = auth?.currentUser?.email || "admin"
+		payload.approvedAt = firebase.firestore.FieldValue.serverTimestamp()
+	}
+
+	await db.collection("reviews").doc(reviewId).set(payload, { merge: true })
+}
+
+async function updateReviewText(reviewId, text) {
 	await db
 		.collection("reviews")
 		.doc(reviewId)
 		.set(
 			{
-				status: normalizeReviewStatus(status),
+				text: String(text || "").trim(),
+				status: "pending",
+				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		)
+}
+
+async function updateReviewReply(reviewId, reply) {
+	await db
+		.collection("reviews")
+		.doc(reviewId)
+		.set(
+			{
+				adminReply: String(reply || "").trim(),
 				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
 			},
 			{ merge: true },
@@ -565,6 +672,13 @@ function renderAdminBookings(docs) {
 			const status = normalizeStatus(extractRawStatus(b))
 			const customerName =
 				`${b.firstName || ""} ${b.lastName || ""}`.trim() || "Unknown Customer"
+			const specialRequest = String(b.notes || b.specialRequest || "").trim()
+			const inspirationImageUrl = String(
+				b.inspirationImageUrl ||
+					b.inspirationImage ||
+					b.referenceImageUrl ||
+					"",
+			).trim()
 
 			return `
         <div class="admin-booking-item">
@@ -582,6 +696,18 @@ function renderAdminBookings(docs) {
             <div><span>Time:</span> ${b.time || "N/A"}</div>
             <div><span>Email:</span> ${b.email || "N/A"}</div>
             <div><span>Phone:</span> ${b.phone || "N/A"}</div>
+          </div>
+          <div class="admin-booking-special-request">
+            <span>Special Request:</span>
+            <p>${specialRequest ? escapeHtml(specialRequest) : "No special request provided."}</p>
+          </div>
+          <div class="admin-booking-inspiration">
+            <div><span>Inspiration Image:</span> ${inspirationImageUrl ? `<a href="${escapeHtml(inspirationImageUrl)}" target="_blank" rel="noopener">Open full image</a>` : "Not provided"}</div>
+            ${
+							inspirationImageUrl
+								? `<a class="admin-booking-inspiration-link" href="${escapeHtml(inspirationImageUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(inspirationImageUrl)}" alt="Inspiration image for ${escapeHtml(customerName)}" class="admin-booking-inspiration-image" /></a>`
+								: ""
+						}
           </div>
           <div class="admin-booking-actions">
             <button class="admin-action-btn" data-action="pending" data-id="${b.id}">Set Pending</button>
@@ -1210,6 +1336,8 @@ function initializeAdminPanel() {
 	const galleryList = document.getElementById("adminGalleryList")
 	const reviewsList = document.getElementById("adminReviewsList")
 	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
+	const profanityWordsInput = document.getElementById("adminProfanityWords")
+	const saveProfanityBtn = document.getElementById("adminSaveProfanityList")
 	const cancelEditBtn = document.getElementById("adminGalleryCancelEdit")
 	const confirmModal = document.getElementById("adminConfirmModal")
 	const confirmCancelBtn = document.getElementById("adminConfirmCancel")
@@ -1380,7 +1508,31 @@ function initializeAdminPanel() {
 
 			actionBtn.disabled = true
 			try {
-				if (action === "toggle-featured") {
+				if (action === "save-edit") {
+					const textInput = reviewsList.querySelector(
+						`[data-review-edit-text="${reviewId}"]`,
+					)
+					const nextText = textInput?.value?.trim() || ""
+					if (nextText.length < 10) {
+						throw new Error("Review text must be at least 10 characters.")
+					}
+					await updateReviewText(reviewId, nextText)
+					setAdminMessage(
+						"success",
+						"✅ Review text updated (status reset to pending).",
+						"adminReviewsMessage",
+					)
+				} else if (action === "save-reply") {
+					const replyInput = reviewsList.querySelector(
+						`[data-review-reply-text="${reviewId}"]`,
+					)
+					await updateReviewReply(reviewId, replyInput?.value || "")
+					setAdminMessage(
+						"success",
+						"✅ Admin reply saved.",
+						"adminReviewsMessage",
+					)
+				} else if (action === "toggle-featured") {
 					await toggleReviewFeatured(reviewId)
 					setAdminMessage(
 						"success",
@@ -1420,6 +1572,29 @@ function initializeAdminPanel() {
 		reviewsSortSelect.addEventListener("change", (event) => {
 			adminReviewsSortMode = event.target.value || "featured"
 			renderAdminReviews(adminReviewRawDocs)
+		})
+	}
+
+	if (profanityWordsInput) {
+		profanityWordsInput.value = getAdminProfanityWords().join(", ")
+	}
+
+	if (saveProfanityBtn) {
+		saveProfanityBtn.addEventListener("click", () => {
+			const raw = profanityWordsInput?.value || ""
+			const words = raw
+				.split(",")
+				.map((w) => w.trim())
+				.filter(Boolean)
+			setAdminProfanityWords(words)
+			if (profanityWordsInput) {
+				profanityWordsInput.value = getAdminProfanityWords().join(", ")
+			}
+			setAdminMessage(
+				"success",
+				"✅ Profanity/content filter list saved.",
+				"adminReviewsMessage",
+			)
 		})
 	}
 

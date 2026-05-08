@@ -464,6 +464,30 @@
 							</select>
 						</div>
 
+						<div class="admin-section-card" style="margin-bottom: 14px">
+							<h3>Basic Profanity / Content Check (Before Approval)</h3>
+							<p style="margin-bottom: 8px">
+								Flagged terms are blocked from quick approval until edited.
+							</p>
+							<div class="form-group">
+								<label for="adminProfanityWords"
+									>Blocked terms (comma-separated)</label
+								>
+								<textarea
+									id="adminProfanityWords"
+									rows="3"
+									placeholder="badword1,badword2"
+								></textarea>
+							</div>
+							<button
+								class="btn btn-outline"
+								id="adminSaveProfanityList"
+								type="button"
+							>
+								Save Filter List
+							</button>
+						</div>
+
 						<div class="admin-review-list" id="adminReviewsList"></div>
 
 						<div class="admin-section-card-grid" style="margin-top: 14px">

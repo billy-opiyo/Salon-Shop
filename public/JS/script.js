@@ -315,6 +315,120 @@ let showAllReviews = false
 let reviewsSortMode = "featured"
 let reviewMessageTimer = null
 let reviewsToggleAnimationTimer = null
+const REVIEW_LOCAL_KEYS = {
+	profanityWords: "rb_admin_profanity_words",
+	reviewDrafts: "rb_review_drafts",
+}
+
+const DEFAULT_PROFANITY_WORDS = [
+	"fuck",
+	"shit",
+	"bitch",
+	"asshole",
+	"stupid",
+	"idiot",
+	"scam",
+]
+
+function escapeHtml(value) {
+	return String(value ?? "")
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&#39;")
+}
+
+function toTimestampMs(value) {
+	if (!value) return 0
+	if (typeof value?.toMillis === "function") return value.toMillis()
+	if (typeof value === "number" && Number.isFinite(value)) return value
+	if (value?.seconds && Number.isFinite(value.seconds))
+		return value.seconds * 1000
+	const parsed = Date.parse(String(value))
+	return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function formatDateTime(value) {
+	const ms = toTimestampMs(value)
+	if (!ms) return "N/A"
+	return new Date(ms).toLocaleString()
+}
+
+function getStoredProfanityWords() {
+	try {
+		const raw = localStorage.getItem(REVIEW_LOCAL_KEYS.profanityWords)
+		if (!raw) return [...DEFAULT_PROFANITY_WORDS]
+		const parsed = JSON.parse(raw)
+		if (!Array.isArray(parsed)) return [...DEFAULT_PROFANITY_WORDS]
+		const cleaned = parsed
+			.map((w) =>
+				String(w || "")
+					.trim()
+					.toLowerCase(),
+			)
+			.filter(Boolean)
+		return cleaned.length ? cleaned : [...DEFAULT_PROFANITY_WORDS]
+	} catch (_error) {
+		return [...DEFAULT_PROFANITY_WORDS]
+	}
+}
+
+function textContainsBlockedWord(text = "") {
+	const normalized = String(text || "").toLowerCase()
+	if (!normalized) return false
+	const words = getStoredProfanityWords()
+	return words.some((word) => {
+		if (!word) return false
+		return normalized.includes(word)
+	})
+}
+
+function saveReviewDraft(review = {}) {
+	if (!review?.id) return
+	try {
+		const raw = localStorage.getItem(REVIEW_LOCAL_KEYS.reviewDrafts)
+		const data = raw ? JSON.parse(raw) : {}
+		data[review.id] = {
+			id: review.id,
+			name: review.name || "",
+			rating: Number(review.rating || 5),
+			service: review.service || "",
+			text: review.text || "",
+			photoUrl: review.photoUrl || "",
+			createdAt: review.createdAt || null,
+		}
+		localStorage.setItem(REVIEW_LOCAL_KEYS.reviewDrafts, JSON.stringify(data))
+	} catch (_error) {
+		// no-op
+	}
+}
+
+function removeReviewDraft(reviewId = "") {
+	if (!reviewId) return
+	try {
+		const raw = localStorage.getItem(REVIEW_LOCAL_KEYS.reviewDrafts)
+		if (!raw) return
+		const data = JSON.parse(raw)
+		if (!data || typeof data !== "object") return
+		delete data[reviewId]
+		localStorage.setItem(REVIEW_LOCAL_KEYS.reviewDrafts, JSON.stringify(data))
+	} catch (_error) {
+		// no-op
+	}
+}
+
+function getReviewDraftsArray() {
+	try {
+		const raw = localStorage.getItem(REVIEW_LOCAL_KEYS.reviewDrafts)
+		if (!raw) return []
+		const data = JSON.parse(raw)
+		if (!data || typeof data !== "object") return []
+		return Object.values(data)
+	} catch (_error) {
+		return []
+	}
+}
 
 function showFormMessage(msg, type, text) {
 	if (!msg) return
@@ -347,6 +461,22 @@ function hideReviewMessage(msg, animated = false) {
 	setTimeout(() => {
 		clearFormMessage(msg)
 	}, 300)
+}
+
+function showTimedReviewMessage(type, text, duration = 3500) {
+	const msg = document.getElementById("reviewMessage")
+	if (!msg) return
+
+	if (reviewMessageTimer) {
+		clearTimeout(reviewMessageTimer)
+		reviewMessageTimer = null
+	}
+
+	showFormMessage(msg, type, text)
+	reviewMessageTimer = setTimeout(() => {
+		hideReviewMessage(msg, true)
+		reviewMessageTimer = null
+	}, duration)
 }
 
 const iconPaths = {
@@ -990,6 +1120,10 @@ function normalizeReviewItem(item = {}) {
 		rating,
 		source,
 		service,
+		photoUrl: String(item.photoUrl || "").trim(),
+		adminReply: String(item.adminReply || "").trim(),
+		verifiedBooking: item.verifiedBooking === true,
+		reportsCount: Number(item.reportsCount || 0),
 		featured: item.featured === true,
 		status: item.status || "approved",
 		createdAt: item.createdAt || null,
@@ -1068,8 +1202,32 @@ function renderTestimonials(list = testimonialsData) {
 	const controls = document.getElementById("reviewsToggleControls")
 	if (!grid) return
 
-	const safeList =
+	const approvedList =
 		Array.isArray(list) && list.length ? list : fallbackTestimonialsData
+	const approvedIds = new Set(
+		approvedList
+			.map((review) => String(review?.id || "").trim())
+			.filter(Boolean),
+	)
+	const pendingDrafts = getReviewDraftsArray()
+		.filter((draft) => {
+			const draftId = String(draft?.id || "").trim()
+			return draftId ? !approvedIds.has(draftId) : true
+		})
+		.map((draft) =>
+			normalizeReviewItem({ ...draft, status: "pending", source: "Website" }),
+		)
+
+	// Defensive dedupe by ID in case data from different sources overlaps.
+	const dedupedMap = new Map()
+	for (const review of [...approvedList, ...pendingDrafts]) {
+		const reviewId = String(review?.id || "").trim()
+		const dedupeKey = reviewId || `${review.name}__${review.text}`
+		if (!dedupedMap.has(dedupeKey)) {
+			dedupedMap.set(dedupeKey, review)
+		}
+	}
+	const safeList = Array.from(dedupedMap.values())
 	const sortedList = sortReviewsList(safeList)
 	const shouldCollapse = sortedList.length > DEFAULT_VISIBLE_REVIEWS
 	const visibleList =
@@ -1084,13 +1242,25 @@ function renderTestimonials(list = testimonialsData) {
       <div class="testimonial-stars">
         ${'<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>'.repeat(t.rating)}
       </div>
+      ${t.service ? `<div class="admin-gallery-tags" style="margin-bottom:8px"><span>${escapeHtml(t.service)}</span></div>` : ""}
+      ${t.verifiedBooking ? '<div class="admin-gallery-tags" style="margin-bottom:8px"><span>✅ Verified Booking</span></div>' : ""}
       <p class="testimonial-text">"${t.text}"</p>
+	      ${t.photoUrl ? `<div class="testimonial-review-photo-wrap"><img src="${escapeHtml(t.photoUrl)}" alt="Review photo" class="testimonial-review-photo" /></div>` : ""}
+      ${t.adminReply ? `<p class="testimonial-text" style="font-style:normal;border-left:3px solid var(--primary);padding-left:10px"><strong>Admin Reply:</strong> ${escapeHtml(t.adminReply)}</p>` : ""}
       <div class="testimonial-author">
         <div class="testimonial-avatar">${t.avatar}</div>
         <div class="testimonial-author-info">
           <h4>${t.name}</h4>
           <span>${t.role}</span>
         </div>
+      </div>
+	      ${
+					t.status === "pending"
+						? `<div style="margin-top:10px"><div class="admin-booking-actions"><button class="admin-action-btn" data-review-ui-action="edit" data-review-id="${escapeHtml(t.id)}">Edit Pending</button></div><p style="margin-top:8px;font-size:0.78rem;color:var(--text-muted)">Pending reviews can be edited but not deleted.</p></div>`
+						: ""
+				}
+      <div class="admin-booking-actions" style="margin-top:10px">
+        <button class="admin-action-btn review-report-btn" data-review-ui-action="report" data-review-id="${escapeHtml(t.id)}">Report Abuse</button>
       </div>
       <div class="testimonial-social">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${getReviewSourceIcon(t.source)}</svg>
@@ -1199,6 +1369,8 @@ async function submitReview(event) {
 	)
 	const service = document.getElementById("reviewService")?.value?.trim() || ""
 	const text = document.getElementById("reviewText")?.value?.trim() || ""
+	const editId = document.getElementById("reviewEditId")?.value?.trim() || ""
+	const photoFile = document.getElementById("reviewPhoto")?.files?.[0] || null
 
 	clearFormMessage(msg)
 	msg.classList.remove("is-leaving")
@@ -1227,6 +1399,24 @@ async function submitReview(event) {
 			msg,
 			"error",
 			"❌ Please write at least 10 characters so your feedback is useful.",
+		)
+		return
+	}
+
+	if (name.length < 2 || name.length > 80) {
+		showFormMessage(
+			msg,
+			"error",
+			"❌ Name must be between 2 and 80 characters.",
+		)
+		return
+	}
+
+	if (text.length > 800) {
+		showFormMessage(
+			msg,
+			"error",
+			"❌ Review message is too long (max 800 characters).",
 		)
 		return
 	}
@@ -1261,7 +1451,32 @@ async function submitReview(event) {
 			)
 		}
 
-		await db.collection("reviews").add({
+		let photoUrl = ""
+		if (photoFile) {
+			photoUrl = await uploadImageToCloudinary(photoFile)
+		}
+
+		let verifiedBooking = false
+		if (service) {
+			try {
+				const bookingSnapshot = await db
+					.collection("bookings")
+					.where("uid", "==", activeUid)
+					.where("service", "==", service)
+					.where("status", "==", "completed")
+					.limit(1)
+					.get()
+				verifiedBooking = !bookingSnapshot.empty
+			} catch (verificationError) {
+				console.warn(
+					"Verified-booking lookup skipped (permission/index issue):",
+					verificationError,
+				)
+				verifiedBooking = false
+			}
+		}
+
+		const payload = {
 			name,
 			avatar: name
 				.split(" ")
@@ -1273,18 +1488,52 @@ async function submitReview(event) {
 			rating: Math.round(ratingValue),
 			source: "Website",
 			service,
+			photoUrl,
+			adminReply: "",
+			reportsCount: 0,
+			verifiedBooking,
 			status: "pending",
 			featured: false,
 			uid: activeUid,
 			createdAt: firebase.firestore.FieldValue.serverTimestamp(),
 			updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-		})
+		}
+
+		if (editId) {
+			await db.collection("reviews").doc(editId).set(payload, { merge: true })
+			saveReviewDraft({
+				id: editId,
+				name,
+				rating: Math.round(ratingValue),
+				service,
+				text,
+				photoUrl,
+			})
+		} else {
+			const created = await db.collection("reviews").add(payload)
+			saveReviewDraft({
+				id: created.id,
+				name,
+				rating: Math.round(ratingValue),
+				service,
+				text,
+				photoUrl,
+			})
+		}
 
 		form.reset()
+		const reviewEditIdInput = document.getElementById("reviewEditId")
+		const cancelEditBtn = document.getElementById("cancelReviewEditBtn")
+		const submitReviewBtn = document.getElementById("submitReviewBtn")
+		if (reviewEditIdInput) reviewEditIdInput.value = ""
+		if (cancelEditBtn) cancelEditBtn.style.display = "none"
+		if (submitReviewBtn) submitReviewBtn.textContent = "Submit Review"
 		showFormMessage(
 			msg,
 			"success",
-			"✅ Thank you! Your review was submitted and is pending approval.",
+			editId
+				? "✅ Review updated and is pending approval."
+				: "✅ Thank you! Your review was submitted and is pending approval.",
 		)
 		reviewMessageTimer = setTimeout(() => {
 			hideReviewMessage(msg, true)
@@ -1292,11 +1541,11 @@ async function submitReview(event) {
 		}, 5000)
 	} catch (error) {
 		console.error("Review submit failed:", error)
-		showFormMessage(
-			msg,
-			"error",
-			`❌ ${error.message || "Failed to submit review. Please try again."}`,
-		)
+		const friendlyError =
+			error?.code === "permission-denied"
+				? "Permission issue while saving review. Please sign in again and retry. If it persists, ask admin to deploy latest Firestore rules."
+				: error.message || "Failed to submit review. Please try again."
+		showFormMessage(msg, "error", `❌ ${friendlyError}`)
 	} finally {
 		submitBtn.disabled = false
 		submitBtn.textContent = "Submit Review"
@@ -1306,6 +1555,8 @@ async function submitReview(event) {
 function bindReviewForm() {
 	const reviewForm = document.getElementById("reviewForm")
 	if (!reviewForm) return
+	const cancelEditBtn = document.getElementById("cancelReviewEditBtn")
+	const submitReviewBtn = document.getElementById("submitReviewBtn")
 
 	reviewForm.addEventListener("input", () => {
 		const msg = document.getElementById("reviewMessage")
@@ -1321,6 +1572,85 @@ function bindReviewForm() {
 		event.preventDefault()
 		event.stopPropagation()
 		void submitReview(event)
+	})
+
+	if (cancelEditBtn) {
+		cancelEditBtn.addEventListener("click", () => {
+			reviewForm.reset()
+			const reviewEditIdInput = document.getElementById("reviewEditId")
+			if (reviewEditIdInput) reviewEditIdInput.value = ""
+			cancelEditBtn.style.display = "none"
+			if (submitReviewBtn) submitReviewBtn.textContent = "Submit Review"
+		})
+	}
+
+	const grid = document.getElementById("testimonialsGrid")
+	if (grid) {
+		grid.addEventListener("click", async (event) => {
+			const actionBtn = event.target.closest("button[data-review-ui-action]")
+			if (!actionBtn || !db || !auth) return
+
+			const action = actionBtn.dataset.reviewUiAction
+			const reviewId = actionBtn.dataset.reviewId
+			if (!action || !reviewId) return
+
+			let activeUid = auth.currentUser?.uid || null
+			if (!activeUid) {
+				const cred = await auth.signInAnonymously()
+				activeUid = cred?.user?.uid || auth.currentUser?.uid || null
+			}
+			if (!activeUid) return
+
+			if (action === "report") {
+				await db
+					.collection("reviews")
+					.doc(reviewId)
+					.set(
+						{
+							reportsCount: firebase.firestore.FieldValue.increment(1),
+							updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+						},
+						{ merge: true },
+					)
+				showTimedReviewMessage("success", "✅ Abuse report submitted.")
+				return
+			}
+
+			const draft = getReviewDraftsArray().find((item) => item.id === reviewId)
+			if (!draft) {
+				showFormMessage(
+					document.getElementById("reviewMessage"),
+					"error",
+					"⚠️ You can only edit your own local pending draft.",
+				)
+				return
+			}
+
+			if (action === "edit") {
+				document.getElementById("reviewEditId").value = draft.id
+				document.getElementById("reviewName").value = draft.name || ""
+				document.getElementById("reviewRating").value = String(
+					draft.rating || 5,
+				)
+				document.getElementById("reviewService").value = draft.service || ""
+				document.getElementById("reviewText").value = draft.text || ""
+				if (cancelEditBtn) cancelEditBtn.style.display = "inline-flex"
+				if (submitReviewBtn) submitReviewBtn.textContent = "Update Review"
+				reviewForm.scrollIntoView({ behavior: "smooth", block: "start" })
+			}
+		})
+	}
+}
+
+function populateReviewServiceSelect() {
+	const select = document.getElementById("reviewService")
+	if (!select) return
+	select.innerHTML = '<option value="">Select Service (Optional)</option>'
+	servicesData.forEach((service) => {
+		const option = document.createElement("option")
+		option.value = service.name
+		option.textContent = service.name
+		select.appendChild(option)
 	})
 }
 
@@ -1439,6 +1769,9 @@ window.addEventListener("scroll", () => {
 })
 
 // ============ DARK MODE ============
+if (!localStorage.getItem("theme")) {
+	localStorage.setItem("theme", "dark")
+}
 let isDark = localStorage.getItem("theme") !== "light"
 function applyTheme() {
 	document.body.classList.toggle("light-mode", !isDark)
@@ -1882,6 +2215,7 @@ renderTestimonials(testimonialsData.map((item) => normalizeReviewItem(item)))
 bindReviewsSortControls()
 bindReviewToggleControls()
 bindReviewForm()
+populateReviewServiceSelect()
 populateServiceSelect()
 populateTimeSlots()
 
