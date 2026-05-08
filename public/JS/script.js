@@ -2110,46 +2110,110 @@ document.addEventListener("keydown", (e) => {
 })
 
 // ============ CONTACT FORM ============
-document.getElementById("contactForm").addEventListener("submit", function (e) {
-	e.preventDefault()
+document
+	.getElementById("contactForm")
+	?.addEventListener("submit", async function (e) {
+		e.preventDefault()
 
-	const form = this
-	const submitBtn = this.querySelector('button[type="submit"]')
-	if (submitBtn) {
-		submitBtn.disabled = true
-		submitBtn.textContent = "Sending..."
-	}
+		const form = this
+		const submitBtn = this.querySelector('button[type="submit"]')
+		const msg = document.getElementById("contactFormMessage")
 
-	const formData = new FormData(form)
+		if (submitBtn) {
+			submitBtn.disabled = true
+			submitBtn.textContent = "Sending..."
+		}
 
-	fetch(form.action, {
-		method: "POST",
-		body: formData,
-		headers: {
-			Accept: "application/json",
-		},
-	})
-		.then((response) => {
-			if (!response.ok) throw new Error("Failed to send message")
+		if (msg) clearFormMessage(msg)
+
+		try {
+			if (!firebaseReady || !db || !auth) {
+				throw new Error(
+					"Contact service is not ready yet. Please wait a moment and try again.",
+				)
+			}
+
+			let activeUid = auth.currentUser?.uid || null
+			if (!activeUid) {
+				try {
+					const userCredential = await auth.signInAnonymously()
+					activeUid = userCredential?.user?.uid || auth.currentUser?.uid || null
+				} catch (authError) {
+					throw new Error(getFriendlyAuthError(authError))
+				}
+			}
+
+			if (!activeUid) {
+				throw new Error(
+					"Unable to authenticate contact session. Please refresh and try again.",
+				)
+			}
+
+			const payload = {
+				name: String(
+					document.getElementById("contactName")?.value || "",
+				).trim(),
+				email: String(
+					document.getElementById("contactEmail")?.value || "",
+				).trim(),
+				subject: String(
+					document.getElementById("contactSubject")?.value || "",
+				).trim(),
+				message: String(
+					document.getElementById("contactMessage")?.value || "",
+				).trim(),
+				status: "new",
+				uid: activeUid,
+				createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+			}
+
+			if (
+				!payload.name ||
+				!payload.email ||
+				!payload.subject ||
+				!payload.message
+			) {
+				throw new Error("Please fill in all contact fields before sending.")
+			}
+
+			await db.collection("contactMessages").add(payload)
+
 			form.reset()
 			showContactSuccessPopup()
-		})
-		.catch(() => {
-			// Keep the user on the same page even if sending fails.
-		})
-		.finally(() => {
+			if (msg) {
+				showFormMessage(msg, "success", "✅ Message sent successfully.")
+				if (contactFormMessageTimer) {
+					clearTimeout(contactFormMessageTimer)
+				}
+				contactFormMessageTimer = setTimeout(() => {
+					clearFormMessage(msg)
+					contactFormMessageTimer = null
+				}, 3000)
+			}
+		} catch (error) {
+			console.error("Contact form submit failed:", error)
+			if (msg) {
+				showFormMessage(
+					msg,
+					"error",
+					`❌ ${error.message || "Failed to send message. Please try again."}`,
+				)
+			}
+		} finally {
 			if (submitBtn) {
 				submitBtn.disabled = false
 				submitBtn.textContent = "Send Message"
 			}
-		})
-})
+		}
+	})
 
 const contactSuccessPopup = document.getElementById("contactSuccessPopup")
 const contactSuccessPopupClose = document.getElementById(
 	"contactSuccessPopupClose",
 )
 let contactPopupTimeout
+let contactFormMessageTimer
 
 function hideContactSuccessPopup() {
 	if (!contactSuccessPopup) return

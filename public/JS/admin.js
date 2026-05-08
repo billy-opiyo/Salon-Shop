@@ -11,9 +11,11 @@ let adminUnlocked = false
 let adminBookingsUnsubscribe = null
 let adminGalleryUnsubscribe = null
 let adminReviewsUnsubscribe = null
+let adminContactUnsubscribe = null
 let adminGalleryDocs = []
 let adminReviewDocs = []
 let adminReviewRawDocs = []
+let adminContactDocs = []
 let adminReviewsSortMode = "featured"
 let adminGalleryPreviewObjectUrl = ""
 const adminMessageTimers = new Map()
@@ -232,6 +234,13 @@ function stopAdminReviewsListener() {
 	}
 }
 
+function stopAdminContactListener() {
+	if (typeof adminContactUnsubscribe === "function") {
+		adminContactUnsubscribe()
+		adminContactUnsubscribe = null
+	}
+}
+
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
@@ -317,15 +326,139 @@ function setAdminUnlockedState(value) {
 		stopAdminBookingsListener()
 		stopAdminGalleryListener()
 		stopAdminReviewsListener()
+		stopAdminContactListener()
 		setAdminMessage("", "")
 		setAdminMessage("", "", "adminGalleryMessage")
 		setAdminMessage("", "", "adminReviewsMessage")
+		setAdminMessage("", "", "adminContactMessage")
 	} else {
 		startAdminBookingsListener()
 		startAdminGalleryListener()
 		startAdminReviewsListener()
+		startAdminContactListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
+}
+
+function normalizeContactStatus(status) {
+	const raw = String(status || "new")
+		.trim()
+		.toLowerCase()
+	if (["new", "read", "resolved"].includes(raw)) return raw
+	return "new"
+}
+
+function getContactStatusClass(status) {
+	switch (normalizeContactStatus(status)) {
+		case "resolved":
+			return "admin-status-completed"
+		case "read":
+			return "admin-status-confirmed"
+		default:
+			return "admin-status-pending"
+	}
+}
+
+function normalizeContactDoc(doc = {}) {
+	return {
+		id: String(doc.id || ""),
+		name: String(doc.name || "Anonymous").trim() || "Anonymous",
+		email: String(doc.email || "").trim(),
+		subject: String(doc.subject || "").trim() || "No subject",
+		message: String(doc.message || "").trim(),
+		status: normalizeContactStatus(doc.status),
+		uid: String(doc.uid || "").trim(),
+		createdAt: doc.createdAt || null,
+		updatedAt: doc.updatedAt || null,
+	}
+}
+
+function renderAdminContactMessages(docs) {
+	const list = document.getElementById("adminContactList")
+	if (!list) return
+
+	const items = docs.map(normalizeContactDoc).sort((a, b) => {
+		const updatedDiff = toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
+		if (updatedDiff !== 0) return updatedDiff
+		return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+	})
+
+	adminContactDocs = items
+
+	const total = items.length
+	const newCount = items.filter((m) => m.status === "new").length
+	const readCount = items.filter((m) => m.status === "read").length
+	const resolvedCount = items.filter((m) => m.status === "resolved").length
+
+	const totalEl = document.getElementById("adminMessagesTotalCount")
+	const newEl = document.getElementById("adminMessagesNewCount")
+	const readEl = document.getElementById("adminMessagesReadCount")
+	const resolvedEl = document.getElementById("adminMessagesResolvedCount")
+
+	if (totalEl) totalEl.textContent = String(total)
+	if (newEl) newEl.textContent = String(newCount)
+	if (readEl) readEl.textContent = String(readCount)
+	if (resolvedEl) resolvedEl.textContent = String(resolvedCount)
+
+	if (!items.length) {
+		list.innerHTML =
+			'<div class="admin-empty-state">No contact messages yet. New messages will appear in realtime.</div>'
+		return
+	}
+
+	list.innerHTML = items
+		.map(
+			(item) => `
+      <article class="admin-review-item">
+        <div class="admin-review-item-head">
+          <div>
+            <div class="admin-booking-name">${escapeHtml(item.name)}</div>
+            <div class="admin-booking-id">Message ID: ${escapeHtml(item.id)}</div>
+          </div>
+          <span class="admin-status-badge ${getContactStatusClass(item.status)}">${item.status}</span>
+        </div>
+        <div class="admin-review-meta">
+          <div><span>Email:</span> ${escapeHtml(item.email || "N/A")}</div>
+          <div><span>Subject:</span> ${escapeHtml(item.subject)}</div>
+          <div><span>Sent:</span> ${formatAdminDate(item.createdAt)}</div>
+          <div><span>Updated:</span> ${formatAdminDate(item.updatedAt)}</div>
+        </div>
+        <div class="admin-booking-special-request">
+          <span>Message Received:</span>
+          <p>${item.message ? escapeHtml(item.message) : "No message content provided."}</p>
+        </div>
+        <div class="admin-booking-actions">
+          <button class="admin-action-btn" data-contact-action="new" data-id="${item.id}">Mark New</button>
+          <button class="admin-action-btn" data-contact-action="read" data-id="${item.id}">Mark Read</button>
+          <button class="admin-action-btn" data-contact-action="resolved" data-id="${item.id}">Resolve</button>
+          <button class="admin-action-btn danger" data-contact-action="delete" data-id="${item.id}">Delete</button>
+        </div>
+      </article>
+    `,
+		)
+		.join("")
+}
+
+async function updateContactMessageStatus(messageId, status) {
+	await db
+		.collection("contactMessages")
+		.doc(messageId)
+		.set(
+			{
+				status: normalizeContactStatus(status),
+				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		)
+}
+
+async function deleteContactMessage(messageId) {
+	const confirmed = await showAdminConfirmModal(
+		"Delete this contact message permanently? This action cannot be undone.",
+		"Delete Message",
+	)
+	if (!confirmed) return
+	await db.collection("contactMessages").doc(messageId).delete()
 }
 
 function normalizeReviewStatus(status) {
@@ -1326,6 +1459,30 @@ function startAdminReviewsListener() {
 		)
 }
 
+function startAdminContactListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminContactListener()
+
+	adminContactUnsubscribe = db
+		.collection("contactMessages")
+		.limit(300)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminContactMessages(docs)
+			},
+			(error) => {
+				console.error("Admin contact messages listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch contact messages in realtime: ${error.message || "unknown error"}`,
+					"adminContactMessage",
+				)
+			},
+		)
+}
+
 function initializeAdminPanel() {
 	const loginForm = document.getElementById("adminLoginForm")
 	const logoutBtn = document.getElementById("adminLogoutBtn")
@@ -1335,6 +1492,7 @@ function initializeAdminPanel() {
 	const galleryForm = document.getElementById("adminGalleryForm")
 	const galleryList = document.getElementById("adminGalleryList")
 	const reviewsList = document.getElementById("adminReviewsList")
+	const contactList = document.getElementById("adminContactList")
 	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
 	const profanityWordsInput = document.getElementById("adminProfanityWords")
 	const saveProfanityBtn = document.getElementById("adminSaveProfanityList")
@@ -1572,6 +1730,45 @@ function initializeAdminPanel() {
 		reviewsSortSelect.addEventListener("change", (event) => {
 			adminReviewsSortMode = event.target.value || "featured"
 			renderAdminReviews(adminReviewRawDocs)
+		})
+	}
+
+	if (contactList) {
+		contactList.addEventListener("click", async (event) => {
+			const actionBtn = event.target.closest("button[data-contact-action]")
+			if (!actionBtn || !adminUnlocked || !auth?.currentUser) return
+
+			const action = actionBtn.dataset.contactAction
+			const messageId = actionBtn.dataset.id
+			if (!action || !messageId) return
+
+			actionBtn.disabled = true
+			try {
+				if (action === "delete") {
+					await deleteContactMessage(messageId)
+					setAdminMessage(
+						"success",
+						"✅ Contact message deleted.",
+						"adminContactMessage",
+					)
+				} else {
+					await updateContactMessageStatus(messageId, action)
+					setAdminMessage(
+						"success",
+						`✅ Message marked as ${normalizeContactStatus(action)}.`,
+						"adminContactMessage",
+					)
+				}
+			} catch (error) {
+				console.error("Contact message action failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Message action failed: ${error.message || "unknown error"}`,
+					"adminContactMessage",
+				)
+			} finally {
+				actionBtn.disabled = false
+			}
 		})
 	}
 

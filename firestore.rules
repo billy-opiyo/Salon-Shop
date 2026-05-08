@@ -203,5 +203,44 @@ service cloud.firestore {
       // Only admins may delete reviews.
       allow delete: if isAdmin();
     }
+
+    match /contactMessages/{messageId} {
+      // Anyone signed in (anonymous auth included) can submit contact messages.
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          'name',
+          'email',
+          'subject',
+          'message',
+          'status',
+          'uid',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.email is string
+        && request.resource.data.subject is string
+        && request.resource.data.message is string
+        && request.resource.data.status == 'new'
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.email.size() >= 5
+        && request.resource.data.email.size() <= 160
+        && request.resource.data.subject.size() >= 2
+        && request.resource.data.subject.size() <= 200
+        && request.resource.data.message.size() >= 5
+        && request.resource.data.message.size() <= 3000;
+
+      // Admin only read/update/delete for contact inbox management.
+      allow read, delete: if isAdmin();
+
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'status',
+          'updatedAt'
+        ])
+        && request.resource.data.status in ['new', 'read', 'resolved'];
+    }
   }
 }

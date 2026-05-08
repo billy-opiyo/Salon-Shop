@@ -151,6 +151,15 @@
 						>
 							Reviews
 						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
+							data-admin-section-tab="messages"
+							role="tab"
+							aria-selected="false"
+						>
+							Messages
+						</button>
 					</div>
 
 					<section
@@ -507,6 +516,39 @@
 								</a>
 							</article>
 						</div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="messages"
+						role="tabpanel"
+					>
+						<div class="admin-stats">
+							<div class="admin-stat-card">
+								<div class="label">Total</div>
+								<strong id="adminMessagesTotalCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">New</div>
+								<strong id="adminMessagesNewCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Read</div>
+								<strong id="adminMessagesReadCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Resolved</div>
+								<strong id="adminMessagesResolvedCount">0</strong>
+							</div>
+						</div>
+
+						<div
+							class="form-message"
+							id="adminContactMessage"
+							style="display: none"
+						></div>
+
+						<div class="admin-review-list" id="adminContactList"></div>
 					</section>
 				</div>
 			</div>
