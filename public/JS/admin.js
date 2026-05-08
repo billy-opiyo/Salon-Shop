@@ -95,6 +95,26 @@ function initializeAdminSectionTabs() {
 	setActiveAdminSection(defaultAdminSection)
 }
 
+function setAdminPasswordVisibility(isVisible) {
+	const passwordInput = document.getElementById("adminPassword")
+	const passwordToggle = document.getElementById("adminPasswordToggle")
+	if (!passwordInput || !passwordToggle) return
+
+	const shouldShow = isVisible === true
+	passwordInput.type = shouldShow ? "text" : "password"
+	passwordToggle.setAttribute("aria-pressed", shouldShow ? "true" : "false")
+	passwordToggle.setAttribute(
+		"aria-label",
+		shouldShow ? "Hide password" : "Show password",
+	)
+
+	const icon = passwordToggle.querySelector("i")
+	if (icon) {
+		icon.classList.toggle("fa-eye", !shouldShow)
+		icon.classList.toggle("fa-eye-slash", shouldShow)
+	}
+}
+
 function canInitializeFirebase() {
 	return (
 		typeof firebase !== "undefined" &&
@@ -954,6 +974,7 @@ function initializeAdminPanel() {
 	const loginForm = document.getElementById("adminLoginForm")
 	const logoutBtn = document.getElementById("adminLogoutBtn")
 	const loginBtn = document.getElementById("adminLoginBtn")
+	const passwordToggleBtn = document.getElementById("adminPasswordToggle")
 	const bookingList = document.getElementById("adminBookingsList")
 	const galleryForm = document.getElementById("adminGalleryForm")
 	const galleryList = document.getElementById("adminGalleryList")
@@ -966,6 +987,15 @@ function initializeAdminPanel() {
 
 	initializeAdminSectionTabs()
 	bindGalleryPreviewEvents()
+	setAdminPasswordVisibility(false)
+
+	if (passwordToggleBtn) {
+		passwordToggleBtn.addEventListener("click", () => {
+			const passwordInput = document.getElementById("adminPassword")
+			if (!passwordInput) return
+			setAdminPasswordVisibility(passwordInput.type === "password")
+		})
+	}
 
 	loginForm.addEventListener("submit", async (event) => {
 		event.preventDefault()
@@ -999,7 +1029,10 @@ function initializeAdminPanel() {
 
 		try {
 			await auth.signInWithEmailAndPassword(email, password)
-			if (passwordInput) passwordInput.value = ""
+			if (passwordInput) {
+				passwordInput.value = ""
+				setAdminPasswordVisibility(false)
+			}
 		} catch (error) {
 			console.error("Admin sign in failed:", error)
 			setAdminMessage(

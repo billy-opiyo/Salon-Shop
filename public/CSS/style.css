@@ -1274,7 +1274,50 @@ h6 {
 
 .admin-auth-form #adminLoginBtn {
     grid-column: 1 / -1;
-    width: 100%;
+    width: 37.5%;
+    justify-self: center;
+}
+
+.admin-password-field {
+    position: relative;
+}
+
+.admin-password-field input {
+    padding-right: 48px;
+}
+
+.admin-password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 34px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+.admin-password-toggle:hover {
+    color: var(--primary);
+    background: rgba(200, 150, 62, 0.08);
+}
+
+.admin-password-toggle:focus-visible {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(200, 150, 62, 0.12);
+    outline: none;
+}
+
+.admin-password-toggle i {
+    font-size: 0.92rem;
+    line-height: 1;
 }
 
 .admin-user-state {
@@ -2098,6 +2141,10 @@ h6 {
         grid-template-columns: 1fr;
     }
 
+    .admin-auth-form #adminLoginBtn {
+        width: 100%;
+    }
+
     .admin-booking-meta {
         grid-template-columns: 1fr;
     }
@@ -2253,6 +2300,74 @@ h6 {
         white-space: normal;
         line-height: 1.25;
         padding: 9px 10px;
+    }
+
+    .admin-bookings-list {
+        --admin-bookings-visible-cards: 3;
+        --admin-booking-card-height: auto;
+        gap: 10px;
+        padding-right: 2px;
+    }
+
+    .admin-booking-item {
+        min-height: 0;
+        padding: 12px;
+    }
+
+    .admin-booking-item-head {
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .admin-booking-name {
+        font-size: 0.96rem;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+    }
+
+    .admin-booking-id {
+        font-size: 0.72rem;
+    }
+
+    .admin-booking-meta {
+        gap: 7px 10px;
+        font-size: 0.82rem;
+        margin-bottom: 10px;
+    }
+
+    .admin-booking-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .admin-booking-actions .admin-action-btn {
+        width: 100%;
+        min-width: 0;
+        justify-content: center;
+        white-space: normal;
+        line-height: 1.25;
+        padding: 9px 10px;
+    }
+
+    .admin-section-card {
+        padding: 14px;
+        gap: 10px;
+    }
+
+    .admin-section-card h3 {
+        font-size: 0.98rem;
+    }
+
+    .admin-section-card p,
+    .admin-section-card ul {
+        font-size: 0.86rem;
+        line-height: 1.5;
+    }
+
+    .admin-section-card .btn {
+        width: 100%;
+        justify-content: center;
     }
 }
 
@@ -3061,6 +3176,102 @@ h6 {
     .footer-bottom {
         flex-direction: column;
         text-align: center;
+    }
+}
+
+@media (max-width: 490px) {
+    .container {
+        padding: 0 14px;
+    }
+
+    .section-title {
+        font-size: clamp(1.65rem, 7.4vw, 2rem);
+        margin-bottom: 14px;
+    }
+
+    .section-desc {
+        font-size: 0.94rem;
+        line-height: 1.6;
+    }
+
+    .hero {
+        padding: 106px 0 46px;
+    }
+
+    .hero-text p {
+        font-size: 0.98rem;
+        margin-bottom: 24px;
+    }
+
+    .services-tabs {
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .services-tab {
+        padding: 8px 14px;
+        font-size: 0.78rem;
+    }
+
+    .services-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .service-card {
+        padding: 20px;
+    }
+
+    .booking-form {
+        padding: 22px 16px;
+    }
+
+    .form-row {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .gallery-header {
+        margin-bottom: 30px;
+    }
+
+    .gallery-filter-group {
+        gap: 8px;
+    }
+
+    .gallery-filter-chip {
+        padding: 7px 10px;
+        font-size: 0.78rem;
+    }
+
+    .testimonial-card {
+        padding: 20px;
+    }
+
+    .contact-item {
+        gap: 12px;
+    }
+
+    .contact-item-icon {
+        width: 42px;
+        height: 42px;
+    }
+
+    .newsletter-inner {
+        padding: 28px 14px;
+    }
+
+    .blog-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .blog-card-content {
+        padding: 18px;
+    }
+
+    .footer {
+        padding: 46px 0 24px;
     }
 }
 
