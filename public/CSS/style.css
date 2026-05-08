@@ -2034,6 +2034,26 @@ h6 {
     color: var(--text-secondary);
 }
 
+.admin-inline-link {
+    color: var(--primary-light);
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(200, 150, 62, 0.45);
+    transition: var(--transition-fast);
+    font-weight: 600;
+}
+
+.admin-inline-link:hover {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    text-shadow: 0 0 12px rgba(200, 150, 62, 0.25);
+}
+
+.admin-inline-link:focus-visible {
+    outline: 2px solid rgba(200, 150, 62, 0.45);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
 .admin-booking-inspiration {
     margin-top: 12px;
     margin-bottom: 12px;

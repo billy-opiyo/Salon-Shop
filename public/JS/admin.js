@@ -17,6 +17,7 @@ let adminReviewDocs = []
 let adminReviewRawDocs = []
 let adminContactDocs = []
 let adminReviewsSortMode = "featured"
+let adminMessagesSortMode = "newest"
 let adminGalleryPreviewObjectUrl = ""
 const adminMessageTimers = new Map()
 const adminMessageHideTimers = new Map()
@@ -373,17 +374,72 @@ function normalizeContactDoc(doc = {}) {
 	}
 }
 
-function renderAdminContactMessages(docs) {
-	const list = document.getElementById("adminContactList")
-	if (!list) return
+function sortAdminContactMessages(items = [], mode = adminMessagesSortMode) {
+	const data = [...items]
 
-	const items = docs.map(normalizeContactDoc).sort((a, b) => {
+	if (mode === "oldest") {
+		return data.sort((a, b) => {
+			const createdDiff =
+				toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt)
+			if (createdDiff !== 0) return createdDiff
+			return toTimestampMs(a.updatedAt) - toTimestampMs(b.updatedAt)
+		})
+	}
+
+	if (mode === "status-new-first") {
+		const priority = { new: 0, read: 1, resolved: 2 }
+		return data.sort((a, b) => {
+			const pDiff =
+				(priority[normalizeContactStatus(a.status)] ?? 9) -
+				(priority[normalizeContactStatus(b.status)] ?? 9)
+			if (pDiff !== 0) return pDiff
+			const updatedDiff =
+				toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
+			if (updatedDiff !== 0) return updatedDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	if (mode === "status-unresolved-first") {
+		return data.sort((a, b) => {
+			const aResolved = normalizeContactStatus(a.status) === "resolved"
+			const bResolved = normalizeContactStatus(b.status) === "resolved"
+			if (aResolved !== bResolved) return aResolved ? 1 : -1
+			const updatedDiff =
+				toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
+			if (updatedDiff !== 0) return updatedDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	if (mode === "name-az") {
+		return data.sort((a, b) => {
+			const nameDiff = String(a.name || "").localeCompare(
+				String(b.name || ""),
+				undefined,
+				{
+					sensitivity: "base",
+				},
+			)
+			if (nameDiff !== 0) return nameDiff
+			return toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
+		})
+	}
+
+	return data.sort((a, b) => {
 		const updatedDiff = toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
 		if (updatedDiff !== 0) return updatedDiff
 		return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
 	})
+}
 
-	adminContactDocs = items
+function renderAdminContactMessages(docs) {
+	const list = document.getElementById("adminContactList")
+	if (!list) return
+
+	const normalizedItems = docs.map(normalizeContactDoc)
+	adminContactDocs = normalizedItems
+	const items = sortAdminContactMessages(normalizedItems)
 
 	const total = items.length
 	const newCount = items.filter((m) => m.status === "new").length
@@ -418,7 +474,7 @@ function renderAdminContactMessages(docs) {
           <span class="admin-status-badge ${getContactStatusClass(item.status)}">${item.status}</span>
         </div>
         <div class="admin-review-meta">
-          <div><span>Email:</span> ${escapeHtml(item.email || "N/A")}</div>
+          <div><span>Email:</span> ${item.email ? `<a class="admin-inline-link" href="mailto:${encodeURIComponent(item.email)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.email)}</a>` : "N/A"}</div>
           <div><span>Subject:</span> ${escapeHtml(item.subject)}</div>
           <div><span>Sent:</span> ${formatAdminDate(item.createdAt)}</div>
           <div><span>Updated:</span> ${formatAdminDate(item.updatedAt)}</div>
@@ -1494,6 +1550,7 @@ function initializeAdminPanel() {
 	const reviewsList = document.getElementById("adminReviewsList")
 	const contactList = document.getElementById("adminContactList")
 	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
+	const messagesSortSelect = document.getElementById("adminMessagesSortSelect")
 	const profanityWordsInput = document.getElementById("adminProfanityWords")
 	const saveProfanityBtn = document.getElementById("adminSaveProfanityList")
 	const cancelEditBtn = document.getElementById("adminGalleryCancelEdit")
@@ -1730,6 +1787,14 @@ function initializeAdminPanel() {
 		reviewsSortSelect.addEventListener("change", (event) => {
 			adminReviewsSortMode = event.target.value || "featured"
 			renderAdminReviews(adminReviewRawDocs)
+		})
+	}
+
+	if (messagesSortSelect) {
+		messagesSortSelect.value = adminMessagesSortMode
+		messagesSortSelect.addEventListener("change", (event) => {
+			adminMessagesSortMode = event.target.value || "newest"
+			renderAdminContactMessages(adminContactDocs)
 		})
 	}
 
