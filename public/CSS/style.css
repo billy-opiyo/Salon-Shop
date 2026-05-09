@@ -38,9 +38,14 @@
 
 html {
     scroll-behavior: smooth;
+    scroll-padding-top: calc(var(--nav-height) + 16px);
     font-size: 16px;
     scrollbar-width: thin;
     scrollbar-color: var(--primary) var(--bg-secondary);
+}
+
+section[id] {
+    scroll-margin-top: calc(var(--nav-height) + 16px);
 }
 
 body {
@@ -1426,6 +1431,27 @@ h6 {
     min-height: calc((var(--admin-gallery-card-height) * var(--admin-gallery-visible-cards)) + (var(--admin-gallery-list-gap) * (var(--admin-gallery-visible-cards) - 1)) + 36px);
 }
 
+.admin-gallery-form--focus-flash {
+    animation: adminGalleryFormFlash 1.6s ease;
+}
+
+@keyframes adminGalleryFormFlash {
+    0% {
+        box-shadow: 0 0 0 0 rgba(255, 159, 10, 0.5);
+        border-color: rgba(255, 159, 10, 0.75);
+        transform: translateY(-2px);
+    }
+    45% {
+        box-shadow: 0 0 0 10px rgba(255, 159, 10, 0.14);
+        border-color: rgba(255, 159, 10, 0.95);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 159, 10, 0);
+        border-color: var(--border);
+        transform: translateY(0);
+    }
+}
+
 .admin-gallery-form-head,
 .admin-gallery-list-head {
     display: flex;
@@ -1858,6 +1884,13 @@ h6 {
     padding-left: 0;
     color: var(--text-secondary);
     font-size: 0.9rem;
+    transform: translateY(0);
+    transition:
+        background-color 0.25s ease,
+        color 0.25s ease,
+        border-color 0.25s ease,
+        box-shadow 0.25s ease,
+        transform 0.25s ease;
 }
 
 .admin-section-card .btn {
@@ -2108,6 +2141,7 @@ h6 {
 }
 
 .admin-inline-link:hover {
+    transform: translateY(-1px);
     color: var(--primary);
     border-bottom-color: var(--primary);
     text-shadow: 0 0 12px rgba(200, 150, 62, 0.25);

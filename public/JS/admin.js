@@ -1187,6 +1187,23 @@ function loadGalleryItemForEditing(id) {
 	}
 	setGalleryPreviewImage(item.imageUrl || "")
 	updateGalleryPreview()
+
+	const galleryForm = document.getElementById("adminGalleryForm")
+	if (galleryForm) {
+		galleryForm.scrollIntoView({ behavior: "smooth", block: "start" })
+		galleryForm.classList.remove("admin-gallery-form--focus-flash")
+		void galleryForm.offsetWidth
+		galleryForm.classList.add("admin-gallery-form--focus-flash")
+		setTimeout(() => {
+			galleryForm.classList.remove("admin-gallery-form--focus-flash")
+		}, 1600)
+		const firstInput = galleryForm.querySelector("input, select, textarea")
+		if (firstInput && typeof firstInput.focus === "function") {
+			setTimeout(() => {
+				firstInput.focus({ preventScroll: true })
+			}, 250)
+		}
+	}
 }
 
 function renderAdminGallery(docs) {

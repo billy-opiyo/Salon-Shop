@@ -647,7 +647,7 @@ function setGoogleAuthButtonsBusy(isBusy) {
 		authUi.postBookingGoogleBtn.disabled = busy
 		authUi.postBookingGoogleBtn.textContent = busy
 			? "Signing in..."
-			: "Sign In with Google"
+			: "Sign In Now"
 	}
 }
 
@@ -1531,6 +1531,49 @@ async function handleLogout() {
 	}
 }
 
+async function handleContinueAsGuest() {
+	const guestBtn = authUi.continueAsGuestBtn
+	if (guestBtn) {
+		guestBtn.disabled = true
+		guestBtn.textContent = "Continuing..."
+	}
+
+	try {
+		if (firebaseReady && auth) {
+			const currentUser = auth.currentUser
+			if (currentUser && !currentUser.isAnonymous) {
+				await auth.signOut()
+			}
+
+			if (!auth.currentUser) {
+				await auth.signInAnonymously()
+			}
+		}
+
+		setDashboardPromptState()
+		closeAuthModal()
+		showFavoritesToast("You're now continuing as guest")
+		document.getElementById("booking")?.scrollIntoView({
+			behavior: "smooth",
+			block: "start",
+		})
+	} catch (error) {
+		console.error("Continue as guest failed:", error)
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				`❌ ${getFriendlyAuthError(error)}`,
+			)
+		}
+	} finally {
+		if (guestBtn) {
+			guestBtn.disabled = false
+			guestBtn.textContent = "Continue as Guest"
+		}
+	}
+}
+
 function bindAuthUiEvents() {
 	if (authUi.openBtn) {
 		authUi.openBtn.addEventListener("click", () => openAuthModal("signin"))
@@ -1573,17 +1616,19 @@ function bindAuthUiEvents() {
 	}
 	if (authUi.continueAsGuestBtn) {
 		authUi.continueAsGuestBtn.addEventListener("click", () => {
-			closeAuthModal()
-			document.getElementById("booking")?.scrollIntoView({
-				behavior: "smooth",
-				block: "start",
-			})
+			void handleContinueAsGuest()
 		})
 	}
 	if (authUi.postBookingGoogleBtn) {
 		authUi.postBookingGoogleBtn.addEventListener("click", () => {
-			shouldAutoFocusDashboardAfterAuth = true
-			void handleGoogleAuth()
+			openAuthModal("signin")
+			if (authUi.message) {
+				showFormMessage(
+					authUi.message,
+					"success",
+					"Sign in using your email and password to sync this booking.",
+				)
+			}
 		})
 	}
 	if (authUi.postBookingLaterBtn) {
