@@ -250,6 +250,9 @@ let filteredGalleryData = [...galleryData]
 let showAllGallery = false
 let currentLightboxIndex = 0
 let galleryRealtimeUnsubscribe = null
+let dashboardFavoritesUnsubscribe = null
+let dashboardFavoriteStyles = []
+let activeDashboardUid = ""
 let gallerySortBy = "recommended"
 const galleryFiltersState = {
 	length: "all",
@@ -315,6 +318,8 @@ let showAllReviews = false
 let reviewsSortMode = "featured"
 let reviewMessageTimer = null
 let reviewsToggleAnimationTimer = null
+let favoritesToastTimer = null
+let dashboardFavoritesMessageTimer = null
 const REVIEW_LOCAL_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 	reviewDrafts: "rb_review_drafts",
@@ -536,6 +541,10 @@ let authObserverAttached = false
 let shouldAutoFocusDashboardAfterAuth = false
 let googleAuthInProgress = false
 
+function isNonGuestSignedIn() {
+	return Boolean(auth?.currentUser && !auth.currentUser.isAnonymous)
+}
+
 const authUi = {
 	modal: null,
 	openBtn: null,
@@ -567,12 +576,17 @@ const authUi = {
 	dashboardMessage: null,
 	dashboardBookingsList: null,
 	dashboardReviewsList: null,
+	dashboardFavoritesList: null,
+	dashboardFavoritesCount: null,
 	dashboardProfileName: null,
 	dashboardProfileEmail: null,
 	dashboardProfilePhone: null,
 	postBookingAuthPrompt: null,
 	postBookingGoogleBtn: null,
 	postBookingLaterBtn: null,
+	reviewAuthHint: null,
+	reviewAuthHintBtn: null,
+	favoritesToast: null,
 }
 
 function getFriendlyAuthError(error) {
@@ -761,6 +775,12 @@ function initAuthUiRefs() {
 		"dashboardBookingsList",
 	)
 	authUi.dashboardReviewsList = document.getElementById("dashboardReviewsList")
+	authUi.dashboardFavoritesList = document.getElementById(
+		"dashboardFavoritesList",
+	)
+	authUi.dashboardFavoritesCount = document.getElementById(
+		"dashboardFavoritesCount",
+	)
 	authUi.dashboardProfileName = document.getElementById("dashboardProfileName")
 	authUi.dashboardProfileEmail = document.getElementById(
 		"dashboardProfileEmail",
@@ -773,6 +793,43 @@ function initAuthUiRefs() {
 	)
 	authUi.postBookingGoogleBtn = document.getElementById("postBookingGoogleBtn")
 	authUi.postBookingLaterBtn = document.getElementById("postBookingLaterBtn")
+	authUi.reviewAuthHint = document.getElementById("reviewAuthHint")
+	authUi.reviewAuthHintBtn = document.getElementById("reviewAuthHintBtn")
+	authUi.favoritesToast = document.getElementById("favoritesToast")
+}
+
+function updateReviewAuthHintVisibility() {
+	if (!authUi.reviewAuthHint) return
+	authUi.reviewAuthHint.classList.toggle("hidden", isNonGuestSignedIn())
+}
+
+function showFavoritesToast(message = "") {
+	if (!authUi.favoritesToast || !message) return
+	authUi.favoritesToast.textContent = message
+	authUi.favoritesToast.classList.add("show")
+	if (favoritesToastTimer) {
+		clearTimeout(favoritesToastTimer)
+	}
+	favoritesToastTimer = setTimeout(() => {
+		authUi.favoritesToast?.classList.remove("show")
+		favoritesToastTimer = null
+	}, 1800)
+}
+
+function showTimedDashboardFavoritesMessage(type, text, duration = 2600) {
+	if (!authUi.dashboardMessage) return
+
+	if (dashboardFavoritesMessageTimer) {
+		clearTimeout(dashboardFavoritesMessageTimer)
+		dashboardFavoritesMessageTimer = null
+	}
+
+	showFormMessage(authUi.dashboardMessage, type, text)
+
+	dashboardFavoritesMessageTimer = setTimeout(() => {
+		hideReviewMessage(authUi.dashboardMessage, true)
+		dashboardFavoritesMessageTimer = null
+	}, duration)
 }
 
 function setAuthPasswordVisibility(isVisible) {
@@ -854,6 +911,9 @@ function getUserDisplayName(user) {
 }
 
 function setDashboardPromptState() {
+	stopDashboardFavoritesListener()
+	dashboardFavoriteStyles = []
+	activeDashboardUid = ""
 	if (authUi.clientDashboard) authUi.clientDashboard.classList.add("hidden")
 	if (authUi.navDashboardLink) authUi.navDashboardLink.classList.add("hidden")
 	if (authUi.openBtn) authUi.openBtn.classList.remove("hidden")
@@ -867,6 +927,17 @@ function setDashboardPromptState() {
 	if (authUi.dashboardAuthBtn) {
 		authUi.dashboardAuthBtn.textContent = "Sign In to Sync Data"
 	}
+	if (dashboardFavoritesMessageTimer) {
+		clearTimeout(dashboardFavoritesMessageTimer)
+		dashboardFavoritesMessageTimer = null
+	}
+	renderDashboardFavorites(
+		authUi.dashboardFavoritesList,
+		[],
+		"Sign in to save favorite braid styles.",
+	)
+	if (authUi.dashboardFavoritesCount) authUi.dashboardFavoritesCount.textContent = "0"
+	updateFavoriteButtonsUI()
 	setPostBookingPromptVisible(false)
 }
 
@@ -940,8 +1011,214 @@ function renderDashboardList(mount, items, emptyText) {
 	mount.innerHTML = items.map((item) => `<li>${item}</li>`).join("")
 }
 
+function getGalleryIdentity(style = {}) {
+	return String(style.id || style.styleName || style.styleType || "")
+		.trim()
+		.toLowerCase()
+}
+
+function isStyleFavorited(style = {}) {
+	const identity = getGalleryIdentity(style)
+	if (!identity) return false
+	return dashboardFavoriteStyles.some(
+		(item) => getGalleryIdentity(item) === identity,
+	)
+}
+
+function setFavoriteButtonState(button, favorited) {
+	if (!button) return
+	const active = favorited === true
+	button.classList.toggle("is-favorited", active)
+	button.textContent = active ? "♥ Saved" : "♡ Save"
+	button.setAttribute("aria-pressed", active ? "true" : "false")
+}
+
+function updateFavoriteButtonsUI() {
+	document.querySelectorAll(".gallery-save-favorite-btn").forEach((btn) => {
+		const styleId = btn.dataset.favStyleId || ""
+		const style = galleryData.find(
+			(item) => String(item.id || "") === String(styleId),
+		)
+		setFavoriteButtonState(btn, isStyleFavorited(style))
+	})
+
+	const lightboxFavoriteBtn = document.getElementById("lightboxFavoriteBtn")
+	if (lightboxFavoriteBtn) {
+		const visible = getVisibleGalleryData()
+		const safeIndex =
+			((currentLightboxIndex % Math.max(visible.length, 1)) +
+				Math.max(visible.length, 1)) %
+			Math.max(visible.length, 1)
+		const activeStyle = visible[safeIndex]
+		setFavoriteButtonState(lightboxFavoriteBtn, isStyleFavorited(activeStyle))
+	}
+}
+
+function renderDashboardFavorites(mount, styles = [], emptyText) {
+	if (authUi.dashboardFavoritesCount) {
+		authUi.dashboardFavoritesCount.textContent = String(styles.length || 0)
+	}
+
+	if (!mount) return
+	if (!Array.isArray(styles) || !styles.length) {
+		mount.innerHTML = `<li>${emptyText}</li>`
+		return
+	}
+
+	mount.innerHTML = styles
+		.map((style) => {
+			const styleId = escapeHtml(String(style.id || ""))
+			const styleName = escapeHtml(style.styleName || "Favorite style")
+			const styleMeta = escapeHtml(
+				`${style.styleType || "Braids"} • ${style.stylistName || "Royal Braids Team"}`,
+			)
+			const imageUrl = escapeHtml(style.imageUrl || "")
+			return `
+      <li class="dashboard-favorite-card">
+        <div class="dashboard-favorite-item">
+        <div class="dashboard-favorite-media">
+          ${
+						imageUrl
+							? `<img src="${imageUrl}" alt="${styleName}" loading="lazy" />`
+							: "<span>Style</span>"
+					}
+        </div>
+        <div class="dashboard-favorite-content">
+          <strong>${styleName}</strong>
+          <p>${styleMeta}</p>
+          <div class="dashboard-favorite-actions">
+            <button type="button" class="btn btn-outline" data-dashboard-favorite-book="${styleId}">Book</button>
+            <button type="button" class="btn btn-outline" data-dashboard-favorite-remove="${styleId}">Remove</button>
+          </div>
+        </div>
+        </div>
+      </li>
+    `
+		})
+		.join("")
+}
+
+function stopDashboardFavoritesListener() {
+	if (typeof dashboardFavoritesUnsubscribe === "function") {
+		dashboardFavoritesUnsubscribe()
+		dashboardFavoritesUnsubscribe = null
+	}
+}
+
+function getFavoritePayload(style = {}) {
+	return {
+		id: String(style.id || "").trim(),
+		styleName: String(style.styleName || "").trim(),
+		styleType: String(style.styleType || "").trim(),
+		stylistName: String(style.stylistName || "").trim(),
+		imageUrl: String(style.imageUrl || "").trim(),
+		savedAt: firebase.firestore.FieldValue.serverTimestamp(),
+	}
+}
+
+async function toggleFavoriteStyle(style = {}, sourceButton = null) {
+	if (!firebaseReady || !db || !auth) return
+
+	const user = auth.currentUser
+	if (!user || user.isAnonymous) {
+		shouldAutoFocusDashboardAfterAuth = true
+		openAuthModal("signin")
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				"🔐 Sign in to save favorite braid styles.",
+			)
+		}
+		return
+	}
+
+	const styleId = String(style.id || "").trim()
+	if (!styleId) return
+
+	if (sourceButton) sourceButton.disabled = true
+	const favoriteRef = db
+		.collection("users")
+		.doc(user.uid)
+		.collection("favorites")
+		.doc(styleId)
+
+	try {
+		if (isStyleFavorited(style)) {
+			await favoriteRef.delete()
+			showFavoritesToast("Removed from favorites")
+			showTimedDashboardFavoritesMessage(
+				"success",
+				"🗑️ Style removed from favorites.",
+			)
+		} else {
+			await favoriteRef.set(getFavoritePayload(style), { merge: true })
+			showFavoritesToast("Saved to favorites")
+			showTimedDashboardFavoritesMessage(
+				"success",
+				"💖 Style saved to favorites.",
+			)
+		}
+	} catch (error) {
+		console.error("Favorite toggle failed:", error)
+		showTimedDashboardFavoritesMessage(
+			"error",
+			"⚠️ Could not update favorites right now.",
+		)
+	} finally {
+		if (sourceButton) sourceButton.disabled = false
+	}
+}
+
+function startDashboardFavoritesListener(uid) {
+	if (!firebaseReady || !db || !uid) return
+
+	if (
+		activeDashboardUid === uid &&
+		typeof dashboardFavoritesUnsubscribe === "function"
+	) {
+		return
+	}
+
+	stopDashboardFavoritesListener()
+	activeDashboardUid = uid
+
+	dashboardFavoritesUnsubscribe = db
+		.collection("users")
+		.doc(uid)
+		.collection("favorites")
+		.limit(30)
+		.onSnapshot(
+			(snapshot) => {
+				dashboardFavoriteStyles = snapshot.docs
+					.map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
+					.sort(
+						(a, b) =>
+							toTimestampMs(b.savedAt || b.updatedAt) -
+							toTimestampMs(a.savedAt || a.updatedAt),
+					)
+
+				renderDashboardFavorites(
+					authUi.dashboardFavoritesList,
+					dashboardFavoriteStyles,
+					"No favorite styles yet. Tap ♡ Save in gallery.",
+				)
+				updateFavoriteButtonsUI()
+			},
+			(error) => {
+				console.error("Favorites listener failed:", error)
+				renderDashboardFavorites(
+					authUi.dashboardFavoritesList,
+					[],
+					"Could not load favorite styles right now.",
+				)
+			},
+		)
+}
+
 async function loadUserDashboardData(uid) {
 	if (!firebaseReady || !db || !uid) return
+	startDashboardFavoritesListener(uid)
 
 	try {
 		let bookingsSnap = null
@@ -1313,6 +1590,11 @@ function bindAuthUiEvents() {
 			setPostBookingPromptVisible(false)
 		})
 	}
+	if (authUi.reviewAuthHintBtn) {
+		authUi.reviewAuthHintBtn.addEventListener("click", () => {
+			openAuthModal("signin")
+		})
+	}
 	if (authUi.logoutBtn) {
 		authUi.logoutBtn.addEventListener("click", () => {
 			void handleLogout()
@@ -1322,6 +1604,29 @@ function bindAuthUiEvents() {
 		authUi.dashboardAuthBtn.addEventListener("click", () =>
 			openAuthModal("signin"),
 		)
+	}
+	if (authUi.dashboardFavoritesList) {
+		authUi.dashboardFavoritesList.addEventListener("click", (event) => {
+			const removeBtn = event.target.closest("[data-dashboard-favorite-remove]")
+			const bookBtn = event.target.closest("[data-dashboard-favorite-book]")
+			if (!removeBtn && !bookBtn) return
+
+			const styleId =
+				removeBtn?.dataset.dashboardFavoriteRemove ||
+				bookBtn?.dataset.dashboardFavoriteBook ||
+				""
+			const style = dashboardFavoriteStyles.find(
+				(item) => String(item.id || "") === String(styleId),
+			)
+			if (!style) return
+
+			if (bookBtn) {
+				selectService(style.styleName || style.styleType || "")
+				return
+			}
+
+			void toggleFavoriteStyle(style, removeBtn)
+		})
 	}
 
 	if (authUi.profileTrigger && authUi.profileMenu) {
@@ -1352,6 +1657,7 @@ function attachAuthStateObserver() {
 			setDashboardSignedInState(user)
 			await upsertUserProfile(user)
 			await loadUserDashboardData(user.uid)
+			renderTestimonials(testimonialsData)
 			focusDashboardAfterAuthIfRequested()
 		} else {
 			setDashboardPromptState()
@@ -1365,6 +1671,7 @@ function attachAuthStateObserver() {
 				[],
 				"Sign in to view your submitted reviews.",
 			)
+			renderTestimonials(testimonialsData)
 		}
 	})
 }
@@ -1741,11 +2048,14 @@ function renderGallery() {
         <h4>${item.styleName}</h4>
         <p>${item.styleType} • by ${item.stylistName}</p>
         ${item.hasBeforeAfter ? '<span class="before-after">Before & After</span>' : ""}
+        <button type="button" class="gallery-save-favorite-btn" data-fav-style-id="${escapeHtml(item.id || "")}" aria-pressed="false">♡ Save</button>
       </div>
     </div>
   `,
 		)
 		.join("")
+
+	updateFavoriteButtonsUI()
 }
 
 function toggleGalleryView() {
@@ -1837,6 +2147,24 @@ function wireGalleryInteractions() {
 			if (!trigger) return
 			const key = trigger.dataset.featureOpen
 			openGalleryItemByIdOrName(key)
+		})
+	}
+
+	const galleryGrid = document.getElementById("galleryGrid")
+	if (galleryGrid) {
+		galleryGrid.addEventListener("click", (event) => {
+			const favoriteBtn = event.target.closest(".gallery-save-favorite-btn")
+			if (!favoriteBtn) return
+			event.preventDefault()
+			event.stopPropagation()
+
+			const styleId = favoriteBtn.dataset.favStyleId || ""
+			const style = galleryData.find(
+				(item) => String(item.id || "") === String(styleId),
+			)
+			if (!style) return
+
+			void toggleFavoriteStyle(style, favoriteBtn)
 		})
 	}
 
@@ -1999,6 +2327,8 @@ function renderTestimonials(list = testimonialsData) {
 	const viewLessBtn = document.getElementById("viewLessReviewsBtn")
 	const controls = document.getElementById("reviewsToggleControls")
 	if (!grid) return
+	const canReportAbuse = isNonGuestSignedIn()
+	updateReviewAuthHintVisibility()
 
 	const approvedList =
 		Array.isArray(list) && list.length ? list : fallbackTestimonialsData
@@ -2057,9 +2387,13 @@ function renderTestimonials(list = testimonialsData) {
 						? `<div style="margin-top:10px"><div class="admin-booking-actions"><button class="admin-action-btn" data-review-ui-action="edit" data-review-id="${escapeHtml(t.id)}">Edit Pending</button></div><p style="margin-top:8px;font-size:0.78rem;color:var(--text-muted)">Pending reviews can be edited but not deleted.</p></div>`
 						: ""
 				}
-      <div class="admin-booking-actions" style="margin-top:10px">
-        <button class="admin-action-btn review-report-btn" data-review-ui-action="report" data-review-id="${escapeHtml(t.id)}">Report Abuse</button>
-      </div>
+	      ${
+					canReportAbuse
+						? `<div class="admin-booking-actions" style="margin-top:10px">
+	        <button class="admin-action-btn review-report-btn" data-review-ui-action="report" data-review-id="${escapeHtml(t.id)}">Report Abuse</button>
+	      </div>`
+						: ""
+				}
       <div class="testimonial-social">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${getReviewSourceIcon(t.source)}</svg>
       </div>
@@ -2386,31 +2720,40 @@ function bindReviewForm() {
 	if (grid) {
 		grid.addEventListener("click", async (event) => {
 			const actionBtn = event.target.closest("button[data-review-ui-action]")
-			if (!actionBtn || !db || !auth) return
+			if (!actionBtn) return
 
 			const action = actionBtn.dataset.reviewUiAction
 			const reviewId = actionBtn.dataset.reviewId
 			if (!action || !reviewId) return
 
-			let activeUid = auth.currentUser?.uid || null
-			if (!activeUid) {
-				const cred = await auth.signInAnonymously()
-				activeUid = cred?.user?.uid || auth.currentUser?.uid || null
-			}
-			if (!activeUid) return
-
 			if (action === "report") {
-				await db
-					.collection("reviews")
-					.doc(reviewId)
-					.set(
-						{
-							reportsCount: firebase.firestore.FieldValue.increment(1),
-							updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-						},
-						{ merge: true },
+				if (!db || !auth || !isNonGuestSignedIn()) {
+					showTimedReviewMessage(
+						"error",
+						"🔐 Sign in to report abuse.",
 					)
-				showTimedReviewMessage("success", "✅ Abuse report submitted.")
+					return
+				}
+
+				try {
+					await db
+						.collection("reviews")
+						.doc(reviewId)
+						.set(
+							{
+								reportsCount: firebase.firestore.FieldValue.increment(1),
+								updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+							},
+							{ merge: true },
+						)
+					showTimedReviewMessage("success", "✅ Abuse report submitted.")
+				} catch (error) {
+					console.error("Report abuse failed:", error)
+					showTimedReviewMessage(
+						"error",
+						"⚠️ Could not submit abuse report right now.",
+					)
+				}
 				return
 			}
 
@@ -2867,7 +3210,27 @@ function updateLightbox() {
 			document.body.style.overflow = ""
 		}
 	}
+
+	const lightboxFavoriteBtn = document.getElementById("lightboxFavoriteBtn")
+	if (lightboxFavoriteBtn) {
+		lightboxFavoriteBtn.dataset.favStyleId = String(item.id || "")
+		setFavoriteButtonState(lightboxFavoriteBtn, isStyleFavorited(item))
+	}
 }
+
+document
+	.getElementById("lightboxFavoriteBtn")
+	?.addEventListener("click", () => {
+		const visible = getVisibleGalleryData()
+		if (!visible.length) return
+		const safeIndex =
+			((currentLightboxIndex % visible.length) + visible.length) %
+			visible.length
+		const item = visible[safeIndex]
+		if (!item) return
+		const lightboxFavoriteBtn = document.getElementById("lightboxFavoriteBtn")
+		void toggleFavoriteStyle(item, lightboxFavoriteBtn)
+	})
 
 document.getElementById("lightboxClose")?.addEventListener("click", () => {
 	if (lightbox) lightbox.classList.remove("active")

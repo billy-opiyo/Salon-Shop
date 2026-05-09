@@ -593,16 +593,28 @@
 								Check your email for confirmation details. We'll send a reminder
 								SMS 1 hour before your appointment.
 							</p>
-							<div class="post-booking-auth-prompt hidden" id="postBookingAuthPrompt">
+							<div
+								class="post-booking-auth-prompt hidden"
+								id="postBookingAuthPrompt"
+							>
 								<h4>Save your booking and track updates?</h4>
 								<p>
-									Sign in now so you can manage appointments, reviews, and faster rebooking.
+									Sign in now so you can manage appointments, reviews, and
+									faster rebooking.
 								</p>
 								<div class="post-booking-auth-actions">
-									<button type="button" class="btn btn-primary" id="postBookingGoogleBtn">
+									<button
+										type="button"
+										class="btn btn-primary"
+										id="postBookingGoogleBtn"
+									>
 										Sign In with Google
 									</button>
-									<button type="button" class="btn btn-outline" id="postBookingLaterBtn">
+									<button
+										type="button"
+										class="btn btn-outline"
+										id="postBookingLaterBtn"
+									>
 										Maybe Later
 									</button>
 								</div>
@@ -628,8 +640,8 @@
 						<div class="section-subtitle">Your Account</div>
 						<h2 class="section-title">My Dashboard</h2>
 						<p class="section-desc">
-							Track appointments, manage your reviews, and keep your profile up to
-							date for faster rebooking.
+							Track appointments, manage your reviews, and keep your profile up
+							to date for faster rebooking.
 						</p>
 						<div class="form-message" id="dashboardMessage"></div>
 					</div>
@@ -650,6 +662,16 @@
 						</div>
 
 						<div class="dashboard-card">
+							<h3>
+								Favorite Styles
+								<span class="dashboard-count-badge" id="dashboardFavoritesCount">0</span>
+							</h3>
+							<ul id="dashboardFavoritesList" class="dashboard-favorites-list">
+								<li>Sign in to save favorite braid styles.</li>
+							</ul>
+						</div>
+
+						<div class="dashboard-card">
 							<h3>Profile Settings</h3>
 							<div class="dashboard-profile-item">
 								<span>Name</span>
@@ -661,10 +683,16 @@
 							</div>
 							<div class="dashboard-profile-item">
 								<span>Phone</span>
-								<strong id="dashboardProfilePhone">Add phone during booking</strong>
+								<strong id="dashboardProfilePhone"
+									>Add phone during booking</strong
+								>
 							</div>
 							<div class="dashboard-actions">
-								<button type="button" class="btn btn-outline" id="dashboardAuthBtn">
+								<button
+									type="button"
+									class="btn btn-outline"
+									id="dashboardAuthBtn"
+								>
 									Sign In to Sync Data
 								</button>
 							</div>
@@ -683,6 +711,12 @@
 					<p class="section-desc" id="reviewsSummary" style="margin: 0 auto">
 						★ 5.0 average from 6 reviews
 					</p>
+					<div class="review-auth-hint hidden" id="reviewAuthHint" role="status">
+						<span>🔐 Sign in to report abusive reviews.</span>
+						<button type="button" class="btn btn-outline" id="reviewAuthHintBtn">
+							Sign In
+						</button>
+					</div>
 				</div>
 				<div class="reviews-sort-row animate-on-scroll delay-1">
 					<label class="reviews-sort-label" for="reviewsSortSelect"
@@ -1278,6 +1312,13 @@
 						id="lightboxBookNow"
 						>Book Now</a
 					>
+					<button
+						type="button"
+						class="btn btn-outline gallery-favorite-btn"
+						id="lightboxFavoriteBtn"
+					>
+						♡ Save Style
+					</button>
 				</div>
 			</div>
 		</div>
@@ -1304,7 +1345,11 @@
 					<h3 id="authCardTitle">Sign in to manage bookings and reviews</h3>
 				</div>
 
-				<button type="button" class="auth-provider-btn" id="continueWithGoogleBtn">
+				<button
+					type="button"
+					class="auth-provider-btn"
+					id="continueWithGoogleBtn"
+				>
 					Continue with Google
 				</button>
 				<button
@@ -1359,18 +1404,26 @@
 							</button>
 						</div>
 					</div>
-					<button type="submit" class="btn btn-primary auth-submit-btn" id="emailAuthSubmit">
+					<button
+						type="submit"
+						class="btn btn-primary auth-submit-btn"
+						id="emailAuthSubmit"
+					>
 						Sign In
 					</button>
 				</form>
 
 				<div class="auth-links">
-					<button type="button" id="switchToSignupBtn">Don't have an account? Sign Up</button>
+					<button type="button" id="switchToSignupBtn">
+						Don't have an account? Sign Up
+					</button>
 					<button type="button" id="switchToSigninBtn" class="hidden">
 						Already have an account? Sign In
 					</button>
 					<button type="button" id="forgotPasswordBtn">Forgot Password?</button>
-					<button type="button" id="continueAsGuestBtn">Continue as Guest</button>
+					<button type="button" id="continueAsGuestBtn">
+						Continue as Guest
+					</button>
 				</div>
 				<div class="form-message" id="authMessage"></div>
 			</div>
@@ -1406,6 +1459,8 @@
 				<h4>Message was sent successfully.</h4>
 			</div>
 		</div>
+
+		<div class="favorites-toast" id="favoritesToast" role="status" aria-live="polite"></div>
 
 		<!-- ========== BACK TO TOP ========== -->
 		<a href="#home" class="back-to-top" id="backToTop" aria-label="Back to top">

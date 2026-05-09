@@ -249,6 +249,35 @@ service cloud.firestore {
         && request.resource.data.phone is string;
 
       allow delete: if false;
+
+      match /favorites/{favoriteId} {
+        allow read: if isSignedIn() && userId == request.auth.uid;
+
+        allow create, update: if isSignedIn()
+          && userId == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'id',
+            'styleName',
+            'styleType',
+            'stylistName',
+            'imageUrl',
+            'savedAt'
+          ])
+          && request.resource.data.id is string
+          && request.resource.data.styleName is string
+          && request.resource.data.styleType is string
+          && request.resource.data.stylistName is string
+          && request.resource.data.imageUrl is string
+          && request.resource.data.id.size() >= 1
+          && request.resource.data.id.size() <= 160
+          && request.resource.data.styleName.size() >= 1
+          && request.resource.data.styleName.size() <= 140
+          && request.resource.data.styleType.size() <= 120
+          && request.resource.data.stylistName.size() <= 120
+          && request.resource.data.imageUrl.size() <= 1000;
+
+        allow delete: if isSignedIn() && userId == request.auth.uid;
+      }
     }
 
     match /contactMessages/{messageId} {
