@@ -9,6 +9,28 @@ A Firebase-powered salon website for **Royal Braids** with:
 
 This README explains how the project works end-to-end, including architecture, feature operations, security model, setup, and deployment.
 
+## Table of Contents
+
+- [1) Project Goals](#1-project-goals)
+- [1.1) Latest Features Added](#11-latest-features-added)
+- [2) Tech Stack](#2-tech-stack)
+- [3) Repository Structure](#3-repository-structure)
+- [4) Firebase Configuration & Hosting Targets](#4-firebase-configuration--hosting-targets)
+- [5) App Architecture (Runtime)](#5-app-architecture-runtime)
+- [6) Public Features and Their Operations](#6-public-features-and-their-operations)
+- [7) Admin Features and Their Operations](#7-admin-features-and-their-operations)
+- [8) Firestore Data Model](#8-firestore-data-model)
+- [9) Security Model (firestore.rules)](#9-security-model-firestorerules)
+- [10) Cloud Function: Booking Confirmation Email](#10-cloud-function-booking-confirmation-email)
+- [11) Local Development Setup](#11-local-development-setup)
+- [12) Deployment Notes](#12-deployment-notes)
+- [13) Operational Workflows (Step-by-Step)](#13-operational-workflows-step-by-step)
+- [14) Important Implementation Notes](#14-important-implementation-notes)
+- [15) Troubleshooting](#15-troubleshooting)
+- [16) Future Enhancements (Recommended)](#16-future-enhancements-recommended)
+- [17) License / Ownership](#17-license--ownership)
+- [18) All Current Features in This Project (As of Now)](#18-all-current-features-in-this-project-as-of-now)
+
 ---
 
 ## 1) Project Goals
@@ -20,6 +42,42 @@ The project is designed to:
 3. Prevent double-booking using transactional slot locks.
 4. Let admins manage bookings, gallery styles, reviews, and contact messages in one console.
 5. Keep public content dynamic through Firestore realtime listeners.
+
+---
+
+## 1.1) Latest Features Added
+
+This README now reflects the newer capabilities currently implemented in the codebase:
+
+- **Realtime slot-based availability** for booking (`bookingSlots` listener + transaction lock).
+- **Gallery upgrades**:
+  - Dynamic filter chips (length, size, style type)
+  - Multi-mode sorting (recommended, name, created/updated dates)
+  - Featured rails (**Trending** and **Most Booked**)
+  - Before/after lightbox support
+- **Review system upgrades**:
+  - Public review submission with anonymous auth support
+  - Pending-review local drafts + “edit pending” UX
+  - Public abuse reporting (`reportsCount` increments)
+  - Review sorting (featured/newest/highest-rated)
+  - Verified-booking detection attempt on submit (service + completed booking check)
+- **Admin dashboard upgrades**:
+  - Section-based tabs (Bookings, Gallery, Reviews, Messages)
+  - Gallery live preview + publish checklist + progress meter
+  - Review moderation tools (approve/reject/pending, feature toggle, text edit, admin reply, delete)
+  - Contact inbox tools (sort, status workflow, delete)
+  - Confirmation modal for destructive actions
+  - Password visibility toggle in admin login
+- **Contact workflow upgrade**:
+  - Firestore-backed contact message pipeline with statuses (`new`, `read`, `resolved`)
+  - Success toast popup on submit
+- **Security hardening in Firestore rules**:
+  - Strict allowed keys and type validation
+  - Owner/admin access separation
+  - Constrained update paths per collection
+- **Cloud Function email automation**:
+  - Booking-created trigger sends confirmation email via Resend
+  - Delivery result tracked in booking document fields (`emailStatus`, timestamps/errors)
 
 ---
 
@@ -507,3 +565,108 @@ Or by component:
 ## 17) License / Ownership
 
 This repository is currently configured as a private/business project for Royal Braids operations.
+
+---
+
+## 18) All Current Features in This Project (As of Now)
+
+### A) Public Website Features
+
+1. Sticky header + active-section navigation highlight.
+2. Mobile menu toggle with body-scroll lock.
+3. Dark mode toggle with localStorage persistence.
+4. Smooth scroll navigation for in-page anchors.
+5. Scroll-triggered animations (`IntersectionObserver`).
+6. Hero counters with animated count-up effect.
+7. Services catalog rendered from JS data.
+8. Service category tabs (All, Braids, Twists, Cornrows, Special).
+9. “Book This Service” quick action (auto-fills booking service selection).
+10. Gallery with Firestore realtime sync and local fallback data.
+11. Gallery filter chips (length, size, style type).
+12. Gallery sort controls (recommended, name asc/desc, created/updated date modes).
+13. Featured gallery rails:
+    - Trending Braids
+    - Most Booked Styles
+14. Gallery “View All / View Less” paging behavior.
+15. Gallery empty-state message when filters return no matches.
+16. Lightbox with:
+    - Previous/next navigation
+    - Keyboard navigation
+    - Escape close
+    - Overlay click close
+    - Before/after split view support
+17. Booking form with required validation and optional inspiration image upload.
+18. Date minimum restriction to block past-date bookings.
+19. Realtime slot availability by date + stylist.
+20. Firestore transaction-based slot locking (double-booking prevention).
+21. Booking success state view + reset booking flow.
+22. Review summary (average rating + review count).
+23. Testimonials rendering with Firestore approved reviews + fallback list.
+24. Review sort modes (Featured, Newest, Highest Rated).
+25. Review toggle controls (View All / View Less with transition effect).
+26. Review submission form with validation rules.
+27. Optional review photo upload via Cloudinary.
+28. Pending review draft persistence in localStorage.
+29. Pending review edit UX for owner draft context.
+30. Public abuse reporting action on reviews.
+31. Contact form saved to Firestore (`contactMessages`).
+32. Contact success toast popup + timed auto-hide.
+33. Back-to-top floating button.
+34. Footer quick links + social links.
+
+### B) Admin Console Features
+
+1. Admin login with Firebase email/password auth.
+2. Allowed-email gate for admin access.
+3. Admin logout flow.
+4. Password visibility toggle in login form.
+5. Admin section tabs:
+   - Bookings
+   - Gallery
+   - Reviews
+   - Messages
+6. Realtime bookings feed.
+7. Booking stats cards (total/pending/confirmed/completed/cancelled).
+8. Booking status updates from action buttons.
+9. Cancel + release slot transaction action.
+10. Realtime gallery management list.
+11. Gallery create/update/delete.
+12. Gallery image upload (main + optional before image).
+13. Gallery live preview card.
+14. Gallery publish checklist with completion meter.
+15. Gallery featured flags (Trending, Most Booked).
+16. Realtime reviews moderation list.
+17. Review stats cards (total/pending/approved/rejected).
+18. Review moderation actions:
+    - Set pending / approve / reject
+    - Save text edit
+    - Save admin reply
+    - Toggle featured
+    - Delete
+19. Basic profanity/content blocklist management (local storage-based in admin UI).
+20. Realtime contact messages list.
+21. Contact message stats cards (total/new/read/resolved).
+22. Contact message sort modes (newest/oldest/status/name variants).
+23. Contact status transitions (new/read/resolved).
+24. Contact message delete action.
+25. Destructive action confirmation modal.
+26. Per-section success/error toasts/messages.
+
+### C) Backend / Data / Security Features
+
+1. Firebase Hosting with target mapping (`main-site`).
+2. Firestore security rules with helper guards:
+   - `isSignedIn()`
+   - `isAdmin()`
+3. Strict schema validation for booking creation.
+4. Strict schema validation for slot-lock creation.
+5. Public read-only slot availability model.
+6. Public gallery read + admin-only gallery writes.
+7. Review lifecycle security (pending submit, admin moderation, owner pending edit, report increments).
+8. Contact message security (signed-in create, admin read/update/delete).
+9. Booking ownership/admin read controls.
+10. Admin-limited booking status updates.
+11. App Check activation support in both public/admin apps.
+12. Cloud Function trigger on booking create.
+13. Booking confirmation email delivery via Resend.
+14. Booking email delivery status persistence (`sent`/`failed`) for auditability.
