@@ -3,6 +3,13 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<script>
+			// Force localhost when opening via 127.0.0.1 to avoid Firebase Auth handler mismatches.
+			if (window.location.hostname === "127.0.0.1") {
+				const target = `${window.location.protocol}//localhost${window.location.port ? `:${window.location.port}` : ""}${window.location.pathname}${window.location.search}${window.location.hash}`
+				window.location.replace(target)
+			}
+		</script>
 		<meta
 			name="description"
 			content="Premium African Hair Braiding & Salon in Nairobi offering luxury braiding, and hair  treatments. Book online today."
@@ -46,26 +53,15 @@
 					<a href="#gallery">Gallery</a>
 					<a href="#services">Services</a>
 					<a href="#booking">Booking</a>
+					<a href="#clientDashboard" id="navDashboardLink" class="hidden"
+						>Dashboard</a
+					>
 					<a href="#testimonials">Reviews</a>
 					<a href="#blog">Blog</a>
 					<a href="#contact">Contact</a>
 				</nav>
 
 				<div class="header-actions">
-					<div class="contact-mini">
-						<svg
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke-width="2"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						>
-							<path
-								d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"
-							></path>
-						</svg>
-						+254 700 123 456
-					</div>
 					<div
 						class="dark-mode-toggle"
 						id="darkModeToggle"
@@ -79,6 +75,25 @@
 						<svg class="moon" viewBox="0 0 24 24">
 							<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
 						</svg>
+					</div>
+					<button class="auth-btn" id="openAuthModalBtn" type="button">
+						Sign In
+					</button>
+					<div class="auth-profile hidden" id="authProfileMenu">
+						<button
+							type="button"
+							class="auth-profile-trigger"
+							id="authProfileTrigger"
+							aria-label="Open profile menu"
+							aria-expanded="false"
+						>
+							<span id="authProfileInitial">R</span>
+						</button>
+						<div class="auth-profile-dropdown" id="authProfileDropdown">
+							<p id="authProfileName">Welcome back</p>
+							<a href="#clientDashboard">My Dashboard</a>
+							<button type="button" id="logoutBtn">Logout</button>
+						</div>
 					</div>
 					<a href="#booking" class="book-btn">Book Now</a>
 					<button class="nav-toggle" id="navToggle" aria-label="Menu">
@@ -578,6 +593,20 @@
 								Check your email for confirmation details. We'll send a reminder
 								SMS 1 hour before your appointment.
 							</p>
+							<div class="post-booking-auth-prompt hidden" id="postBookingAuthPrompt">
+								<h4>Save your booking and track updates?</h4>
+								<p>
+									Sign in now so you can manage appointments, reviews, and faster rebooking.
+								</p>
+								<div class="post-booking-auth-actions">
+									<button type="button" class="btn btn-primary" id="postBookingGoogleBtn">
+										Sign In with Google
+									</button>
+									<button type="button" class="btn btn-outline" id="postBookingLaterBtn">
+										Maybe Later
+									</button>
+								</div>
+							</div>
 							<button
 								class="btn btn-primary"
 								onclick="resetBooking()"
@@ -585,6 +614,60 @@
 							>
 								Book Another
 							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- ========== CLIENT DASHBOARD ========== -->
+		<section class="client-dashboard hidden" id="clientDashboard">
+			<div class="container">
+				<div class="dashboard-shell animate-on-scroll">
+					<div class="dashboard-heading">
+						<div class="section-subtitle">Your Account</div>
+						<h2 class="section-title">My Dashboard</h2>
+						<p class="section-desc">
+							Track appointments, manage your reviews, and keep your profile up to
+							date for faster rebooking.
+						</p>
+						<div class="form-message" id="dashboardMessage"></div>
+					</div>
+
+					<div class="dashboard-grid">
+						<div class="dashboard-card">
+							<h3>My Appointments</h3>
+							<ul id="dashboardBookingsList" class="dashboard-list">
+								<li>No appointments yet.</li>
+							</ul>
+						</div>
+
+						<div class="dashboard-card">
+							<h3>My Reviews</h3>
+							<ul id="dashboardReviewsList" class="dashboard-list">
+								<li>No reviews submitted yet.</li>
+							</ul>
+						</div>
+
+						<div class="dashboard-card">
+							<h3>Profile Settings</h3>
+							<div class="dashboard-profile-item">
+								<span>Name</span>
+								<strong id="dashboardProfileName">Guest User</strong>
+							</div>
+							<div class="dashboard-profile-item">
+								<span>Email</span>
+								<strong id="dashboardProfileEmail">Not signed in</strong>
+							</div>
+							<div class="dashboard-profile-item">
+								<span>Phone</span>
+								<strong id="dashboardProfilePhone">Add phone during booking</strong>
+							</div>
+							<div class="dashboard-actions">
+								<button type="button" class="btn btn-outline" id="dashboardAuthBtn">
+									Sign In to Sync Data
+								</button>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -1196,6 +1279,100 @@
 						>Book Now</a
 					>
 				</div>
+			</div>
+		</div>
+
+		<!-- ========== AUTH MODAL ========== -->
+		<div class="auth-modal" id="authModal" aria-hidden="true">
+			<div class="auth-modal-backdrop" id="authModalBackdrop"></div>
+			<div
+				class="auth-card"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="authCardTitle"
+			>
+				<button
+					type="button"
+					class="auth-close"
+					id="closeAuthModalBtn"
+					aria-label="Close sign in modal"
+				>
+					✕
+				</button>
+				<div class="auth-card-head">
+					<p class="section-subtitle">Welcome Back</p>
+					<h3 id="authCardTitle">Sign in to manage bookings and reviews</h3>
+				</div>
+
+				<button type="button" class="auth-provider-btn" id="continueWithGoogleBtn">
+					Continue with Google
+				</button>
+				<button
+					type="button"
+					class="auth-provider-btn auth-provider-btn--muted"
+					id="continueWithPhoneBtn"
+					disabled
+				>
+					Continue with Phone (coming soon)
+				</button>
+
+				<div class="auth-separator"><span>or</span></div>
+
+				<form id="emailAuthForm" class="auth-email-form">
+					<div class="form-group" id="authNameGroup" style="display: none">
+						<label for="authName">Name</label>
+						<input
+							type="text"
+							id="authName"
+							placeholder="Jane Doe"
+							autocomplete="name"
+						/>
+					</div>
+					<div class="form-group">
+						<label for="authEmail">Email</label>
+						<input
+							type="email"
+							id="authEmail"
+							placeholder="you@email.com"
+							autocomplete="email"
+							required
+						/>
+					</div>
+					<div class="form-group auth-password-field">
+						<label for="authPassword">Password</label>
+						<div class="auth-password-input-wrap">
+							<input
+								type="password"
+								id="authPassword"
+								placeholder="••••••••"
+								autocomplete="current-password"
+								required
+							/>
+							<button
+								type="button"
+								class="auth-password-toggle"
+								id="authPasswordToggle"
+								aria-label="Show password"
+								aria-pressed="false"
+							>
+								<i class="fa-solid fa-eye" aria-hidden="true"></i>
+							</button>
+						</div>
+					</div>
+					<button type="submit" class="btn btn-primary auth-submit-btn" id="emailAuthSubmit">
+						Sign In
+					</button>
+				</form>
+
+				<div class="auth-links">
+					<button type="button" id="switchToSignupBtn">Don't have an account? Sign Up</button>
+					<button type="button" id="switchToSigninBtn" class="hidden">
+						Already have an account? Sign In
+					</button>
+					<button type="button" id="forgotPasswordBtn">Forgot Password?</button>
+					<button type="button" id="continueAsGuestBtn">Continue as Guest</button>
+				</div>
+				<div class="form-message" id="authMessage"></div>
 			</div>
 		</div>
 

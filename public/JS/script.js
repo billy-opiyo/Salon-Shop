@@ -531,8 +531,85 @@ let firebaseReady = false
 let db = null
 let auth = null
 let activeAvailabilityUnsubscribe = null
+let authMode = "signin"
+let authObserverAttached = false
+let shouldAutoFocusDashboardAfterAuth = false
+let googleAuthInProgress = false
+
+const authUi = {
+	modal: null,
+	openBtn: null,
+	closeBtn: null,
+	backdrop: null,
+	googleBtn: null,
+	phoneBtn: null,
+	emailForm: null,
+	nameGroup: null,
+	nameInput: null,
+	emailInput: null,
+	passwordInput: null,
+	passwordToggleBtn: null,
+	submitBtn: null,
+	switchToSignupBtn: null,
+	switchToSigninBtn: null,
+	forgotPasswordBtn: null,
+	continueAsGuestBtn: null,
+	message: null,
+	profileMenu: null,
+	profileTrigger: null,
+	profileDropdown: null,
+	profileInitial: null,
+	profileName: null,
+	logoutBtn: null,
+	navDashboardLink: null,
+	clientDashboard: null,
+	dashboardAuthBtn: null,
+	dashboardMessage: null,
+	dashboardBookingsList: null,
+	dashboardReviewsList: null,
+	dashboardProfileName: null,
+	dashboardProfileEmail: null,
+	dashboardProfilePhone: null,
+	postBookingAuthPrompt: null,
+	postBookingGoogleBtn: null,
+	postBookingLaterBtn: null,
+}
 
 function getFriendlyAuthError(error) {
+	const code = error?.code || ""
+
+	if (code === "auth/popup-closed-by-user") {
+		return "Sign-in popup was closed before completing. Please try again."
+	}
+
+	if (code === "auth/popup-blocked") {
+		return "Popup was blocked by your browser. Allow popups for this site and try again."
+	}
+
+	if (code === "auth/cancelled-popup-request") {
+		return "A sign-in attempt is already in progress. Please wait and try again."
+	}
+
+	if (code === "auth/unauthorized-domain") {
+		return "This website domain is not authorized in Firebase Authentication. Add it under Authentication → Settings → Authorized domains."
+	}
+
+	if (code === "auth/invalid-credential") {
+		return "Invalid sign-in credential. Please try again with Google."
+	}
+
+	if (code === "auth/invalid-action-code") {
+		return "The requested auth action is invalid or expired. Please retry sign-in."
+	}
+
+	if (code === "auth/operation-not-supported-in-this-environment") {
+		return "Google popup sign-in is not supported in this environment. Use a normal browser window (not restricted/private embedded mode)."
+	}
+
+	if (code === "auth/user-disabled") {
+		return "This account has been disabled. Please contact support."
+	}
+
 	if (error?.code === "auth/admin-restricted-operation") {
 		return "Anonymous sign-in is disabled. In Firebase Console, go to Authentication → Sign-in method and enable Anonymous provider."
 	}
@@ -542,6 +619,81 @@ function getFriendlyAuthError(error) {
 	}
 
 	return error?.message || "Authentication failed"
+}
+
+function setGoogleAuthButtonsBusy(isBusy) {
+	const busy = isBusy === true
+	if (authUi.googleBtn) {
+		authUi.googleBtn.disabled = busy
+		authUi.googleBtn.textContent = busy
+			? "Signing in..."
+			: "Continue with Google"
+	}
+	if (authUi.postBookingGoogleBtn) {
+		authUi.postBookingGoogleBtn.disabled = busy
+		authUi.postBookingGoogleBtn.textContent = busy
+			? "Signing in..."
+			: "Sign In with Google"
+	}
+}
+
+function shouldPreferRedirectGoogleAuth() {
+	const ua = navigator.userAgent || ""
+	const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
+	const isEmbeddedBrowser =
+		/(FBAN|FBAV|Instagram|Line|LinkedInApp|Twitter|wv|WebView)/i.test(ua) ||
+		/ /.test(ua)
+
+	return isMobileDevice || isEmbeddedBrowser
+}
+
+async function finalizeGoogleSignInResult(user, context = {}) {
+	if (!user || user.isAnonymous) {
+		throw new Error("Google sign-in did not complete. Please try again.")
+	}
+
+	await upsertUserProfile(user, { provider: "google.com" })
+	await loadUserDashboardData(user.uid)
+	if (context.source === "redirect" && authUi.message) {
+		showFormMessage(
+			authUi.message,
+			"success",
+			"✅ Signed in with Google successfully.",
+		)
+	}
+	closeAuthModal()
+}
+
+async function handleGoogleRedirectResultOnLoad(showNoResult = false) {
+	if (!firebaseReady || !auth) return false
+
+	try {
+		const redirectResult = await auth.getRedirectResult()
+		const redirectedUser = redirectResult?.user || auth.currentUser
+		if (redirectedUser && !redirectedUser.isAnonymous) {
+			await finalizeGoogleSignInResult(redirectedUser, { source: "redirect" })
+			return true
+		}
+
+		if (showNoResult && authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				"❌ Google redirect sign-in did not complete. Please try again.",
+			)
+		}
+		return false
+	} catch (error) {
+		console.error("Google redirect result failed:", error)
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				`❌ ${getFriendlyAuthError(error)}`,
+			)
+		}
+		return false
+	}
 }
 
 function canInitializeFirebase() {
@@ -566,9 +718,655 @@ async function initializeFirebaseServices() {
 	}
 
 	auth = firebase.auth()
+	try {
+		await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+	} catch (persistenceError) {
+		console.warn("Auth persistence setup failed:", persistenceError)
+	}
 	db = firebase.firestore()
 
 	firebaseReady = true
+}
+
+function initAuthUiRefs() {
+	authUi.modal = document.getElementById("authModal")
+	authUi.openBtn = document.getElementById("openAuthModalBtn")
+	authUi.closeBtn = document.getElementById("closeAuthModalBtn")
+	authUi.backdrop = document.getElementById("authModalBackdrop")
+	authUi.googleBtn = document.getElementById("continueWithGoogleBtn")
+	authUi.phoneBtn = document.getElementById("continueWithPhoneBtn")
+	authUi.emailForm = document.getElementById("emailAuthForm")
+	authUi.nameGroup = document.getElementById("authNameGroup")
+	authUi.nameInput = document.getElementById("authName")
+	authUi.emailInput = document.getElementById("authEmail")
+	authUi.passwordInput = document.getElementById("authPassword")
+	authUi.passwordToggleBtn = document.getElementById("authPasswordToggle")
+	authUi.submitBtn = document.getElementById("emailAuthSubmit")
+	authUi.switchToSignupBtn = document.getElementById("switchToSignupBtn")
+	authUi.switchToSigninBtn = document.getElementById("switchToSigninBtn")
+	authUi.forgotPasswordBtn = document.getElementById("forgotPasswordBtn")
+	authUi.continueAsGuestBtn = document.getElementById("continueAsGuestBtn")
+	authUi.message = document.getElementById("authMessage")
+	authUi.profileMenu = document.getElementById("authProfileMenu")
+	authUi.profileTrigger = document.getElementById("authProfileTrigger")
+	authUi.profileDropdown = document.getElementById("authProfileDropdown")
+	authUi.profileInitial = document.getElementById("authProfileInitial")
+	authUi.profileName = document.getElementById("authProfileName")
+	authUi.logoutBtn = document.getElementById("logoutBtn")
+	authUi.navDashboardLink = document.getElementById("navDashboardLink")
+	authUi.clientDashboard = document.getElementById("clientDashboard")
+	authUi.dashboardAuthBtn = document.getElementById("dashboardAuthBtn")
+	authUi.dashboardMessage = document.getElementById("dashboardMessage")
+	authUi.dashboardBookingsList = document.getElementById(
+		"dashboardBookingsList",
+	)
+	authUi.dashboardReviewsList = document.getElementById("dashboardReviewsList")
+	authUi.dashboardProfileName = document.getElementById("dashboardProfileName")
+	authUi.dashboardProfileEmail = document.getElementById(
+		"dashboardProfileEmail",
+	)
+	authUi.dashboardProfilePhone = document.getElementById(
+		"dashboardProfilePhone",
+	)
+	authUi.postBookingAuthPrompt = document.getElementById(
+		"postBookingAuthPrompt",
+	)
+	authUi.postBookingGoogleBtn = document.getElementById("postBookingGoogleBtn")
+	authUi.postBookingLaterBtn = document.getElementById("postBookingLaterBtn")
+}
+
+function setAuthPasswordVisibility(isVisible) {
+	if (!authUi.passwordInput || !authUi.passwordToggleBtn) return
+
+	const shouldShow = isVisible === true
+	authUi.passwordInput.type = shouldShow ? "text" : "password"
+	authUi.passwordToggleBtn.setAttribute(
+		"aria-label",
+		shouldShow ? "Hide password" : "Show password",
+	)
+	authUi.passwordToggleBtn.setAttribute(
+		"aria-pressed",
+		shouldShow ? "true" : "false",
+	)
+
+	const icon = authUi.passwordToggleBtn.querySelector("i")
+	if (icon) {
+		icon.classList.toggle("fa-eye", !shouldShow)
+		icon.classList.toggle("fa-eye-slash", shouldShow)
+	}
+}
+
+function setPostBookingPromptVisible(isVisible) {
+	if (!authUi.postBookingAuthPrompt) return
+	authUi.postBookingAuthPrompt.classList.toggle("hidden", !isVisible)
+}
+
+function setAuthMode(mode = "signin") {
+	authMode = mode === "signup" ? "signup" : "signin"
+	if (authUi.nameGroup) {
+		authUi.nameGroup.style.display = authMode === "signup" ? "block" : "none"
+	}
+	if (authUi.submitBtn) {
+		authUi.submitBtn.textContent =
+			authMode === "signup" ? "Create Account" : "Sign In"
+	}
+	if (authUi.switchToSignupBtn) {
+		authUi.switchToSignupBtn.classList.toggle("hidden", authMode === "signup")
+	}
+	if (authUi.switchToSigninBtn) {
+		authUi.switchToSigninBtn.classList.toggle("hidden", authMode !== "signup")
+	}
+	if (authUi.passwordInput) {
+		authUi.passwordInput.setAttribute(
+			"autocomplete",
+			authMode === "signup" ? "new-password" : "current-password",
+		)
+	}
+	setAuthPasswordVisibility(false)
+}
+
+function openAuthModal(defaultMode = "signin") {
+	setAuthMode(defaultMode)
+	if (authUi.message) clearFormMessage(authUi.message)
+	if (authUi.modal) {
+		authUi.modal.classList.add("active")
+		authUi.modal.setAttribute("aria-hidden", "false")
+		document.body.style.overflow = "hidden"
+	}
+}
+
+function closeAuthModal() {
+	if (authUi.modal) {
+		authUi.modal.classList.remove("active")
+		authUi.modal.setAttribute("aria-hidden", "true")
+		document.body.style.overflow = ""
+	}
+}
+
+function getUserDisplayName(user) {
+	if (!user) return "Guest User"
+	if (user.displayName && user.displayName.trim())
+		return user.displayName.trim()
+	if (user.email && user.email.includes("@")) {
+		return user.email.split("@")[0]
+	}
+	return "Royal Braids Client"
+}
+
+function setDashboardPromptState() {
+	if (authUi.clientDashboard) authUi.clientDashboard.classList.add("hidden")
+	if (authUi.navDashboardLink) authUi.navDashboardLink.classList.add("hidden")
+	if (authUi.openBtn) authUi.openBtn.classList.remove("hidden")
+	if (authUi.profileMenu) authUi.profileMenu.classList.add("hidden")
+	if (authUi.dashboardProfileName)
+		authUi.dashboardProfileName.textContent = "Guest User"
+	if (authUi.dashboardProfileEmail)
+		authUi.dashboardProfileEmail.textContent = "Not signed in"
+	if (authUi.dashboardProfilePhone)
+		authUi.dashboardProfilePhone.textContent = "Add phone during booking"
+	if (authUi.dashboardAuthBtn) {
+		authUi.dashboardAuthBtn.textContent = "Sign In to Sync Data"
+	}
+	setPostBookingPromptVisible(false)
+}
+
+function setDashboardSignedInState(user) {
+	if (authUi.clientDashboard) authUi.clientDashboard.classList.remove("hidden")
+	if (authUi.navDashboardLink)
+		authUi.navDashboardLink.classList.remove("hidden")
+	if (authUi.openBtn) authUi.openBtn.classList.add("hidden")
+	if (authUi.profileMenu) authUi.profileMenu.classList.remove("hidden")
+
+	const displayName = getUserDisplayName(user)
+	const initial = displayName.charAt(0).toUpperCase() || "R"
+
+	if (authUi.profileName) authUi.profileName.textContent = displayName
+	if (authUi.profileInitial) authUi.profileInitial.textContent = initial
+	if (authUi.dashboardProfileName)
+		authUi.dashboardProfileName.textContent = displayName
+	if (authUi.dashboardProfileEmail)
+		authUi.dashboardProfileEmail.textContent = user?.email || "No email"
+	if (authUi.dashboardAuthBtn) {
+		authUi.dashboardAuthBtn.textContent = "Manage Account"
+	}
+	setPostBookingPromptVisible(false)
+}
+
+function focusDashboardAfterAuthIfRequested() {
+	if (!shouldAutoFocusDashboardAfterAuth) return
+	shouldAutoFocusDashboardAfterAuth = false
+
+	if (authUi.clientDashboard) {
+		authUi.clientDashboard.scrollIntoView({
+			behavior: "smooth",
+			block: "start",
+		})
+		authUi.clientDashboard.setAttribute("tabindex", "-1")
+		authUi.clientDashboard.focus({ preventScroll: true })
+	}
+}
+
+async function upsertUserProfile(user, extras = {}) {
+	if (!firebaseReady || !db || !user?.uid) return
+	const safeDisplayName =
+		(user.displayName || extras.displayName || "").trim() ||
+		getUserDisplayName(user)
+	const providerId =
+		user.providerData?.[0]?.providerId || extras.provider || "unknown"
+	const emailValue = user.email || extras.email || ""
+	const phoneValue =
+		typeof extras.phone === "string"
+			? extras.phone
+			: (user.phoneNumber && String(user.phoneNumber)) || ""
+	await db.collection("users").doc(user.uid).set(
+		{
+			displayName: safeDisplayName,
+			email: emailValue,
+			provider: providerId,
+			phone: phoneValue,
+			updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+			createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+		},
+		{ merge: true },
+	)
+}
+
+function renderDashboardList(mount, items, emptyText) {
+	if (!mount) return
+	if (!Array.isArray(items) || !items.length) {
+		mount.innerHTML = `<li>${emptyText}</li>`
+		return
+	}
+	mount.innerHTML = items.map((item) => `<li>${item}</li>`).join("")
+}
+
+async function loadUserDashboardData(uid) {
+	if (!firebaseReady || !db || !uid) return
+
+	try {
+		let bookingsSnap = null
+		let reviewsSnap = null
+
+		try {
+			;[bookingsSnap, reviewsSnap] = await Promise.all([
+				db
+					.collection("bookings")
+					.where("uid", "==", uid)
+					.orderBy("createdAt", "desc")
+					.limit(5)
+					.get(),
+				db
+					.collection("reviews")
+					.where("uid", "==", uid)
+					.orderBy("createdAt", "desc")
+					.limit(5)
+					.get(),
+			])
+		} catch (indexedQueryError) {
+			console.warn(
+				"Indexed dashboard query failed, falling back to non-indexed fetch:",
+				indexedQueryError,
+			)
+			;[bookingsSnap, reviewsSnap] = await Promise.all([
+				db.collection("bookings").where("uid", "==", uid).get(),
+				db.collection("reviews").where("uid", "==", uid).get(),
+			])
+		}
+
+		const bookingItems = []
+		let latestPhone = ""
+		const bookingsDocs = [...(bookingsSnap?.docs || [])].sort(
+			(a, b) =>
+				toTimestampMs(b.data()?.createdAt) - toTimestampMs(a.data()?.createdAt),
+		)
+		bookingsDocs.slice(0, 5).forEach((doc) => {
+			const data = doc.data() || {}
+			if (!latestPhone && data.phone) latestPhone = data.phone
+			bookingItems.push(
+				`${escapeHtml(data.service || "Service")} • ${escapeHtml(data.date || "No date")} at ${escapeHtml(data.time || "No time")} • ${escapeHtml(data.status || "pending")}`,
+			)
+		})
+
+		const reviewItems = []
+		const reviewDocs = [...(reviewsSnap?.docs || [])].sort(
+			(a, b) =>
+				toTimestampMs(b.data()?.createdAt) - toTimestampMs(a.data()?.createdAt),
+		)
+		reviewDocs.slice(0, 5).forEach((doc) => {
+			const data = doc.data() || {}
+			const safeRating = Math.max(0, Math.min(5, Number(data.rating || 0)))
+			reviewItems.push(
+				`${"★".repeat(safeRating)}${"☆".repeat(5 - safeRating)} • ${escapeHtml(data.status || "pending")} • ${escapeHtml((data.text || "").slice(0, 80))}${(data.text || "").length > 80 ? "..." : ""}`,
+			)
+		})
+
+		renderDashboardList(
+			authUi.dashboardBookingsList,
+			bookingItems,
+			"No appointments yet.",
+		)
+		renderDashboardList(
+			authUi.dashboardReviewsList,
+			reviewItems,
+			"No reviews submitted yet.",
+		)
+
+		if (latestPhone && authUi.dashboardProfilePhone) {
+			authUi.dashboardProfilePhone.textContent = latestPhone
+		}
+
+		if (authUi.dashboardMessage) clearFormMessage(authUi.dashboardMessage)
+	} catch (error) {
+		console.error("Dashboard data load failed:", error)
+		if (authUi.dashboardMessage) {
+			showFormMessage(
+				authUi.dashboardMessage,
+				"error",
+				"⚠️ Could not load dashboard data right now.",
+			)
+		}
+	}
+}
+
+async function handleGoogleAuth() {
+	if (!firebaseReady || !auth) return
+	if (authUi.message) clearFormMessage(authUi.message)
+	if (googleAuthInProgress) {
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				"⏳ Google sign-in is already in progress. Please wait...",
+			)
+		}
+		return
+	}
+
+	googleAuthInProgress = true
+	setGoogleAuthButtonsBusy(true)
+
+	try {
+		const provider = new firebase.auth.GoogleAuthProvider()
+		provider.setCustomParameters({
+			prompt: "select_account",
+		})
+
+		if (shouldPreferRedirectGoogleAuth()) {
+			if (authUi.message) {
+				showFormMessage(
+					authUi.message,
+					"success",
+					"🔄 Opening secure Google sign-in...",
+				)
+			}
+			await auth.signInWithRedirect(provider)
+			return
+		}
+
+		const popupResult = await auth.signInWithPopup(provider)
+		const signedInUser = popupResult?.user || auth.currentUser
+		await finalizeGoogleSignInResult(signedInUser, { source: "popup" })
+	} catch (error) {
+		console.error("Google auth failed:", error)
+		shouldAutoFocusDashboardAfterAuth = false
+		const code = error?.code || ""
+
+		const useRedirectFallback =
+			code === "auth/invalid-action-code" ||
+			code === "auth/operation-not-supported-in-this-environment" ||
+			code === "auth/popup-blocked"
+
+		if (useRedirectFallback) {
+			try {
+				if (authUi.message) {
+					showFormMessage(
+						authUi.message,
+						"success",
+						"🔄 Popup failed, redirecting to Google sign-in...",
+					)
+				}
+				const provider = new firebase.auth.GoogleAuthProvider()
+				provider.setCustomParameters({ prompt: "select_account" })
+				await auth.signInWithRedirect(provider)
+				return
+			} catch (redirectError) {
+				console.error("Google redirect fallback failed:", redirectError)
+				if (authUi.message) {
+					showFormMessage(
+						authUi.message,
+						"error",
+						`❌ ${getFriendlyAuthError(redirectError)}`,
+					)
+				}
+			}
+		}
+
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				`❌ ${getFriendlyAuthError(error)}`,
+			)
+		}
+	} finally {
+		googleAuthInProgress = false
+		setGoogleAuthButtonsBusy(false)
+	}
+}
+
+async function handleEmailAuthSubmit(event) {
+	event.preventDefault()
+	if (!firebaseReady || !auth) return
+	if (authUi.message) clearFormMessage(authUi.message)
+
+	const email = authUi.emailInput?.value?.trim() || ""
+	const password = authUi.passwordInput?.value || ""
+	const name = authUi.nameInput?.value?.trim() || ""
+
+	if (!email || !password) {
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				"❌ Email and password are required.",
+			)
+		}
+		return
+	}
+
+	if (authMode === "signup" && name.length < 2) {
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				"❌ Please enter your full name.",
+			)
+		}
+		return
+	}
+
+	if (authUi.submitBtn) {
+		authUi.submitBtn.disabled = true
+		authUi.submitBtn.textContent =
+			authMode === "signup" ? "Creating Account..." : "Signing In..."
+	}
+
+	try {
+		const currentUser = auth.currentUser
+		const credential = firebase.auth.EmailAuthProvider.credential(
+			email,
+			password,
+		)
+
+		if (authMode === "signup") {
+			if (currentUser?.isAnonymous) {
+				await currentUser.linkWithCredential(credential)
+			} else {
+				await auth.createUserWithEmailAndPassword(email, password)
+			}
+
+			if (name && auth.currentUser) {
+				await auth.currentUser.updateProfile({ displayName: name })
+			}
+		} else {
+			if (currentUser?.isAnonymous) {
+				try {
+					await currentUser.linkWithCredential(credential)
+				} catch (_linkError) {
+					await auth.signInWithEmailAndPassword(email, password)
+				}
+			} else {
+				await auth.signInWithEmailAndPassword(email, password)
+			}
+		}
+
+		await upsertUserProfile(auth.currentUser, {
+			displayName: name,
+			provider: "password",
+		})
+		if (auth.currentUser?.uid) {
+			await loadUserDashboardData(auth.currentUser.uid)
+		}
+
+		if (authUi.emailForm) authUi.emailForm.reset()
+		closeAuthModal()
+	} catch (error) {
+		console.error("Email auth failed:", error)
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				`❌ ${getFriendlyAuthError(error)}`,
+			)
+		}
+	} finally {
+		if (authUi.submitBtn) {
+			authUi.submitBtn.disabled = false
+			authUi.submitBtn.textContent =
+				authMode === "signup" ? "Create Account" : "Sign In"
+		}
+	}
+}
+
+async function handleForgotPassword() {
+	if (!firebaseReady || !auth) return
+	const email = authUi.emailInput?.value?.trim() || ""
+	if (!email) {
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				"❌ Enter your email first, then click Forgot Password.",
+			)
+		}
+		return
+	}
+
+	try {
+		await auth.sendPasswordResetEmail(email)
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"success",
+				"✅ Password reset email sent. Please check your inbox.",
+			)
+		}
+	} catch (error) {
+		if (authUi.message) {
+			showFormMessage(
+				authUi.message,
+				"error",
+				`❌ ${getFriendlyAuthError(error)}`,
+			)
+		}
+	}
+}
+
+async function handleLogout() {
+	if (!firebaseReady || !auth) return
+	try {
+		await auth.signOut()
+		closeAuthModal()
+		setDashboardPromptState()
+	} catch (error) {
+		console.error("Logout failed:", error)
+	}
+}
+
+function bindAuthUiEvents() {
+	if (authUi.openBtn) {
+		authUi.openBtn.addEventListener("click", () => openAuthModal("signin"))
+	}
+	if (authUi.closeBtn) {
+		authUi.closeBtn.addEventListener("click", closeAuthModal)
+	}
+	if (authUi.backdrop) {
+		authUi.backdrop.addEventListener("click", closeAuthModal)
+	}
+	if (authUi.googleBtn) {
+		authUi.googleBtn.addEventListener("click", () => {
+			void handleGoogleAuth()
+		})
+	}
+	if (authUi.emailForm) {
+		authUi.emailForm.addEventListener("submit", (event) => {
+			void handleEmailAuthSubmit(event)
+		})
+	}
+	if (authUi.passwordToggleBtn && authUi.passwordInput) {
+		authUi.passwordToggleBtn.addEventListener("click", () => {
+			setAuthPasswordVisibility(authUi.passwordInput.type === "password")
+		})
+	}
+	if (authUi.switchToSignupBtn) {
+		authUi.switchToSignupBtn.addEventListener("click", () =>
+			setAuthMode("signup"),
+		)
+	}
+	if (authUi.switchToSigninBtn) {
+		authUi.switchToSigninBtn.addEventListener("click", () =>
+			setAuthMode("signin"),
+		)
+	}
+	if (authUi.forgotPasswordBtn) {
+		authUi.forgotPasswordBtn.addEventListener("click", () => {
+			void handleForgotPassword()
+		})
+	}
+	if (authUi.continueAsGuestBtn) {
+		authUi.continueAsGuestBtn.addEventListener("click", () => {
+			closeAuthModal()
+			document.getElementById("booking")?.scrollIntoView({
+				behavior: "smooth",
+				block: "start",
+			})
+		})
+	}
+	if (authUi.postBookingGoogleBtn) {
+		authUi.postBookingGoogleBtn.addEventListener("click", () => {
+			shouldAutoFocusDashboardAfterAuth = true
+			void handleGoogleAuth()
+		})
+	}
+	if (authUi.postBookingLaterBtn) {
+		authUi.postBookingLaterBtn.addEventListener("click", () => {
+			setPostBookingPromptVisible(false)
+		})
+	}
+	if (authUi.logoutBtn) {
+		authUi.logoutBtn.addEventListener("click", () => {
+			void handleLogout()
+		})
+	}
+	if (authUi.dashboardAuthBtn) {
+		authUi.dashboardAuthBtn.addEventListener("click", () =>
+			openAuthModal("signin"),
+		)
+	}
+
+	if (authUi.profileTrigger && authUi.profileMenu) {
+		authUi.profileTrigger.addEventListener("click", () => {
+			authUi.profileMenu.classList.toggle("open")
+			const expanded = authUi.profileMenu.classList.contains("open")
+			authUi.profileTrigger.setAttribute(
+				"aria-expanded",
+				expanded ? "true" : "false",
+			)
+		})
+
+		document.addEventListener("click", (event) => {
+			if (!authUi.profileMenu?.contains(event.target)) {
+				authUi.profileMenu.classList.remove("open")
+				authUi.profileTrigger?.setAttribute("aria-expanded", "false")
+			}
+		})
+	}
+}
+
+function attachAuthStateObserver() {
+	if (authObserverAttached || !auth) return
+	authObserverAttached = true
+
+	auth.onAuthStateChanged(async (user) => {
+		if (user && !user.isAnonymous) {
+			setDashboardSignedInState(user)
+			await upsertUserProfile(user)
+			await loadUserDashboardData(user.uid)
+			focusDashboardAfterAuthIfRequested()
+		} else {
+			setDashboardPromptState()
+			renderDashboardList(
+				authUi.dashboardBookingsList,
+				[],
+				"Sign in to view your appointments.",
+			)
+			renderDashboardList(
+				authUi.dashboardReviewsList,
+				[],
+				"Sign in to view your submitted reviews.",
+			)
+		}
+	})
 }
 
 function getSlotId(date, stylist, time) {
@@ -1880,7 +2678,8 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 	btn.textContent = "Processing..."
 	;(async () => {
 		try {
-			let activeUid = auth.currentUser?.uid || null
+			const signedInUser = auth.currentUser && !auth.currentUser.isAnonymous
+			let activeUid = signedInUser ? auth.currentUser.uid : null
 
 			if (!activeUid) {
 				try {
@@ -1953,6 +2752,14 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 				"✅ Booking confirmed and saved in realtime!",
 			)
 
+			setPostBookingPromptVisible(Boolean(auth.currentUser?.isAnonymous))
+			if (signedInUser && activeUid) {
+				await upsertUserProfile(auth.currentUser, {
+					phone: data.phone || "",
+				})
+				await loadUserDashboardData(activeUid)
+			}
+
 			handleAvailabilityWatch()
 		} catch (error) {
 			console.error("Booking failed:", error)
@@ -1975,6 +2782,7 @@ function resetBooking() {
 	document.getElementById("bookingForm").style.display = "block"
 	document.getElementById("bookingSuccess").style.display = "none"
 	clearFormMessage(document.getElementById("bookingMessage"))
+	setPostBookingPromptVisible(false)
 }
 
 // Set min date for booking
@@ -2264,6 +3072,10 @@ const mutationObserver = new MutationObserver((mutations) => {
 mutationObserver.observe(document.body, { childList: true, subtree: true })
 
 // ============ INITIALIZE ============
+initAuthUiRefs()
+setAuthMode("signin")
+setDashboardPromptState()
+bindAuthUiEvents()
 renderServices()
 galleryData = fallbackGalleryData.map((item, i) =>
 	normalizeGalleryItem({ id: `fallback-${i}`, ...item }),
@@ -2284,7 +3096,9 @@ populateServiceSelect()
 populateTimeSlots()
 
 // Initialize booking integrations
-initializeFirebaseServices().then(() => {
+initializeFirebaseServices().then(async () => {
+	await handleGoogleRedirectResultOnLoad()
+
 	const stylistSelect = document.getElementById("stylistSelect")
 	const dateInput = document.getElementById("datePicker")
 
@@ -2297,4 +3111,5 @@ initializeFirebaseServices().then(() => {
 
 	startGalleryRealtimeListener()
 	startTestimonialsRealtimeListener()
+	attachAuthStateObserver()
 })

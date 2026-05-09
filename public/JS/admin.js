@@ -7,6 +7,7 @@ const cloudinaryConfig = appConfig.cloudinary || {}
 let firebaseReady = false
 let db = null
 let auth = null
+let adminFirebaseApp = null
 let adminUnlocked = false
 let adminBookingsUnsubscribe = null
 let adminGalleryUnsubscribe = null
@@ -22,6 +23,7 @@ let adminGalleryPreviewObjectUrl = ""
 const adminMessageTimers = new Map()
 const adminMessageHideTimers = new Map()
 const defaultAdminSection = "bookings"
+const ADMIN_APP_NAME = "royalBraidsAdminApp"
 const ADMIN_REVIEW_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 }
@@ -141,6 +143,17 @@ function canInitializeFirebase() {
 		firebaseConfig.projectId &&
 		firebaseConfig.appId
 	)
+}
+
+function getOrCreateAdminFirebaseApp() {
+	if (!firebase?.apps?.length) {
+		return firebase.initializeApp(firebaseConfig, ADMIN_APP_NAME)
+	}
+
+	const existingNamed = firebase.apps.find((app) => app.name === ADMIN_APP_NAME)
+	if (existingNamed) return existingNamed
+
+	return firebase.initializeApp(firebaseConfig, ADMIN_APP_NAME)
 }
 
 function isAllowedAdminEmail(email) {
@@ -802,9 +815,7 @@ function handleAuthStateChange(user) {
 		"❌ This account is not authorized for admin access.",
 		"adminAuthMessage",
 	)
-	auth.signOut().catch((error) => {
-		console.error("Forced admin signout failed:", error)
-	})
+	setAdminUnlockedState(false)
 }
 
 function renderAdminBookings(docs) {
@@ -1899,16 +1910,24 @@ async function initializeFirebaseServices() {
 		return
 	}
 
-	if (!firebase.apps.length) {
-		firebase.initializeApp(firebaseConfig)
-	}
+	adminFirebaseApp = getOrCreateAdminFirebaseApp()
 
 	if (typeof firebase.appCheck === "function" && appCheckConfig.siteKey) {
-		firebase.appCheck().activate(appCheckConfig.siteKey, true)
+		try {
+			firebase.appCheck(adminFirebaseApp).activate(appCheckConfig.siteKey, true)
+		} catch (appCheckError) {
+			console.warn("Admin App Check activation failed:", appCheckError)
+		}
 	}
 
-	auth = firebase.auth()
-	db = firebase.firestore()
+	auth = firebase.auth(adminFirebaseApp)
+	db = firebase.firestore(adminFirebaseApp)
+
+	try {
+		await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+	} catch (persistenceError) {
+		console.warn("Admin auth persistence setup failed:", persistenceError)
+	}
 
 	auth.onAuthStateChanged((user) => {
 		handleAuthStateChange(user)

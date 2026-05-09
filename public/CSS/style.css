@@ -475,12 +475,12 @@ h6 {
 .nav {
     display: flex;
     align-items: center;
-    gap: 35px;
+    gap: 24px;
 }
 
 .nav a {
     color: var(--text-secondary);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 500;
     position: relative;
     transition: var(--transition-fast);
@@ -510,7 +510,7 @@ h6 {
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 12px;
 }
 
 .contact-mini {
@@ -586,12 +586,13 @@ h6 {
 }
 
 .book-btn {
-    padding: 10px 24px;
+    padding: 8px 16px;
     background: var(--primary);
     color: #0A0A0A;
     border-radius: var(--radius-full);
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
 }
 
 .book-btn:hover {
@@ -3568,6 +3569,53 @@ h6 {
         padding: 0 14px;
     }
 
+    .header-inner {
+        gap: 6px;
+    }
+
+    .logo {
+        font-size: 0.92rem;
+        gap: 4px;
+        line-height: 1;
+    }
+
+    .logo-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .header-actions {
+        gap: 4px;
+    }
+
+    .dark-mode-toggle {
+        width: 42px;
+        height: 24px;
+    }
+
+    .dark-mode-toggle::after {
+        width: 18px;
+        height: 18px;
+    }
+
+    .dark-mode-toggle.active::after {
+        left: 22px;
+    }
+
+    .auth-btn {
+        padding: 6px 8px;
+        font-size: 0.68rem;
+    }
+
+    .book-btn {
+        padding: 6px 8px;
+        font-size: 0.68rem;
+    }
+
+    .nav-toggle span {
+        width: 22px;
+    }
+
     .reviews-submit-form {
         padding: 20px;
     }
@@ -4237,4 +4285,556 @@ select option {
 
 .hidden {
     display: none !important;
+}
+
+/* ============ AUTH + CLIENT DASHBOARD ============ */
+.auth-btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.45);
+    background: rgba(200, 150, 62, 0.14);
+    color: var(--text-primary);
+    font-size: 0.86rem;
+    font-weight: 600;
+    transition: transform 0.25s ease, background-color 0.25s ease, color 0.25s ease,
+        border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.auth-btn:hover {
+    background: var(--primary);
+    color: #0A0A0A;
+    transform: translateY(-1px);
+}
+
+.auth-profile {
+    position: relative;
+}
+
+.auth-profile-trigger {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(200, 150, 62, 0.85), rgba(184, 78, 122, 0.85));
+    color: #0A0A0A;
+    font-weight: 700;
+    transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+}
+
+.auth-profile-trigger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+}
+
+.auth-profile-trigger:active {
+    transform: translateY(0);
+}
+
+.auth-profile-trigger:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(200, 150, 62, 0.35);
+}
+
+.auth-profile-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 190px;
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+    display: none;
+    z-index: 1200;
+    transform-origin: top right;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.auth-profile.open .auth-profile-dropdown {
+    display: grid;
+    gap: 8px;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.auth-profile-dropdown p {
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+.auth-profile-dropdown a,
+.auth-profile-dropdown button {
+    display: inline-flex;
+    justify-content: flex-start;
+    padding: 10px;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.88rem;
+}
+
+.auth-profile-dropdown a:hover,
+.auth-profile-dropdown button:hover {
+    background: rgba(200, 150, 62, 0.14);
+}
+
+.auth-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    z-index: 2000;
+}
+
+.auth-modal.active {
+    display: flex;
+}
+
+.auth-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 10, 10, 0.75);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity 0.24s ease;
+}
+
+.auth-card {
+    position: relative;
+    width: min(100%, 470px);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 22px 56px rgba(0, 0, 0, 0.45);
+    z-index: 1;
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+    transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.auth-modal.active .auth-modal-backdrop {
+    opacity: 1;
+}
+
+.auth-modal.active .auth-card {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.auth-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.auth-close:hover {
+    background: rgba(200, 150, 62, 0.18);
+    color: var(--primary);
+    border-color: var(--primary);
+    transform: scale(1.03);
+}
+
+.auth-card-head {
+    margin-bottom: 14px;
+}
+
+.auth-card-head .section-subtitle {
+    margin-bottom: 8px;
+    font-size: 0.72rem;
+}
+
+.auth-card-head h3 {
+    font-size: 1.25rem;
+    line-height: 1.35;
+}
+
+.auth-provider-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(200, 150, 62, 0.14);
+    color: var(--text-primary);
+    font-weight: 600;
+    margin-bottom: 10px;
+    transition: transform 0.22s ease, background-color 0.22s ease, border-color 0.22s ease,
+        box-shadow 0.22s ease;
+}
+
+.auth-provider-btn:hover {
+    background: rgba(200, 150, 62, 0.22);
+    border-color: rgba(200, 150, 62, 0.55);
+    transform: translateY(-1px);
+}
+
+.auth-provider-btn--muted {
+    opacity: 0.65;
+}
+
+.auth-separator {
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin: 12px 0;
+    position: relative;
+}
+
+.auth-separator::before,
+.auth-separator::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 1px;
+    background: var(--border);
+}
+
+.auth-separator::before {
+    left: 0;
+}
+
+.auth-separator::after {
+    right: 0;
+}
+
+.auth-email-form .form-group {
+    margin-bottom: 12px;
+}
+
+.auth-password-field {
+    position: relative;
+}
+
+.auth-password-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.auth-password-input-wrap input {
+    width: 100%;
+    padding-right: 48px;
+}
+
+.auth-password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    z-index: 2;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.auth-password-toggle:hover {
+    color: var(--primary);
+    background: rgba(200, 150, 62, 0.08);
+}
+
+.auth-password-toggle:focus-visible {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(200, 150, 62, 0.12);
+    outline: none;
+}
+
+.auth-password-toggle i {
+    font-size: 0.92rem;
+    line-height: 1;
+}
+
+.auth-submit-btn {
+    width: 100%;
+    margin-top: 4px;
+}
+
+.auth-links {
+    margin-top: 14px;
+    display: grid;
+    gap: 6px;
+}
+
+.auth-links button {
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    font-weight: 500;
+    justify-content: center;
+    padding: 4px;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.auth-links button:hover {
+    color: var(--primary);
+    transform: translateY(-1px);
+}
+
+.client-dashboard {
+    padding: clamp(60px, 8vw, 90px) 0;
+    background: var(--bg-secondary);
+}
+
+.dashboard-shell {
+    padding: clamp(20px, 3vw, 30px);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.dashboard-card {
+    padding: 18px;
+    background: rgba(10, 10, 10, 0.3);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    transition: transform 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease,
+        background-color 0.24s ease;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(200, 150, 62, 0.55);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+}
+
+.dashboard-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+}
+
+.dashboard-list {
+    display: grid;
+    gap: 10px;
+    list-style: none;
+    padding: 0;
+}
+
+#dashboardBookingsList,
+#dashboardReviewsList {
+    --dashboard-visible-cards: 4;
+    --dashboard-item-height: 78px;
+    max-height: calc((var(--dashboard-item-height) * var(--dashboard-visible-cards)) + (10px * (var(--dashboard-visible-cards) - 1)));
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #c8963e #1b1712;
+}
+
+#dashboardBookingsList::-webkit-scrollbar,
+#dashboardReviewsList::-webkit-scrollbar {
+    width: 8px;
+}
+
+#dashboardBookingsList::-webkit-scrollbar-track,
+#dashboardReviewsList::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #17120d, #20180f);
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.18);
+}
+
+#dashboardBookingsList::-webkit-scrollbar-thumb,
+#dashboardReviewsList::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f2d08a, #c8963e, #a6792d);
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.55);
+}
+
+#dashboardBookingsList::-webkit-scrollbar-thumb:hover,
+#dashboardReviewsList::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #ffd98f, #d6a74f, #b9832f);
+}
+
+.dashboard-list li {
+    font-size: 0.88rem;
+    padding: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-secondary);
+}
+
+#dashboardBookingsList li,
+#dashboardReviewsList li {
+    min-height: var(--dashboard-item-height);
+}
+
+.dashboard-profile-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.dashboard-profile-item span {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+}
+
+.dashboard-profile-item strong {
+    font-size: 0.9rem;
+    text-align: right;
+    word-break: break-word;
+}
+
+.dashboard-profile-item:last-child {
+    border-bottom: 0;
+}
+
+.dashboard-actions {
+    margin-top: 14px;
+}
+
+.post-booking-auth-prompt {
+    margin: 16px auto 0;
+    padding: 16px;
+    max-width: 520px;
+    border-radius: 12px;
+    border: 1px solid rgba(200, 150, 62, 0.35);
+    background: rgba(200, 150, 62, 0.08);
+    text-align: left;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease,
+        opacity 0.25s ease;
+}
+
+.post-booking-auth-prompt h4 {
+    font-size: 1rem;
+    margin-bottom: 6px;
+}
+
+.post-booking-auth-prompt p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.post-booking-auth-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.post-booking-auth-actions .btn {
+    padding: 10px 16px;
+    min-width: 180px;
+}
+
+@media (max-width: 1024px) {
+    .auth-btn {
+        padding: 8px 12px;
+        font-size: 0.78rem;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .auth-card {
+        padding: 20px;
+    }
+
+    .auth-password-toggle {
+        width: 32px;
+        height: 32px;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .post-booking-auth-actions .btn {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 360px) {
+    .header-inner {
+        gap: 4px;
+    }
+
+    .logo {
+        font-size: 0.86rem;
+        gap: 3px;
+    }
+
+    .logo-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .header-actions {
+        gap: 3px;
+    }
+
+    .dark-mode-toggle {
+        width: 38px;
+        height: 22px;
+    }
+
+    .dark-mode-toggle::after {
+        width: 16px;
+        height: 16px;
+    }
+
+    .dark-mode-toggle.active::after {
+        left: 20px;
+    }
+
+    .auth-btn,
+    .book-btn {
+        padding: 5px 7px;
+        font-size: 0.64rem;
+    }
+
+    .auth-profile-trigger {
+        width: 34px;
+        height: 34px;
+    }
+
+    .nav-toggle span {
+        width: 20px;
+    }
+
+    .auth-card {
+        padding: 16px;
+        border-radius: 14px;
+    }
 }

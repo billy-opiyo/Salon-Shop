@@ -13,6 +13,13 @@ service cloud.firestore {
         ];
     }
 
+    function isOwnerOrAdmin(ownerUid) {
+      return isSignedIn() && (
+        request.auth.uid == ownerUid ||
+        isAdmin()
+      );
+    }
+
     function bookingCreateHasAllowedKeys() {
       return request.resource.data.keys().hasOnly([
         'firstName',
@@ -113,7 +120,9 @@ service cloud.firestore {
       // Public can only see approved reviews; admins can see all.
       allow read: if (
         resource.data.status == 'approved'
-      ) || isAdmin();
+      ) || isAdmin() || (
+        isSignedIn() && resource.data.uid == request.auth.uid
+      );
 
       // Public users can submit reviews, but only as pending.
       allow create: if isSignedIn()
@@ -202,6 +211,44 @@ service cloud.firestore {
 
       // Only admins may delete reviews.
       allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow create: if isSignedIn()
+        && userId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'email',
+          'provider',
+          'phone',
+          'updatedAt',
+          'createdAt'
+        ])
+        && request.resource.data.displayName is string
+        && request.resource.data.email is string
+        && request.resource.data.provider is string
+        && request.resource.data.phone is string;
+
+      allow read: if isAdmin() || (
+        isSignedIn() && userId == request.auth.uid
+      );
+
+      allow update: if isSignedIn()
+        && userId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'email',
+          'provider',
+          'phone',
+          'updatedAt',
+          'createdAt'
+        ])
+        && request.resource.data.displayName is string
+        && request.resource.data.email is string
+        && request.resource.data.provider is string
+        && request.resource.data.phone is string;
+
+      allow delete: if false;
     }
 
     match /contactMessages/{messageId} {
