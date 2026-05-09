@@ -859,37 +859,48 @@ h6 {
 
 .hero-badge {
     position: absolute;
-    bottom: -20px;
-    left: -20px;
+    bottom: 14px;
+    left: 14px;
     background: var(--primary);
     color: #0A0A0A;
-    padding: 20px;
+    width: 102px;
+    min-height: 72px;
+    padding: 8px 10px;
     border-radius: var(--radius);
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     animation: float 3s ease-in-out infinite;
 }
 
 .hero-badge .number {
-    font-size: 2.5rem;
+    font-size: 1.6rem;
     font-family: var(--font-heading);
     font-weight: 800;
     line-height: 1;
 }
 
 .hero-badge .text {
-    font-size: 0.8rem;
+    font-size: 0.68rem;
     font-weight: 600;
     margin-top: 4px;
 }
 
 .hero-float {
     position: absolute;
-    top: 20px;
-    right: -15px;
+    top: 14px;
+    right: 14px;
     background: var(--bg-card);
-    padding: 15px 20px;
+    width: 102px;
+    min-height: 72px;
+    padding: 8px 10px;
     border-radius: var(--radius);
     border: 1px solid var(--border);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     animation: float 4s ease-in-out infinite;
     animation-delay: 1s;
 }
@@ -897,10 +908,11 @@ h6 {
 .hero-float span {
     color: var(--primary);
     font-weight: 700;
+    font-size: 0.86rem;
 }
 
 .hero-float p {
-    font-size: 0.8rem;
+    font-size: 0.68rem;
     color: var(--text-secondary);
     margin-top: 2px;
 }
@@ -923,19 +935,23 @@ h6 {
     }
 
     .hero-badge {
-        bottom: 12px;
-        left: 12px;
-        padding: 14px 16px;
+        bottom: 10px;
+        left: 10px;
+        width: 96px;
+        min-height: 66px;
+        padding: 8px 9px;
     }
 
     .hero-badge .number {
-        font-size: 2rem;
+        font-size: 1.45rem;
     }
 
     .hero-float {
-        top: 12px;
-        right: 12px;
-        padding: 12px 14px;
+        top: 10px;
+        right: 10px;
+        width: 96px;
+        min-height: 66px;
+        padding: 8px 9px;
     }
 
     .hero {
@@ -958,31 +974,35 @@ h6 {
     }
 
     .hero-badge {
-        bottom: 10px;
-        left: 10px;
-        padding: 10px 12px;
+        bottom: 8px;
+        left: 8px;
+        width: 88px;
+        min-height: 60px;
+        padding: 7px 8px;
     }
 
     .hero-badge .number {
-        font-size: 1.45rem;
+        font-size: 1.2rem;
     }
 
     .hero-badge .text {
-        font-size: 0.68rem;
+        font-size: 0.62rem;
     }
 
     .hero-float {
-        top: 10px;
-        right: 10px;
-        padding: 8px 10px;
+        top: 8px;
+        right: 8px;
+        width: 88px;
+        min-height: 60px;
+        padding: 7px 8px;
     }
 
     .hero-float span {
-        font-size: 0.82rem;
+        font-size: 0.76rem;
     }
 
     .hero-float p {
-        font-size: 0.68rem;
+        font-size: 0.62rem;
     }
 
     .hero-stats {
@@ -4818,15 +4838,20 @@ select option {
 }
 
 #dashboardFavoritesList {
+    display: grid;
     --dashboard-visible-cards: 2;
-    --dashboard-item-height: 136px;
-    max-height: calc((var(--dashboard-item-height) * var(--dashboard-visible-cards)) + (10px * (var(--dashboard-visible-cards) - 1)));
+    --dashboard-item-height: 148px;
+    --dashboard-list-gap: 12px;
+    gap: var(--dashboard-list-gap);
+    max-height: calc((var(--dashboard-item-height) * var(--dashboard-visible-cards)) + (var(--dashboard-list-gap) * (var(--dashboard-visible-cards) - 1)));
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 8px;
+    padding: 2px 8px 2px 0;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: #e0ac4f #1b1712;
+    list-style: none;
+    margin: 0;
 }
 
 #dashboardBookingsList::-webkit-scrollbar,
@@ -4885,10 +4910,10 @@ select option {
 .dashboard-favorite-item {
     display: grid;
     grid-template-columns: 72px minmax(0, 1fr);
-    gap: 10px;
+    gap: 12px;
     align-items: center;
-    min-height: 122px;
-    padding: 12px;
+    min-height: 132px;
+    padding: 14px;
     border-radius: 12px;
     border: 1px solid rgba(200, 150, 62, 0.32);
     background: linear-gradient(145deg, rgba(28, 22, 15, 0.92), rgba(18, 14, 10, 0.96));
@@ -4946,7 +4971,8 @@ select option {
 
 @media (max-width: 700px) {
     #dashboardFavoritesList {
-        --dashboard-item-height: 148px;
+        --dashboard-item-height: 156px;
+        --dashboard-list-gap: 12px;
     }
 
     .dashboard-favorite-item {
@@ -5126,7 +5152,7 @@ select option {
 
     .nav-toggle span {
         width: 20px;
-    }
+   }
 
     .auth-card {
         padding: 16px;
