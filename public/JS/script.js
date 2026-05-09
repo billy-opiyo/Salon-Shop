@@ -936,7 +936,8 @@ function setDashboardPromptState() {
 		[],
 		"Sign in to save favorite braid styles.",
 	)
-	if (authUi.dashboardFavoritesCount) authUi.dashboardFavoritesCount.textContent = "0"
+	if (authUi.dashboardFavoritesCount)
+		authUi.dashboardFavoritesCount.textContent = "0"
 	updateFavoriteButtonsUI()
 	setPostBookingPromptVisible(false)
 }
@@ -2728,10 +2729,7 @@ function bindReviewForm() {
 
 			if (action === "report") {
 				if (!db || !auth || !isNonGuestSignedIn()) {
-					showTimedReviewMessage(
-						"error",
-						"🔐 Sign in to report abuse.",
-					)
+					showTimedReviewMessage("error", "🔐 Sign in to report abuse.")
 					return
 				}
 
