@@ -1467,10 +1467,12 @@ h6 {
         border-color: rgba(255, 159, 10, 0.75);
         transform: translateY(-2px);
     }
+
     45% {
         box-shadow: 0 0 0 10px rgba(255, 159, 10, 0.14);
         border-color: rgba(255, 159, 10, 0.95);
     }
+
     100% {
         box-shadow: 0 0 0 0 rgba(255, 159, 10, 0);
         border-color: var(--border);
@@ -5158,7 +5160,7 @@ select option {
 
     .nav-toggle span {
         width: 20px;
-   }
+    }
 
     .hero-image-main img {
         max-height: 58vh;
