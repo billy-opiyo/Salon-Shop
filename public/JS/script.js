@@ -586,6 +586,9 @@ const authUi = {
 	postBookingLaterBtn: null,
 	reviewAuthHint: null,
 	reviewAuthHintBtn: null,
+	reviewSubmitWrap: null,
+	reviewSubmitAuthGate: null,
+	reviewSubmitAuthGateBtn: null,
 	favoritesToast: null,
 }
 
@@ -795,12 +798,27 @@ function initAuthUiRefs() {
 	authUi.postBookingLaterBtn = document.getElementById("postBookingLaterBtn")
 	authUi.reviewAuthHint = document.getElementById("reviewAuthHint")
 	authUi.reviewAuthHintBtn = document.getElementById("reviewAuthHintBtn")
+	authUi.reviewSubmitWrap = document.getElementById("reviewSubmitWrap")
+	authUi.reviewSubmitAuthGate = document.getElementById("reviewSubmitAuthGate")
+	authUi.reviewSubmitAuthGateBtn = document.getElementById(
+		"reviewSubmitAuthGateBtn",
+	)
 	authUi.favoritesToast = document.getElementById("favoritesToast")
 }
 
 function updateReviewAuthHintVisibility() {
 	if (!authUi.reviewAuthHint) return
 	authUi.reviewAuthHint.classList.toggle("hidden", isNonGuestSignedIn())
+}
+
+function updateReviewSubmissionVisibility() {
+	const canSubmitReview = isNonGuestSignedIn()
+	if (authUi.reviewSubmitWrap) {
+		authUi.reviewSubmitWrap.classList.toggle("hidden", !canSubmitReview)
+	}
+	if (authUi.reviewSubmitAuthGate) {
+		authUi.reviewSubmitAuthGate.classList.toggle("hidden", canSubmitReview)
+	}
 }
 
 function showFavoritesToast(message = "") {
@@ -940,6 +958,7 @@ function setDashboardPromptState() {
 		authUi.dashboardFavoritesCount.textContent = "0"
 	updateFavoriteButtonsUI()
 	setPostBookingPromptVisible(false)
+	updateReviewSubmissionVisibility()
 }
 
 function setDashboardSignedInState(user) {
@@ -961,6 +980,7 @@ function setDashboardSignedInState(user) {
 	if (authUi.dashboardAuthBtn) {
 		authUi.dashboardAuthBtn.textContent = "Manage Account"
 	}
+	updateReviewSubmissionVisibility()
 	setPostBookingPromptVisible(false)
 }
 
@@ -1703,6 +1723,11 @@ function bindAuthUiEvents() {
 	}
 	if (authUi.reviewAuthHintBtn) {
 		authUi.reviewAuthHintBtn.addEventListener("click", () => {
+			openAuthModal("signin")
+		})
+	}
+	if (authUi.reviewSubmitAuthGateBtn) {
+		authUi.reviewSubmitAuthGateBtn.addEventListener("click", () => {
 			openAuthModal("signin")
 		})
 	}
@@ -2605,6 +2630,15 @@ async function submitReview(event) {
 	const msg = document.getElementById("reviewMessage")
 
 	if (!form || !submitBtn || !msg) return
+	if (!isNonGuestSignedIn()) {
+		showFormMessage(
+			msg,
+			"error",
+			"🔐 Please log in to submit a review.",
+		)
+		openAuthModal("signin")
+		return
+	}
 
 	const name = document.getElementById("reviewName")?.value?.trim() || ""
 	const ratingValue = Number(
@@ -2677,21 +2711,10 @@ async function submitReview(event) {
 	submitBtn.textContent = "Submitting..."
 
 	try {
-		let activeUid = auth.currentUser?.uid || null
+		const activeUid = auth.currentUser?.uid || null
 
 		if (!activeUid) {
-			try {
-				const userCredential = await auth.signInAnonymously()
-				activeUid = userCredential?.user?.uid || auth.currentUser?.uid || null
-			} catch (error) {
-				throw new Error(getFriendlyAuthError(error))
-			}
-		}
-
-		if (!activeUid) {
-			throw new Error(
-				"Unable to authenticate review session. Please refresh and try again.",
-			)
+			throw new Error("Please log in to submit your review.")
 		}
 
 		let photoUrl = ""
@@ -3562,6 +3585,7 @@ renderTestimonials(testimonialsData.map((item) => normalizeReviewItem(item)))
 bindReviewsSortControls()
 bindReviewToggleControls()
 bindReviewForm()
+updateReviewSubmissionVisibility()
 populateReviewServiceSelect()
 populateServiceSelect()
 populateTimeSlots()

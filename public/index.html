@@ -718,7 +718,14 @@
 						id="reviewAuthHint"
 						role="status"
 					>
-						<span>🔐 Log in to report abusive reviews.</span>
+						<div class="review-auth-badges">
+							<span class="review-auth-badge"
+								>🔐 Log in to submit reviews.</span
+							>
+							<span class="review-auth-badge"
+								>🚩 Log in to report abusive reviews.</span
+							>
+						</div>
 						<button
 							type="button"
 							class="btn btn-outline"
@@ -761,7 +768,26 @@
 					</button>
 				</div>
 
-				<div class="reviews-submit-wrap animate-on-scroll delay-2">
+				<div
+					class="review-submit-auth-gate hidden animate-on-scroll delay-2"
+					id="reviewSubmitAuthGate"
+				>
+					<div class="review-submit-auth-badge">🔐 Members only</div>
+					<h3>Log in to submit a review</h3>
+					<p>
+						Guests can still read all approved reviews, but only registered
+						logged-in users can post new reviews.
+					</p>
+					<button
+						type="button"
+						class="btn btn-primary"
+						id="reviewSubmitAuthGateBtn"
+					>
+						Log In to Submit Review
+					</button>
+				</div>
+
+				<div class="reviews-submit-wrap animate-on-scroll delay-2" id="reviewSubmitWrap">
 					<form class="reviews-submit-form" id="reviewForm">
 						<input type="hidden" id="reviewEditId" value="" />
 						<h3>Share Your Experience</h3>
