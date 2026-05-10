@@ -1637,7 +1637,7 @@ function initializeAdminPanel() {
 				setAdminPasswordVisibility(false)
 			}
 		} catch (error) {
-			console.error("Admin sign in failed:", error)
+			console.error("Admin log in failed:", error)
 			setAdminMessage(
 				"error",
 				`❌ Login failed: ${error.message || "unknown error"}`,
@@ -1646,7 +1646,7 @@ function initializeAdminPanel() {
 		} finally {
 			if (loginBtn) {
 				loginBtn.disabled = false
-				loginBtn.textContent = "Sign In"
+				loginBtn.textContent = "Log In"
 			}
 		}
 	})

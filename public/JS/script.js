@@ -647,7 +647,7 @@ function setGoogleAuthButtonsBusy(isBusy) {
 		authUi.postBookingGoogleBtn.disabled = busy
 		authUi.postBookingGoogleBtn.textContent = busy
 			? "Signing in..."
-			: "Sign In Now"
+			: "Log In Now"
 	}
 }
 
@@ -667,7 +667,7 @@ async function finalizeGoogleSignInResult(user, context = {}) {
 	}
 
 	await upsertUserProfile(user, { provider: "google.com" })
-	await loadUserDashboardData(user.uid)
+	await loadUserDashboardData(user)
 	if (context.source === "redirect" && authUi.message) {
 		showFormMessage(
 			authUi.message,
@@ -865,7 +865,7 @@ function setAuthMode(mode = "signin") {
 	}
 	if (authUi.submitBtn) {
 		authUi.submitBtn.textContent =
-			authMode === "signup" ? "Create Account" : "Sign In"
+			authMode === "signup" ? "Create Account" : "Log In"
 	}
 	if (authUi.switchToSignupBtn) {
 		authUi.switchToSignupBtn.classList.toggle("hidden", authMode === "signup")
@@ -925,7 +925,7 @@ function setDashboardPromptState() {
 	if (authUi.dashboardProfilePhone)
 		authUi.dashboardProfilePhone.textContent = "Add phone during booking"
 	if (authUi.dashboardAuthBtn) {
-		authUi.dashboardAuthBtn.textContent = "Sign In to Sync Data"
+		authUi.dashboardAuthBtn.textContent = "Log In to Sync Data"
 	}
 	if (dashboardFavoritesMessageTimer) {
 		clearTimeout(dashboardFavoritesMessageTimer)
@@ -934,7 +934,7 @@ function setDashboardPromptState() {
 	renderDashboardFavorites(
 		authUi.dashboardFavoritesList,
 		[],
-		"Sign in to save favorite braid styles.",
+		"Log in to save favorite braid styles.",
 	)
 	if (authUi.dashboardFavoritesCount)
 		authUi.dashboardFavoritesCount.textContent = "0"
@@ -1128,7 +1128,7 @@ async function toggleFavoriteStyle(style = {}, sourceButton = null) {
 			showFormMessage(
 				authUi.message,
 				"error",
-				"🔐 Sign in to save favorite braid styles.",
+				"🔐 Log in to save favorite braid styles.",
 			)
 		}
 		return
@@ -1217,16 +1217,28 @@ function startDashboardFavoritesListener(uid) {
 		)
 }
 
-async function loadUserDashboardData(uid) {
+async function loadUserDashboardData(userOrUid) {
+	const uid =
+		typeof userOrUid === "string"
+			? userOrUid
+			: userOrUid?.uid || auth?.currentUser?.uid || ""
+	const email =
+		typeof userOrUid === "string"
+			? String(auth?.currentUser?.email || "")
+			: String(userOrUid?.email || auth?.currentUser?.email || "")
+				.trim()
+				.toLowerCase()
+
 	if (!firebaseReady || !db || !uid) return
 	startDashboardFavoritesListener(uid)
 
 	try {
-		let bookingsSnap = null
+		let bookingsByUidSnap = null
+		let bookingsByEmailSnap = null
 		let reviewsSnap = null
 
 		try {
-			;[bookingsSnap, reviewsSnap] = await Promise.all([
+			;[bookingsByUidSnap, reviewsSnap] = await Promise.all([
 				db
 					.collection("bookings")
 					.where("uid", "==", uid)
@@ -1245,15 +1257,40 @@ async function loadUserDashboardData(uid) {
 				"Indexed dashboard query failed, falling back to non-indexed fetch:",
 				indexedQueryError,
 			)
-			;[bookingsSnap, reviewsSnap] = await Promise.all([
+			;[bookingsByUidSnap, reviewsSnap] = await Promise.all([
 				db.collection("bookings").where("uid", "==", uid).get(),
 				db.collection("reviews").where("uid", "==", uid).get(),
 			])
 		}
 
+		if (email) {
+			try {
+				bookingsByEmailSnap = await db
+					.collection("bookings")
+					.where("email", "==", email)
+					.limit(20)
+					.get()
+			} catch (emailQueryError) {
+				console.warn(
+					"Email-linked bookings query failed:",
+					emailQueryError,
+				)
+			}
+		}
+
 		const bookingItems = []
 		let latestPhone = ""
-		const bookingsDocs = [...(bookingsSnap?.docs || [])].sort(
+		const bookingDocMap = new Map()
+		;(bookingsByUidSnap?.docs || []).forEach((doc) => {
+			bookingDocMap.set(doc.id, doc)
+		})
+		;(bookingsByEmailSnap?.docs || []).forEach((doc) => {
+			if (!bookingDocMap.has(doc.id)) {
+				bookingDocMap.set(doc.id, doc)
+			}
+		})
+
+		const bookingsDocs = [...bookingDocMap.values()].sort(
 			(a, b) =>
 				toTimestampMs(b.data()?.createdAt) - toTimestampMs(a.data()?.createdAt),
 		)
@@ -1337,11 +1374,35 @@ async function handleGoogleAuth() {
 					"🔄 Opening secure Google sign-in...",
 				)
 			}
-			await auth.signInWithRedirect(provider)
+			if (auth.currentUser?.isAnonymous) {
+				await auth.currentUser.linkWithRedirect(provider)
+			} else {
+				await auth.signInWithRedirect(provider)
+			}
 			return
 		}
 
-		const popupResult = await auth.signInWithPopup(provider)
+		let popupResult = null
+		if (auth.currentUser?.isAnonymous) {
+			try {
+				popupResult = await auth.currentUser.linkWithPopup(provider)
+			} catch (linkError) {
+				const linkCode = linkError?.code || ""
+				const canFallbackToSignin =
+					linkCode === "auth/credential-already-in-use" ||
+					linkCode === "auth/email-already-in-use" ||
+					linkCode === "auth/account-exists-with-different-credential"
+
+				if (!canFallbackToSignin) {
+					throw linkError
+				}
+
+				popupResult = await auth.signInWithPopup(provider)
+			}
+		} else {
+			popupResult = await auth.signInWithPopup(provider)
+		}
+
 		const signedInUser = popupResult?.user || auth.currentUser
 		await finalizeGoogleSignInResult(signedInUser, { source: "popup" })
 	} catch (error) {
@@ -1365,7 +1426,11 @@ async function handleGoogleAuth() {
 				}
 				const provider = new firebase.auth.GoogleAuthProvider()
 				provider.setCustomParameters({ prompt: "select_account" })
-				await auth.signInWithRedirect(provider)
+				if (auth.currentUser?.isAnonymous) {
+					await auth.currentUser.linkWithRedirect(provider)
+				} else {
+					await auth.signInWithRedirect(provider)
+				}
 				return
 			} catch (redirectError) {
 				console.error("Google redirect fallback failed:", redirectError)
@@ -1463,7 +1528,7 @@ async function handleEmailAuthSubmit(event) {
 			provider: "password",
 		})
 		if (auth.currentUser?.uid) {
-			await loadUserDashboardData(auth.currentUser.uid)
+			await loadUserDashboardData(auth.currentUser)
 		}
 
 		if (authUi.emailForm) authUi.emailForm.reset()
@@ -1481,7 +1546,7 @@ async function handleEmailAuthSubmit(event) {
 		if (authUi.submitBtn) {
 			authUi.submitBtn.disabled = false
 			authUi.submitBtn.textContent =
-				authMode === "signup" ? "Create Account" : "Sign In"
+				authMode === "signup" ? "Create Account" : "Log In"
 		}
 	}
 }
@@ -1626,7 +1691,7 @@ function bindAuthUiEvents() {
 				showFormMessage(
 					authUi.message,
 					"success",
-					"Sign in using your email and password to sync this booking.",
+					"Log in using your email and password to sync this booking.",
 				)
 			}
 		})
@@ -1702,7 +1767,7 @@ function attachAuthStateObserver() {
 		if (user && !user.isAnonymous) {
 			setDashboardSignedInState(user)
 			await upsertUserProfile(user)
-			await loadUserDashboardData(user.uid)
+			await loadUserDashboardData(user)
 			renderTestimonials(testimonialsData)
 			focusDashboardAfterAuthIfRequested()
 		} else {
@@ -1710,12 +1775,12 @@ function attachAuthStateObserver() {
 			renderDashboardList(
 				authUi.dashboardBookingsList,
 				[],
-				"Sign in to view your appointments.",
+				"Log in to view your appointments.",
 			)
 			renderDashboardList(
 				authUi.dashboardReviewsList,
 				[],
-				"Sign in to view your submitted reviews.",
+				"Log in to view your submitted reviews.",
 			)
 			renderTestimonials(testimonialsData)
 		}
@@ -2721,7 +2786,7 @@ async function submitReview(event) {
 		console.error("Review submit failed:", error)
 		const friendlyError =
 			error?.code === "permission-denied"
-				? "Permission issue while saving review. Please sign in again and retry. If it persists, ask admin to deploy latest Firestore rules."
+				? "Permission issue while saving review. Please log in again and retry. If it persists, ask admin to deploy latest Firestore rules."
 				: error.message || "Failed to submit review. Please try again."
 		showFormMessage(msg, "error", `❌ ${friendlyError}`)
 	} finally {
@@ -2774,7 +2839,7 @@ function bindReviewForm() {
 
 			if (action === "report") {
 				if (!db || !auth || !isNonGuestSignedIn()) {
-					showTimedReviewMessage("error", "🔐 Sign in to report abuse.")
+					showTimedReviewMessage("error", "🔐 Log in to report abuse.")
 					return
 				}
 
@@ -3113,7 +3178,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 				transaction.set(bookingRef, {
 					firstName: data.firstName || "",
 					lastName: data.lastName || "",
-					email: data.email || "",
+					email: String(data.email || "").trim().toLowerCase(),
 					phone: data.phone || "",
 					service: data.service || "",
 					stylist: data.stylist || "",
@@ -3143,7 +3208,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 				await upsertUserProfile(auth.currentUser, {
 					phone: data.phone || "",
 				})
-				await loadUserDashboardData(activeUid)
+				await loadUserDashboardData(auth.currentUser)
 			}
 
 			handleAvailabilityWatch()

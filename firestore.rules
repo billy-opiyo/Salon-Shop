@@ -67,6 +67,13 @@ service cloud.firestore {
       allow create: if isSignedIn() && bookingCreateIsValid();
       allow read: if isSignedIn() && (
         resource.data.uid == request.auth.uid ||
+        (
+          request.auth.token.email is string
+          && request.auth.token.email != ''
+          && resource.data.email is string
+          && resource.data.email != ''
+          && resource.data.email == request.auth.token.email
+        ) ||
         isAdmin()
       );
 
