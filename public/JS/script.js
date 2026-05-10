@@ -320,6 +320,7 @@ let reviewMessageTimer = null
 let reviewsToggleAnimationTimer = null
 let favoritesToastTimer = null
 let dashboardFavoritesMessageTimer = null
+let authMessageTimer = null
 const REVIEW_LOCAL_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 	reviewDrafts: "rb_review_drafts",
@@ -679,6 +680,8 @@ async function finalizeGoogleSignInResult(user, context = {}) {
 		)
 	}
 	closeAuthModal()
+	const loggedInName = getUserDisplayName(user)
+	showFavoritesToast(`You're now Logged In as ${loggedInName}`)
 }
 
 async function handleGoogleRedirectResultOnLoad(showNoResult = false) {
@@ -850,6 +853,21 @@ function showTimedDashboardFavoritesMessage(type, text, duration = 2600) {
 	}, duration)
 }
 
+function showTimedAuthMessage(type, text, duration = 4200) {
+	if (!authUi.message) return
+
+	if (authMessageTimer) {
+		clearTimeout(authMessageTimer)
+		authMessageTimer = null
+	}
+
+	showFormMessage(authUi.message, type, text)
+	authMessageTimer = setTimeout(() => {
+		hideReviewMessage(authUi.message, true)
+		authMessageTimer = null
+	}, duration)
+}
+
 function setAuthPasswordVisibility(isVisible) {
 	if (!authUi.passwordInput || !authUi.passwordToggleBtn) return
 
@@ -871,6 +889,20 @@ function setAuthPasswordVisibility(isVisible) {
 	}
 }
 
+function clearRegisterPromptHighlight() {
+	authUi.switchToSignupBtn?.classList.remove("auth-register-highlight")
+	authUi.switchToSignupBtn?.removeAttribute("aria-live")
+}
+
+function promptRegisterForMissingAccount() {
+	setAuthMode("signin")
+	if (authUi.switchToSignupBtn) {
+		authUi.switchToSignupBtn.classList.add("auth-register-highlight")
+		authUi.switchToSignupBtn.setAttribute("aria-live", "polite")
+		authUi.switchToSignupBtn.focus()
+	}
+}
+
 function setPostBookingPromptVisible(isVisible) {
 	if (!authUi.postBookingAuthPrompt) return
 	authUi.postBookingAuthPrompt.classList.toggle("hidden", !isVisible)
@@ -878,6 +910,7 @@ function setPostBookingPromptVisible(isVisible) {
 
 function setAuthMode(mode = "signin") {
 	authMode = mode === "signup" ? "signup" : "signin"
+	clearRegisterPromptHighlight()
 	if (authUi.nameGroup) {
 		authUi.nameGroup.style.display = authMode === "signup" ? "block" : "none"
 	}
@@ -1246,8 +1279,8 @@ async function loadUserDashboardData(userOrUid) {
 		typeof userOrUid === "string"
 			? String(auth?.currentUser?.email || "")
 			: String(userOrUid?.email || auth?.currentUser?.email || "")
-				.trim()
-				.toLowerCase()
+					.trim()
+					.toLowerCase()
 
 	if (!firebaseReady || !db || !uid) return
 	startDashboardFavoritesListener(uid)
@@ -1291,10 +1324,7 @@ async function loadUserDashboardData(userOrUid) {
 					.limit(20)
 					.get()
 			} catch (emailQueryError) {
-				console.warn(
-					"Email-linked bookings query failed:",
-					emailQueryError,
-				)
+				console.warn("Email-linked bookings query failed:", emailQueryError)
 			}
 		}
 
@@ -1532,15 +1562,7 @@ async function handleEmailAuthSubmit(event) {
 				await auth.currentUser.updateProfile({ displayName: name })
 			}
 		} else {
-			if (currentUser?.isAnonymous) {
-				try {
-					await currentUser.linkWithCredential(credential)
-				} catch (_linkError) {
-					await auth.signInWithEmailAndPassword(email, password)
-				}
-			} else {
-				await auth.signInWithEmailAndPassword(email, password)
-			}
+			await auth.signInWithEmailAndPassword(email, password)
 		}
 
 		await upsertUserProfile(auth.currentUser, {
@@ -1553,8 +1575,76 @@ async function handleEmailAuthSubmit(event) {
 
 		if (authUi.emailForm) authUi.emailForm.reset()
 		closeAuthModal()
+		const loggedInName = getUserDisplayName(auth.currentUser)
+		showFavoritesToast(`You're now Logged In as ${loggedInName}`)
 	} catch (error) {
 		console.error("Email auth failed:", error)
+		const code = error?.code || ""
+
+		if (authMode === "signin" && code === "auth/wrong-password") {
+			showTimedAuthMessage(
+				"error",
+				"❌ Incorrect password. This account exists — please enter the correct password and try again.",
+			)
+			return
+		}
+
+		if (authMode === "signin" && code === "auth/invalid-credential") {
+			try {
+				const methods = await auth.fetchSignInMethodsForEmail(email)
+
+				if (!Array.isArray(methods) || methods.length === 0) {
+					showTimedAuthMessage(
+						"error",
+						"❌ This account is not available. Please create an account and log in again.",
+					)
+					promptRegisterForMissingAccount()
+					return
+				}
+
+				if (methods.includes("password")) {
+					showTimedAuthMessage(
+						"error",
+						"❌ Incorrect password. This account exists — please enter the correct password and try again.",
+					)
+					return
+				}
+
+				showTimedAuthMessage(
+					"error",
+					"⚠️ This account exists but is not set up for password login. Please use the original sign-in method used during registration.",
+				)
+				return
+			} catch (_lookupError) {
+				showTimedAuthMessage(
+					"error",
+					"❌ This account is not available. Please create an account and log in again.",
+				)
+				promptRegisterForMissingAccount()
+				return
+			}
+		}
+
+		if (authMode === "signin" && code === "auth/user-not-found") {
+			showTimedAuthMessage(
+				"error",
+				"❌ This account is not available. Please create an account and log in again.",
+			)
+			promptRegisterForMissingAccount()
+			return
+		}
+
+		if (authMode === "signup" && code === "auth/email-already-in-use") {
+			setAuthMode("signin")
+			if (authUi.message) {
+				showTimedAuthMessage(
+					"error",
+					"⚠️ This email is already registered. Please log in with your password.",
+				)
+			}
+			return
+		}
+
 		if (authUi.message) {
 			showFormMessage(
 				authUi.message,
@@ -2631,11 +2721,7 @@ async function submitReview(event) {
 
 	if (!form || !submitBtn || !msg) return
 	if (!isNonGuestSignedIn()) {
-		showFormMessage(
-			msg,
-			"error",
-			"🔐 Please log in to submit a review.",
-		)
+		showFormMessage(msg, "error", "🔐 Please log in to submit a review.")
 		openAuthModal("signin")
 		return
 	}
@@ -3201,7 +3287,9 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 				transaction.set(bookingRef, {
 					firstName: data.firstName || "",
 					lastName: data.lastName || "",
-					email: String(data.email || "").trim().toLowerCase(),
+					email: String(data.email || "")
+						.trim()
+						.toLowerCase(),
 					phone: data.phone || "",
 					service: data.service || "",
 					stylist: data.stylist || "",

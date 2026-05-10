@@ -4838,6 +4838,28 @@ select option {
     transform: translateY(-1px);
 }
 
+.auth-links button.auth-register-highlight {
+    color: var(--primary-light);
+    background: rgba(200, 150, 62, 0.18);
+    border: 1px solid rgba(200, 150, 62, 0.55);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    box-shadow: 0 0 0 2px rgba(200, 150, 62, 0.2);
+    animation: pulse 1.4s ease-in-out infinite;
+}
+
+.auth-links button.auth-register-highlight:hover {
+    color: var(--primary-light);
+    transform: translateY(-1px);
+    border-color: rgba(200, 150, 62, 0.8);
+    background: rgba(200, 150, 62, 0.24);
+}
+
+.auth-links button.auth-register-highlight:focus-visible {
+    outline: 2px solid var(--primary-light);
+    outline-offset: 2px;
+}
+
 .client-dashboard {
     padding: clamp(60px, 8vw, 90px) 0;
     background: var(--bg-secondary);
