@@ -4821,6 +4821,7 @@ select option {
     margin-top: 14px;
     display: grid;
     gap: 6px;
+    justify-items: center;
 }
 
 .auth-links button {
@@ -4830,6 +4831,10 @@ select option {
     font-weight: 500;
     justify-content: center;
     padding: 4px;
+    width: auto;
+    display: inline-flex;
+    justify-self: center;
+    max-width: fit-content;
     transition: color 0.2s ease, transform 0.2s ease;
 }
 

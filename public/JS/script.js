@@ -321,6 +321,7 @@ let reviewsToggleAnimationTimer = null
 let favoritesToastTimer = null
 let dashboardFavoritesMessageTimer = null
 let authMessageTimer = null
+const formMessageTimers = new WeakMap()
 const REVIEW_LOCAL_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 	reviewDrafts: "rb_review_drafts",
@@ -449,6 +450,11 @@ function showFormMessage(msg, type, text) {
 
 function clearFormMessage(msg) {
 	if (!msg) return
+	const activeTimer = formMessageTimers.get(msg)
+	if (activeTimer) {
+		clearTimeout(activeTimer)
+		formMessageTimers.delete(msg)
+	}
 	msg.className = "form-message"
 	msg.textContent = ""
 	msg.style.display = "none"
@@ -483,6 +489,23 @@ function showTimedReviewMessage(type, text, duration = 3500) {
 		hideReviewMessage(msg, true)
 		reviewMessageTimer = null
 	}, duration)
+}
+
+function showTimedFormMessage(msg, type, text, duration = 4000) {
+	if (!msg) return
+
+	const activeTimer = formMessageTimers.get(msg)
+	if (activeTimer) {
+		clearTimeout(activeTimer)
+		formMessageTimers.delete(msg)
+	}
+
+	showFormMessage(msg, type, text)
+	const timerId = setTimeout(() => {
+		hideReviewMessage(msg, true)
+		formMessageTimers.delete(msg)
+	}, duration)
+	formMessageTimers.set(msg, timerId)
 }
 
 const iconPaths = {
@@ -673,11 +696,7 @@ async function finalizeGoogleSignInResult(user, context = {}) {
 	await upsertUserProfile(user, { provider: "google.com" })
 	await loadUserDashboardData(user)
 	if (context.source === "redirect" && authUi.message) {
-		showFormMessage(
-			authUi.message,
-			"success",
-			"✅ Signed in with Google successfully.",
-		)
+		showTimedAuthMessage("success", "✅ Signed in with Google successfully.")
 	}
 	closeAuthModal()
 	const loggedInName = getUserDisplayName(user)
@@ -696,8 +715,7 @@ async function handleGoogleRedirectResultOnLoad(showNoResult = false) {
 		}
 
 		if (showNoResult && authUi.message) {
-			showFormMessage(
-				authUi.message,
+			showTimedAuthMessage(
 				"error",
 				"❌ Google redirect sign-in did not complete. Please try again.",
 			)
@@ -706,11 +724,7 @@ async function handleGoogleRedirectResultOnLoad(showNoResult = false) {
 	} catch (error) {
 		console.error("Google redirect result failed:", error)
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
-				"error",
-				`❌ ${getFriendlyAuthError(error)}`,
-			)
+			showTimedAuthMessage("error", `❌ ${getFriendlyAuthError(error)}`)
 		}
 		return false
 	}
@@ -1178,11 +1192,7 @@ async function toggleFavoriteStyle(style = {}, sourceButton = null) {
 		shouldAutoFocusDashboardAfterAuth = true
 		openAuthModal("signin")
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
-				"error",
-				"🔐 Log in to save favorite braid styles.",
-			)
+			showTimedAuthMessage("error", "🔐 Log in to save favorite braid styles.")
 		}
 		return
 	}
@@ -1398,8 +1408,7 @@ async function handleGoogleAuth() {
 	if (authUi.message) clearFormMessage(authUi.message)
 	if (googleAuthInProgress) {
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
+			showTimedAuthMessage(
 				"error",
 				"⏳ Google sign-in is already in progress. Please wait...",
 			)
@@ -1418,11 +1427,7 @@ async function handleGoogleAuth() {
 
 		if (shouldPreferRedirectGoogleAuth()) {
 			if (authUi.message) {
-				showFormMessage(
-					authUi.message,
-					"success",
-					"🔄 Opening secure Google sign-in...",
-				)
+				showTimedAuthMessage("success", "🔄 Opening secure Google sign-in...")
 			}
 			if (auth.currentUser?.isAnonymous) {
 				await auth.currentUser.linkWithRedirect(provider)
@@ -1468,8 +1473,7 @@ async function handleGoogleAuth() {
 		if (useRedirectFallback) {
 			try {
 				if (authUi.message) {
-					showFormMessage(
-						authUi.message,
+					showTimedAuthMessage(
 						"success",
 						"🔄 Popup failed, redirecting to Google sign-in...",
 					)
@@ -1485,8 +1489,7 @@ async function handleGoogleAuth() {
 			} catch (redirectError) {
 				console.error("Google redirect fallback failed:", redirectError)
 				if (authUi.message) {
-					showFormMessage(
-						authUi.message,
+					showTimedAuthMessage(
 						"error",
 						`❌ ${getFriendlyAuthError(redirectError)}`,
 					)
@@ -1495,11 +1498,7 @@ async function handleGoogleAuth() {
 		}
 
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
-				"error",
-				`❌ ${getFriendlyAuthError(error)}`,
-			)
+			showTimedAuthMessage("error", `❌ ${getFriendlyAuthError(error)}`)
 		}
 	} finally {
 		googleAuthInProgress = false
@@ -1518,22 +1517,14 @@ async function handleEmailAuthSubmit(event) {
 
 	if (!email || !password) {
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
-				"error",
-				"❌ Email and password are required.",
-			)
+			showTimedAuthMessage("error", "❌ Email and password are required.")
 		}
 		return
 	}
 
 	if (authMode === "signup" && name.length < 2) {
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
-				"error",
-				"❌ Please enter your full name.",
-			)
+			showTimedAuthMessage("error", "❌ Please enter your full name.")
 		}
 		return
 	}
@@ -1646,11 +1637,7 @@ async function handleEmailAuthSubmit(event) {
 		}
 
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
-				"error",
-				`❌ ${getFriendlyAuthError(error)}`,
-			)
+			showTimedAuthMessage("error", `❌ ${getFriendlyAuthError(error)}`)
 		}
 	} finally {
 		if (authUi.submitBtn) {
@@ -1666,8 +1653,7 @@ async function handleForgotPassword() {
 	const email = authUi.emailInput?.value?.trim() || ""
 	if (!email) {
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
+			showTimedAuthMessage(
 				"error",
 				"❌ Enter your email first, then click Forgot Password.",
 			)
@@ -1678,19 +1664,14 @@ async function handleForgotPassword() {
 	try {
 		await auth.sendPasswordResetEmail(email)
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
+			showTimedAuthMessage(
 				"success",
 				"✅ Password reset email sent. Please check your inbox.",
 			)
 		}
 	} catch (error) {
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
-				"error",
-				`❌ ${getFriendlyAuthError(error)}`,
-			)
+			showTimedAuthMessage("error", `❌ ${getFriendlyAuthError(error)}`)
 		}
 	}
 }
@@ -1735,11 +1716,7 @@ async function handleContinueAsGuest() {
 	} catch (error) {
 		console.error("Continue as guest failed:", error)
 		if (authUi.message) {
-			showFormMessage(
-				authUi.message,
-				"error",
-				`❌ ${getFriendlyAuthError(error)}`,
-			)
+			showTimedAuthMessage("error", `❌ ${getFriendlyAuthError(error)}`)
 		}
 	} finally {
 		if (guestBtn) {
@@ -1798,8 +1775,7 @@ function bindAuthUiEvents() {
 		authUi.postBookingGoogleBtn.addEventListener("click", () => {
 			openAuthModal("signin")
 			if (authUi.message) {
-				showFormMessage(
-					authUi.message,
+				showTimedAuthMessage(
 					"success",
 					"Log in using your email and password to sync this booking.",
 				)
@@ -2721,7 +2697,7 @@ async function submitReview(event) {
 
 	if (!form || !submitBtn || !msg) return
 	if (!isNonGuestSignedIn()) {
-		showFormMessage(msg, "error", "🔐 Please log in to submit a review.")
+		showTimedFormMessage(msg, "error", "🔐 Please log in to submit a review.")
 		openAuthModal("signin")
 		return
 	}
@@ -2749,7 +2725,7 @@ async function submitReview(event) {
 		ratingValue < 1 ||
 		ratingValue > 5
 	) {
-		showFormMessage(
+		showTimedFormMessage(
 			msg,
 			"error",
 			"❌ Please provide your name, rating, and review message.",
@@ -2758,7 +2734,7 @@ async function submitReview(event) {
 	}
 
 	if (text.length < 10) {
-		showFormMessage(
+		showTimedFormMessage(
 			msg,
 			"error",
 			"❌ Please write at least 10 characters so your feedback is useful.",
@@ -2767,7 +2743,7 @@ async function submitReview(event) {
 	}
 
 	if (name.length < 2 || name.length > 80) {
-		showFormMessage(
+		showTimedFormMessage(
 			msg,
 			"error",
 			"❌ Name must be between 2 and 80 characters.",
@@ -2776,7 +2752,7 @@ async function submitReview(event) {
 	}
 
 	if (text.length > 800) {
-		showFormMessage(
+		showTimedFormMessage(
 			msg,
 			"error",
 			"❌ Review message is too long (max 800 characters).",
@@ -2785,7 +2761,7 @@ async function submitReview(event) {
 	}
 
 	if (!firebaseReady || !db || !auth) {
-		showFormMessage(
+		showTimedFormMessage(
 			msg,
 			"error",
 			"⚠️ Reviews service is not configured yet. Add Firebase keys in APP_CONFIG.",
@@ -2880,24 +2856,20 @@ async function submitReview(event) {
 		if (reviewEditIdInput) reviewEditIdInput.value = ""
 		if (cancelEditBtn) cancelEditBtn.style.display = "none"
 		if (submitReviewBtn) submitReviewBtn.textContent = "Submit Review"
-		showFormMessage(
+		showTimedFormMessage(
 			msg,
 			"success",
 			editId
 				? "✅ Review updated and is pending approval."
 				: "✅ Thank you! Your review was submitted and is pending approval.",
 		)
-		reviewMessageTimer = setTimeout(() => {
-			hideReviewMessage(msg, true)
-			reviewMessageTimer = null
-		}, 5000)
 	} catch (error) {
 		console.error("Review submit failed:", error)
 		const friendlyError =
 			error?.code === "permission-denied"
 				? "Permission issue while saving review. Please log in again and retry. If it persists, ask admin to deploy latest Firestore rules."
 				: error.message || "Failed to submit review. Please try again."
-		showFormMessage(msg, "error", `❌ ${friendlyError}`)
+		showTimedFormMessage(msg, "error", `❌ ${friendlyError}`)
 	} finally {
 		submitBtn.disabled = false
 		submitBtn.textContent = "Submit Review"
@@ -2976,8 +2948,7 @@ function bindReviewForm() {
 
 			const draft = getReviewDraftsArray().find((item) => item.id === reviewId)
 			if (!draft) {
-				showFormMessage(
-					document.getElementById("reviewMessage"),
+				showTimedReviewMessage(
 					"error",
 					"⚠️ You can only edit your own local pending draft.",
 				)
@@ -3225,7 +3196,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 	clearFormMessage(msg)
 
 	if (!firebaseReady || !db || !auth) {
-		showFormMessage(
+		showTimedFormMessage(
 			msg,
 			"error",
 			"⚠️ Booking service is not configured yet. Add Firebase keys in APP_CONFIG.",
@@ -3308,7 +3279,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 
 			form.style.display = "none"
 			document.getElementById("bookingSuccess").style.display = "block"
-			showFormMessage(
+			showTimedFormMessage(
 				msg,
 				"success",
 				"✅ Booking confirmed and saved in realtime!",
@@ -3325,7 +3296,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 			handleAvailabilityWatch()
 		} catch (error) {
 			console.error("Booking failed:", error)
-			showFormMessage(
+			showTimedFormMessage(
 				msg,
 				"error",
 				`❌ ${error.message || "Booking failed. Please try again."}`,
@@ -3572,19 +3543,12 @@ document
 			form.reset()
 			showContactSuccessPopup()
 			if (msg) {
-				showFormMessage(msg, "success", "✅ Message sent successfully.")
-				if (contactFormMessageTimer) {
-					clearTimeout(contactFormMessageTimer)
-				}
-				contactFormMessageTimer = setTimeout(() => {
-					clearFormMessage(msg)
-					contactFormMessageTimer = null
-				}, 3000)
+				showTimedFormMessage(msg, "success", "✅ Message sent successfully.")
 			}
 		} catch (error) {
 			console.error("Contact form submit failed:", error)
 			if (msg) {
-				showFormMessage(
+				showTimedFormMessage(
 					msg,
 					"error",
 					`❌ ${error.message || "Failed to send message. Please try again."}`,
@@ -3603,7 +3567,6 @@ const contactSuccessPopupClose = document.getElementById(
 	"contactSuccessPopupClose",
 )
 let contactPopupTimeout
-let contactFormMessageTimer
 
 function hideContactSuccessPopup() {
 	if (!contactSuccessPopup) return
