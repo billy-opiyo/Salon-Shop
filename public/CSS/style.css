@@ -931,7 +931,10 @@ h6 {
     }
 
     .hero-image-main img {
-        height: 420px;
+        height: auto;
+        max-height: 70vh;
+        object-fit: cover;
+        object-position: top center;
     }
 
     .hero-badge {
@@ -970,7 +973,10 @@ h6 {
     }
 
     .hero-image-main img {
-        height: 310px;
+        height: auto;
+        max-height: 62vh;
+        object-fit: cover;
+        object-position: top center;
     }
 
     .hero-badge {
@@ -2238,15 +2244,15 @@ h6 {
 }
 
 .admin-action-btn.review-report-btn {
-    background: #f4a261;
-    border-color: #f4a261;
-    color: #2b1a10;
-}
-
-.admin-action-btn.review-report-btn:hover {
     background: var(--bg-card);
     border-color: var(--primary);
     color: var(--primary);
+}
+
+.admin-action-btn.review-report-btn:hover {
+    border-color: #f56565;
+    color: #f56565;
+    background: rgba(245, 101, 101, 0.12);
 }
 
 .admin-action-btn:hover {
@@ -5153,6 +5159,45 @@ select option {
     .nav-toggle span {
         width: 20px;
    }
+
+    .hero-image-main img {
+        max-height: 58vh;
+        object-fit: cover;
+        object-position: top center;
+    }
+
+    .hero-badge {
+        bottom: 6px;
+        left: 6px;
+        width: 76px;
+        min-height: 52px;
+        padding: 6px 7px;
+    }
+
+    .hero-badge .number {
+        font-size: 1rem;
+    }
+
+    .hero-badge .text {
+        font-size: 0.55rem;
+        margin-top: 2px;
+    }
+
+    .hero-float {
+        top: 6px;
+        right: 6px;
+        width: 76px;
+        min-height: 52px;
+        padding: 6px 7px;
+    }
+
+    .hero-float span {
+        font-size: 0.68rem;
+    }
+
+    .hero-float p {
+        font-size: 0.54rem;
+    }
 
     .auth-card {
         padding: 16px;
