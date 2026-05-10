@@ -7,10 +7,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn()
-        && request.auth.token.email is string
-        && request.auth.token.email in [
-          'billyopiyo597@gmail.com'
-        ];
+        && request.auth.token.email != null
+        && request.auth.token.email.matches('(?i)^billyopiyo597@gmail\\.com$');
     }
 
     function isOwnerOrAdmin(ownerUid) {
@@ -120,6 +118,14 @@ service cloud.firestore {
       allow read: if true;
 
       // Only admin can create/update/delete gallery content.
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /blogs/{blogId} {
+      // Public blog cards are visible to everyone.
+      allow read: if true;
+
+      // Only admins can create/update/delete blog entries.
       allow create, update, delete: if isAdmin();
     }
 

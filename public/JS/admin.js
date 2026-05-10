@@ -11,9 +11,11 @@ let adminFirebaseApp = null
 let adminUnlocked = false
 let adminBookingsUnsubscribe = null
 let adminGalleryUnsubscribe = null
+let adminBlogsUnsubscribe = null
 let adminReviewsUnsubscribe = null
 let adminContactUnsubscribe = null
 let adminGalleryDocs = []
+let adminBlogDocs = []
 let adminReviewDocs = []
 let adminReviewRawDocs = []
 let adminContactDocs = []
@@ -241,6 +243,13 @@ function stopAdminGalleryListener() {
 	}
 }
 
+function stopAdminBlogsListener() {
+	if (typeof adminBlogsUnsubscribe === "function") {
+		adminBlogsUnsubscribe()
+		adminBlogsUnsubscribe = null
+	}
+}
+
 function stopAdminReviewsListener() {
 	if (typeof adminReviewsUnsubscribe === "function") {
 		adminReviewsUnsubscribe()
@@ -339,15 +348,18 @@ function setAdminUnlockedState(value) {
 	if (!value) {
 		stopAdminBookingsListener()
 		stopAdminGalleryListener()
+		stopAdminBlogsListener()
 		stopAdminReviewsListener()
 		stopAdminContactListener()
 		setAdminMessage("", "")
 		setAdminMessage("", "", "adminGalleryMessage")
+		setAdminMessage("", "", "adminBlogsMessage")
 		setAdminMessage("", "", "adminReviewsMessage")
 		setAdminMessage("", "", "adminContactMessage")
 	} else {
 		startAdminBookingsListener()
 		startAdminGalleryListener()
+		startAdminBlogsListener()
 		startAdminReviewsListener()
 		startAdminContactListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
@@ -944,6 +956,170 @@ function galleryDocToViewModel(doc) {
 	}
 }
 
+function blogDocToViewModel(doc = {}) {
+	return {
+		id: String(doc.id || ""),
+		title:
+			String(doc.title || doc.heading || "Untitled Blog").trim() ||
+			"Untitled Blog",
+		excerpt: String(doc.excerpt || doc.description || "").trim(),
+		imageUrl: String(doc.imageUrl || doc.image || "").trim(),
+		readMoreUrl: String(doc.readMoreUrl || doc.url || "").trim(),
+		readTime: String(doc.readTime || "5 min read").trim() || "5 min read",
+		publishDate: doc.publishDate || doc.date || "",
+		createdAt: doc.createdAt || null,
+		updatedAt: doc.updatedAt || null,
+	}
+}
+
+function formatAdminBlogDate(value) {
+	if (!value) return "N/A"
+	const text = String(value).trim()
+	if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+		const [year, month, day] = text.split("-").map(Number)
+		const date = new Date(year, month - 1, day)
+		if (!Number.isNaN(date.getTime())) {
+			return date.toLocaleDateString(undefined, {
+				year: "numeric",
+				month: "long",
+				day: "numeric",
+			})
+		}
+	}
+
+	const ms = toTimestampMs(value)
+	if (!ms) return text
+	return new Date(ms).toLocaleDateString(undefined, {
+		year: "numeric",
+		month: "long",
+		day: "numeric",
+	})
+}
+
+function resetAdminBlogsForm() {
+	const form = document.getElementById("adminBlogsForm")
+	if (!form) return
+
+	form.reset()
+	document.getElementById("blogEditId").value = ""
+	document.getElementById("adminBlogsFormTitle").textContent = "Add New Blog"
+	document.getElementById("adminBlogsSaveBtn").textContent = "Save Blog"
+	document.getElementById("adminBlogsCancelEdit").style.display = "none"
+}
+
+function loadBlogItemForEditing(id) {
+	const item = adminBlogDocs.find((blog) => blog.id === id)
+	if (!item) return
+
+	setActiveAdminSection("blogs")
+
+	document.getElementById("blogEditId").value = item.id
+	document.getElementById("blogTitle").value = item.title || ""
+	document.getElementById("blogExcerpt").value = item.excerpt || ""
+	document.getElementById("blogReadTime").value = item.readTime || ""
+	document.getElementById("blogDate").value = String(
+		item.publishDate || "",
+	).trim()
+	document.getElementById("blogReadMoreUrl").value = item.readMoreUrl || ""
+
+	document.getElementById("adminBlogsFormTitle").textContent = "Edit Blog"
+	document.getElementById("adminBlogsSaveBtn").textContent = "Update Blog"
+	document.getElementById("adminBlogsCancelEdit").style.display = "inline-flex"
+
+	setAdminMessage("", "", "adminBlogsMessage")
+
+	const blogsForm = document.getElementById("adminBlogsForm")
+	if (blogsForm) {
+		requestAnimationFrame(() => {
+			const headerOffset = 96
+			const targetTop =
+				window.scrollY + blogsForm.getBoundingClientRect().top - headerOffset
+
+			window.scrollTo({
+				top: Math.max(0, targetTop),
+				behavior: "smooth",
+			})
+
+			const firstInput = blogsForm.querySelector("input, textarea")
+			if (firstInput && typeof firstInput.focus === "function") {
+				setTimeout(() => firstInput.focus({ preventScroll: true }), 320)
+			}
+		})
+	}
+}
+
+function renderAdminBlogs(docs) {
+	const list = document.getElementById("adminBlogsList")
+	if (!list) return
+
+	const items = docs.map(blogDocToViewModel).sort((a, b) => {
+		const aUpdated = toTimestampMs(a.updatedAt)
+		const bUpdated = toTimestampMs(b.updatedAt)
+		if (aUpdated !== bUpdated) return bUpdated - aUpdated
+
+		const aCreated = toTimestampMs(a.createdAt)
+		const bCreated = toTimestampMs(b.createdAt)
+		if (aCreated !== bCreated) return bCreated - aCreated
+
+		return String(b.publishDate || "").localeCompare(
+			String(a.publishDate || ""),
+		)
+	})
+
+	adminBlogDocs = items
+
+	if (!items.length) {
+		list.innerHTML =
+			'<div class="admin-empty-state">No blog posts yet. Add your first blog above.</div>'
+		updateAdminBlogScrollButtons()
+		return
+	}
+
+	list.innerHTML = items
+		.map(
+			(item) => `
+      <article class="admin-blog-item">
+        <div class="admin-blog-thumb-wrap">
+          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}" class="admin-blog-thumb" />` : '<div class="admin-blog-thumb admin-blog-thumb--empty">No Image</div>'}
+        </div>
+        <div class="admin-blog-content">
+          <h4>${escapeHtml(item.title)}</h4>
+          <div class="admin-blog-meta">
+            <span>${escapeHtml(formatAdminBlogDate(item.publishDate || item.createdAt))}</span>
+            <span>${escapeHtml(item.readTime || "5 min read")}</span>
+          </div>
+          <p>${escapeHtml(item.excerpt || "")}</p>
+          <a href="${escapeHtml(item.readMoreUrl || "#")}" target="_blank" rel="noopener" class="admin-inline-link">Open Article</a>
+        </div>
+        <div class="admin-gallery-actions">
+          <button class="admin-action-btn" data-blog-action="edit" data-id="${item.id}">Edit</button>
+          <button class="admin-action-btn danger" data-blog-action="delete" data-id="${item.id}">Delete</button>
+        </div>
+      </article>
+    `,
+		)
+		.join("")
+
+	updateAdminBlogScrollButtons()
+}
+
+function updateAdminBlogScrollButtons() {
+	const list = document.getElementById("adminBlogsList")
+	const prevBtn = document.getElementById("adminBlogsPrevBtn")
+	const nextBtn = document.getElementById("adminBlogsNextBtn")
+	if (!list || !prevBtn || !nextBtn) return
+
+	const canScroll = list.scrollHeight - list.clientHeight > 8
+	if (!canScroll) {
+		prevBtn.disabled = true
+		nextBtn.disabled = true
+		return
+	}
+
+	prevBtn.disabled = list.scrollTop <= 2
+	nextBtn.disabled = list.scrollTop + list.clientHeight >= list.scrollHeight - 2
+}
+
 function escapeHtml(value) {
 	return String(value ?? "")
 		.replace(/&/g, "&amp;")
@@ -1435,6 +1611,143 @@ async function deleteGalleryItem(id) {
 	}
 }
 
+async function saveBlogItem(event) {
+	event.preventDefault()
+	if (!adminUnlocked || !db || !auth?.currentUser) return
+
+	const saveBtn = document.getElementById("adminBlogsSaveBtn")
+	const editId = document.getElementById("blogEditId").value.trim()
+
+	const title = document.getElementById("blogTitle").value.trim()
+	const excerpt = document.getElementById("blogExcerpt").value.trim()
+	const readTime = document.getElementById("blogReadTime").value.trim()
+	const publishDate = document.getElementById("blogDate").value
+	const readMoreUrl = document.getElementById("blogReadMoreUrl").value.trim()
+	const imageFile = document.getElementById("blogImage").files?.[0]
+
+	if (!title || !excerpt || !readTime || !publishDate || !readMoreUrl) {
+		setAdminMessage(
+			"error",
+			"❌ Please complete all required blog fields.",
+			"adminBlogsMessage",
+		)
+		return
+	}
+
+	const currentItem = adminBlogDocs.find((blog) => blog.id === editId)
+	if (!editId && !imageFile) {
+		setAdminMessage(
+			"error",
+			"❌ Blog image is required for new posts.",
+			"adminBlogsMessage",
+		)
+		return
+	}
+
+	try {
+		if (saveBtn) {
+			saveBtn.disabled = true
+			saveBtn.textContent = editId ? "Updating..." : "Saving..."
+		}
+
+		let imageUrl = currentItem?.imageUrl || ""
+		if (imageFile) {
+			imageUrl = await uploadImageToCloudinary(imageFile)
+		}
+
+		const payload = {
+			title,
+			excerpt,
+			readTime,
+			publishDate,
+			readMoreUrl,
+			imageUrl,
+			updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+		}
+
+		if (editId) {
+			await db.collection("blogs").doc(editId).set(payload, { merge: true })
+			setAdminMessage(
+				"success",
+				"✅ Blog updated successfully.",
+				"adminBlogsMessage",
+			)
+		} else {
+			await db.collection("blogs").add({
+				...payload,
+				createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+			})
+			setAdminMessage(
+				"success",
+				"✅ Blog created successfully.",
+				"adminBlogsMessage",
+			)
+		}
+
+		resetAdminBlogsForm()
+	} catch (error) {
+		console.error("Saving blog failed:", error)
+		setAdminMessage(
+			"error",
+			`❌ Failed to save blog: ${error.message || "unknown error"}`,
+			"adminBlogsMessage",
+		)
+	} finally {
+		if (saveBtn) {
+			saveBtn.disabled = false
+			saveBtn.textContent = document.getElementById("blogEditId").value
+				? "Update Blog"
+				: "Save Blog"
+		}
+	}
+}
+
+async function deleteBlogItem(id) {
+	if (!id) return
+	const confirmed = await showAdminConfirmModal(
+		"Delete this blog permanently? This action cannot be undone.",
+		"Delete Blog",
+	)
+	if (!confirmed) return
+
+	try {
+		await db.collection("blogs").doc(id).delete()
+		setAdminMessage("success", "✅ Blog deleted.", "adminBlogsMessage")
+		if (document.getElementById("blogEditId").value === id) {
+			resetAdminBlogsForm()
+		}
+	} catch (error) {
+		console.error("Delete blog failed:", error)
+		setAdminMessage(
+			"error",
+			`❌ Failed to delete blog: ${error.message || "unknown error"}`,
+			"adminBlogsMessage",
+		)
+	}
+}
+
+function scrollAdminBlogs(direction = "next") {
+	const list = document.getElementById("adminBlogsList")
+	if (!list) return
+
+	const firstCard = list.querySelector(".admin-blog-item")
+	if (!firstCard) return
+
+	const gap = Number.parseFloat(getComputedStyle(list).rowGap || "12") || 12
+	const step = Math.max(firstCard.offsetHeight, 220) + gap
+	const delta = direction === "prev" ? -step : step
+	const maxTop = Math.max(0, list.scrollHeight - list.clientHeight)
+	const targetTop = Math.min(maxTop, Math.max(0, list.scrollTop + delta))
+
+	if (typeof list.scrollTo === "function") {
+		list.scrollTo({ top: targetTop, behavior: "smooth" })
+	} else {
+		list.scrollTop = targetTop
+	}
+
+	window.setTimeout(updateAdminBlogScrollButtons, 240)
+}
+
 async function updateBookingStatus(bookingId, status) {
 	const ref = db.collection("bookings").doc(bookingId)
 	await ref.set(
@@ -1519,6 +1832,30 @@ function startAdminGalleryListener() {
 		)
 }
 
+function startAdminBlogsListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminBlogsListener()
+
+	adminBlogsUnsubscribe = db
+		.collection("blogs")
+		.limit(300)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminBlogs(docs)
+			},
+			(error) => {
+				console.error("Admin blogs listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch blogs in realtime: ${error.message || "unknown error"}`,
+					"adminBlogsMessage",
+				)
+			},
+		)
+}
+
 function startAdminReviewsListener() {
 	if (!firebaseReady || !db || !adminUnlocked) return
 
@@ -1573,6 +1910,11 @@ function initializeAdminPanel() {
 	const loginBtn = document.getElementById("adminLoginBtn")
 	const passwordToggleBtn = document.getElementById("adminPasswordToggle")
 	const bookingList = document.getElementById("adminBookingsList")
+	const blogsForm = document.getElementById("adminBlogsForm")
+	const blogsList = document.getElementById("adminBlogsList")
+	const blogsCancelEditBtn = document.getElementById("adminBlogsCancelEdit")
+	const blogsPrevBtn = document.getElementById("adminBlogsPrevBtn")
+	const blogsNextBtn = document.getElementById("adminBlogsNextBtn")
 	const galleryForm = document.getElementById("adminGalleryForm")
 	const galleryList = document.getElementById("adminGalleryList")
 	const reviewsList = document.getElementById("adminReviewsList")
@@ -1736,6 +2078,55 @@ function initializeAdminPanel() {
 			}
 			if (action === "delete") {
 				deleteGalleryItem(id)
+			}
+		})
+	}
+
+	if (blogsForm) {
+		blogsForm.setAttribute("action", "javascript:void(0)")
+		blogsForm.addEventListener("submit", (event) => {
+			event.preventDefault()
+			event.stopPropagation()
+			void saveBlogItem(event)
+		})
+	}
+
+	if (blogsCancelEditBtn) {
+		blogsCancelEditBtn.addEventListener("click", resetAdminBlogsForm)
+	}
+
+	if (blogsPrevBtn) {
+		blogsPrevBtn.addEventListener("click", () => {
+			scrollAdminBlogs("prev")
+		})
+	}
+
+	if (blogsNextBtn) {
+		blogsNextBtn.addEventListener("click", () => {
+			scrollAdminBlogs("next")
+		})
+	}
+
+	if (blogsList) {
+		blogsList.addEventListener("scroll", updateAdminBlogScrollButtons, {
+			passive: true,
+		})
+		window.addEventListener("resize", updateAdminBlogScrollButtons)
+
+		blogsList.addEventListener("click", (event) => {
+			const actionBtn = event.target.closest("button[data-blog-action]")
+			if (!actionBtn || !adminUnlocked || !auth?.currentUser) return
+
+			const action = actionBtn.dataset.blogAction
+			const id = actionBtn.dataset.id
+			if (!action || !id) return
+
+			if (action === "edit") {
+				loadBlogItemForEditing(id)
+				return
+			}
+			if (action === "delete") {
+				void deleteBlogItem(id)
 			}
 		})
 	}

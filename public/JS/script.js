@@ -260,6 +260,71 @@ const galleryFiltersState = {
 	styleType: "all",
 }
 
+const fallbackBlogsData = [
+	{
+		title: "How to Keep Knotless Braids Fresh for Weeks",
+		excerpt:
+			"Discover simple daily and nightly habits that keep your knotless braids neat, moisturized, and long-lasting.",
+		imageUrl: "IMG/knotless braids.jpg",
+		publishDate: "2026-04-16",
+		readTime: "5 min read",
+		readMoreUrl: "#blog",
+	},
+	{
+		title: "Scalp Care Tips for Protective Styles",
+		excerpt:
+			"Healthy braids start with a healthy scalp. Learn the products and routines our stylists recommend for itch-free comfort.",
+		imageUrl: "IMG/natural hair care.webp",
+		publishDate: "2026-03-28",
+		readTime: "6 min read",
+		readMoreUrl: "#blog",
+	},
+	{
+		title: "Top Bridal Braids for Nairobi Brides",
+		excerpt:
+			"From elegant up-dos to crown-inspired braid patterns, explore timeless bridal options for your big day.",
+		imageUrl: "IMG/goddess-braids.webp",
+		publishDate: "2026-03-08",
+		readTime: "4 min read",
+		readMoreUrl: "#blog",
+	},
+	{
+		title: "Before-and-After Transformations We Love",
+		excerpt:
+			"See how the right braid pattern, parting, and finish can transform your entire look while protecting natural hair.",
+		imageUrl: "IMG/box-braids-hairstyles-1x1-1.jpg",
+		publishDate: "2026-02-14",
+		readTime: "5 min read",
+		readMoreUrl: "#blog",
+	},
+	{
+		title: "Braids for Busy Professionals",
+		excerpt:
+			"Need a low-maintenance style that still looks polished? These braid options are ideal for packed work schedules.",
+		imageUrl: "IMG/Lemonade_Braids.webp",
+		publishDate: "2026-01-30",
+		readTime: "4 min read",
+		readMoreUrl: "#blog",
+	},
+	{
+		title: "Kids Braiding: Comfort-First Styling Guide",
+		excerpt:
+			"Our gentle approach to kids braiding keeps little ones comfortable while delivering neat and durable protective styles.",
+		imageUrl: "IMG/Kids-Small Single Braids after.jpg",
+		publishDate: "2026-01-12",
+		readTime: "5 min read",
+		readMoreUrl: "#blog",
+	},
+]
+
+const BLOG_CARD_IMAGE_FALLBACK = "IMG/Kids-Small Single Braids after.jpg"
+
+let blogsData = [...fallbackBlogsData]
+let blogsRealtimeUnsubscribe = null
+const DEFAULT_VISIBLE_BLOGS = 3
+let showAllBlogs = false
+let blogsToggleAnimationTimer = null
+
 const fallbackTestimonialsData = [
 	{
 		name: "Fatuma Ali",
@@ -2419,6 +2484,319 @@ function startGalleryRealtimeListener() {
 		)
 }
 
+function normalizeBlogItem(item = {}) {
+	return {
+		id: String(item.id || "").trim(),
+		title:
+			String(item.title || item.heading || "Untitled Blog").trim() ||
+			"Untitled Blog",
+		excerpt: String(item.excerpt || item.description || "").trim(),
+		imageUrl: String(item.imageUrl || item.image || "").trim(),
+		readMoreUrl:
+			String(item.readMoreUrl || item.url || "#blog").trim() || "#blog",
+		readTime: String(item.readTime || "5 min read").trim() || "5 min read",
+		publishDate: item.publishDate || item.date || "",
+		createdAt: item.createdAt || null,
+		updatedAt: item.updatedAt || null,
+	}
+}
+
+function formatBlogDate(value) {
+	if (!value) return "N/A"
+	const text = String(value).trim()
+	if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+		const [year, month, day] = text.split("-").map(Number)
+		const date = new Date(year, month - 1, day)
+		if (!Number.isNaN(date.getTime())) {
+			return date.toLocaleDateString(undefined, {
+				year: "numeric",
+				month: "short",
+				day: "numeric",
+			})
+		}
+	}
+
+	const ms = toTimestampMs(value)
+	if (!ms) return text
+	return new Date(ms).toLocaleDateString(undefined, {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	})
+}
+
+function getBlogSortTime(item = {}) {
+	return (
+		toTimestampMs(item.updatedAt) ||
+		toTimestampMs(item.createdAt) ||
+		toTimestampMs(item.publishDate)
+	)
+}
+
+function sortBlogsList(items = []) {
+	return [...items].sort((a, b) => {
+		const timeDiff = getBlogSortTime(b) - getBlogSortTime(a)
+		if (timeDiff !== 0) return timeDiff
+		return String(a.title || "").localeCompare(
+			String(b.title || ""),
+			undefined,
+			{
+				sensitivity: "base",
+			},
+		)
+	})
+}
+
+function updateBlogScrollButtons() {
+	const grid = document.getElementById("blogGrid")
+	const prevBtn = document.getElementById("blogPrevBtn")
+	const nextBtn = document.getElementById("blogNextBtn")
+	if (!grid || !prevBtn || !nextBtn) return
+
+	const hasMoreBlogsThanDefault =
+		Array.isArray(blogsData) && blogsData.length > DEFAULT_VISIBLE_BLOGS
+	if (!showAllBlogs && hasMoreBlogsThanDefault) {
+		prevBtn.disabled = true
+		nextBtn.disabled = false
+		return
+	}
+
+	const canScroll = grid.scrollWidth - grid.clientWidth > 8
+	if (!canScroll) {
+		prevBtn.disabled = true
+		nextBtn.disabled = true
+		return
+	}
+
+	prevBtn.disabled = grid.scrollLeft <= 2
+	nextBtn.disabled = grid.scrollLeft + grid.clientWidth >= grid.scrollWidth - 2
+}
+
+function scrollBlogCards(direction = "next") {
+	const grid = document.getElementById("blogGrid")
+	if (!grid) return
+
+	if (
+		!showAllBlogs &&
+		Array.isArray(blogsData) &&
+		blogsData.length > DEFAULT_VISIBLE_BLOGS
+	) {
+		showAllBlogs = true
+		renderBlogs(blogsData)
+		requestAnimationFrame(() => scrollBlogCards(direction))
+		return
+	}
+
+	const firstCard = grid.querySelector(".blog-card")
+	if (!firstCard) return
+
+	const style = getComputedStyle(grid)
+	const gap = Number.parseFloat(style.columnGap || style.gap || "24") || 24
+	const step =
+		Math.max(firstCard.offsetWidth, firstCard.getBoundingClientRect().width) +
+		gap
+	const delta = direction === "prev" ? -step : step
+	const maxLeft = Math.max(0, grid.scrollWidth - grid.clientWidth)
+	const targetLeft = Math.min(maxLeft, Math.max(0, grid.scrollLeft + delta))
+
+	if (typeof grid.scrollTo === "function") {
+		grid.scrollTo({ left: targetLeft, behavior: "smooth" })
+	} else {
+		grid.scrollLeft = targetLeft
+	}
+
+	window.setTimeout(updateBlogScrollButtons, 240)
+}
+
+function renderBlogs(list = blogsData) {
+	const grid = document.getElementById("blogGrid")
+	const viewAllBtn = document.getElementById("viewAllBlogsBtn")
+	const viewLessBtn = document.getElementById("viewLessBlogsBtn")
+	const toggleControls = document.getElementById("blogToggleControls")
+	const scrollControls = document.getElementById("blogScrollControls")
+	if (!grid) return
+
+	const sourceItems =
+		Array.isArray(list) && list.length
+			? list
+			: fallbackBlogsData.map((item, i) => ({
+					id: `fallback-blog-${i}`,
+					...item,
+				}))
+
+	const sortedList = sortBlogsList(sourceItems.map(normalizeBlogItem))
+	const shouldCollapse = sortedList.length > DEFAULT_VISIBLE_BLOGS
+	const visibleList =
+		shouldCollapse && !showAllBlogs
+			? sortedList.slice(0, DEFAULT_VISIBLE_BLOGS)
+			: sortedList
+
+	grid.innerHTML = visibleList
+		.map(
+			(blog) => `
+    <article class="blog-card">
+      <div class="blog-card-image">
+        <img
+          src="${escapeHtml(blog.imageUrl || BLOG_CARD_IMAGE_FALLBACK)}"
+          alt="${escapeHtml(blog.title)}"
+          loading="lazy"
+          onerror="if(!this.dataset.fallbackApplied){this.dataset.fallbackApplied='true';this.src='${escapeHtml(BLOG_CARD_IMAGE_FALLBACK)}';}"
+        />
+      </div>
+      <div class="blog-card-content">
+        <div class="blog-card-meta">
+          <span>${escapeHtml(formatBlogDate(blog.publishDate || blog.createdAt))}</span>
+          <span>${escapeHtml(blog.readTime || "5 min read")}</span>
+        </div>
+        <h3>${escapeHtml(blog.title)}</h3>
+        <p class="blog-card-excerpt">${escapeHtml(blog.excerpt)}</p>
+        <a href="${escapeHtml(blog.readMoreUrl || "#blog")}" class="read-more" target="_blank" rel="noopener">
+          Read More
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </a>
+      </div>
+    </article>
+  `,
+		)
+		.join("")
+
+	if (toggleControls && viewAllBtn && viewLessBtn) {
+		if (!shouldCollapse) {
+			toggleControls.classList.add("hidden")
+			viewAllBtn.classList.add("hidden")
+			viewLessBtn.classList.add("hidden")
+		} else {
+			toggleControls.classList.remove("hidden")
+			if (showAllBlogs) {
+				viewAllBtn.classList.add("hidden")
+				viewLessBtn.classList.remove("hidden")
+			} else {
+				viewAllBtn.classList.remove("hidden")
+				viewLessBtn.classList.add("hidden")
+				grid.scrollTo({ left: 0, behavior: "auto" })
+			}
+		}
+	}
+
+	if (scrollControls) {
+		scrollControls.classList.toggle("hidden", visibleList.length < 2)
+	}
+
+	requestAnimationFrame(() => {
+		updateBlogScrollButtons()
+	})
+}
+
+function bindBlogScrollControls() {
+	const grid = document.getElementById("blogGrid")
+	const prevBtn = document.getElementById("blogPrevBtn")
+	const nextBtn = document.getElementById("blogNextBtn")
+
+	if (prevBtn) {
+		prevBtn.addEventListener("click", () => {
+			scrollBlogCards("prev")
+		})
+	}
+
+	if (nextBtn) {
+		nextBtn.addEventListener("click", () => {
+			scrollBlogCards("next")
+		})
+	}
+
+	if (grid) {
+		grid.addEventListener("scroll", updateBlogScrollButtons, { passive: true })
+		window.addEventListener("resize", updateBlogScrollButtons)
+	}
+}
+
+function bindBlogToggleControls() {
+	const viewAllBtn = document.getElementById("viewAllBlogsBtn")
+	const viewLessBtn = document.getElementById("viewLessBlogsBtn")
+
+	const animateBlogsToggle = (nextShowAll, scrollToTop = false) => {
+		if (showAllBlogs === nextShowAll) return
+
+		const grid = document.getElementById("blogGrid")
+
+		const commitSwitch = () => {
+			showAllBlogs = nextShowAll
+			renderBlogs(blogsData)
+			if (scrollToTop) {
+				document
+					.getElementById("blog")
+					?.scrollIntoView({ behavior: "smooth", block: "start" })
+			}
+		}
+
+		if (!grid) {
+			commitSwitch()
+			return
+		}
+
+		if (blogsToggleAnimationTimer) {
+			clearTimeout(blogsToggleAnimationTimer)
+			blogsToggleAnimationTimer = null
+		}
+
+		grid.classList.add("is-switching")
+		blogsToggleAnimationTimer = setTimeout(() => {
+			commitSwitch()
+			requestAnimationFrame(() => {
+				grid.classList.remove("is-switching")
+			})
+			blogsToggleAnimationTimer = null
+		}, 220)
+	}
+
+	if (viewAllBtn) {
+		viewAllBtn.addEventListener("click", () => {
+			animateBlogsToggle(true)
+		})
+	}
+
+	if (viewLessBtn) {
+		viewLessBtn.addEventListener("click", () => {
+			animateBlogsToggle(false, true)
+		})
+	}
+}
+
+function startBlogsRealtimeListener() {
+	if (!firebaseReady || !db) return
+
+	if (typeof blogsRealtimeUnsubscribe === "function") {
+		blogsRealtimeUnsubscribe()
+		blogsRealtimeUnsubscribe = null
+	}
+
+	blogsRealtimeUnsubscribe = db
+		.collection("blogs")
+		.limit(300)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) =>
+					normalizeBlogItem({ id: doc.id, ...doc.data() }),
+				)
+
+				blogsData = docs.length
+					? docs
+					: fallbackBlogsData.map((item, i) =>
+							normalizeBlogItem({ id: `fallback-blog-${i}`, ...item }),
+						)
+
+				renderBlogs(blogsData)
+			},
+			(error) => {
+				console.error("Blogs realtime listener failed:", error)
+				blogsData = fallbackBlogsData.map((item, i) =>
+					normalizeBlogItem({ id: `fallback-blog-${i}`, ...item }),
+				)
+				renderBlogs(blogsData)
+			},
+		)
+}
+
 function normalizeReviewItem(item = {}) {
 	const name =
 		String(item.name || "Anonymous Client").trim() || "Anonymous Client"
@@ -3629,6 +4007,12 @@ renderGalleryFilters()
 renderFeaturedStyles()
 renderGallery()
 wireGalleryInteractions()
+blogsData = fallbackBlogsData.map((item, i) =>
+	normalizeBlogItem({ id: `fallback-blog-${i}`, ...item }),
+)
+renderBlogs(blogsData)
+bindBlogScrollControls()
+bindBlogToggleControls()
 document
 	.getElementById("viewAllGallery")
 	?.addEventListener("click", toggleGalleryView)
@@ -3656,6 +4040,7 @@ initializeFirebaseServices().then(async () => {
 	}
 
 	startGalleryRealtimeListener()
+	startBlogsRealtimeListener()
 	startTestimonialsRealtimeListener()
 	attachAuthStateObserver()
 })

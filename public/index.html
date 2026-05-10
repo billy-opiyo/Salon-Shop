@@ -599,8 +599,8 @@
 							>
 								<h4>Save your booking and track updates?</h4>
 								<p>
-								Log in now so you can manage appointments, reviews, and
-									faster rebooking.
+									Log in now so you can manage appointments, reviews, and faster
+									rebooking.
 								</p>
 								<div class="post-booking-auth-actions">
 									<button
@@ -787,7 +787,10 @@
 					</button>
 				</div>
 
-				<div class="reviews-submit-wrap animate-on-scroll delay-2" id="reviewSubmitWrap">
+				<div
+					class="reviews-submit-wrap animate-on-scroll delay-2"
+					id="reviewSubmitWrap"
+				>
 					<form class="reviews-submit-form" id="reviewForm">
 						<input type="hidden" id="reviewEditId" value="" />
 						<h3>Share Your Experience</h3>
@@ -874,103 +877,34 @@
 						protective styles from our master braiders.
 					</p>
 				</div>
-				<div class="blog-grid animate-on-scroll delay-1">
-					<article class="blog-card">
-						<div class="blog-card-image">
-							<img
-								src="IMG/maintaining box braids.webp"
-								alt="Box Braids Care"
-							/>
-						</div>
-						<div class="blog-card-content">
-							<div class="blog-card-meta">
-								<span>April 15, 2026</span>
-								<span>5 min read</span>
-							</div>
-							<h3>How to Maintain Your Box Braids for 6+ Weeks</h3>
-							<p>
-								Learn the essential care tips to keep your box braids looking
-								fresh and protect your natural hair underneath.
-							</p>
-							<a
-								href="https://www.allure.com/story/how-to-touch-up-box-braids-at-home"
-								class="read-more"
-								target="_blank"
-								>Read More
-								<svg
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<line x1="5" y1="12" x2="19" y2="12"></line>
-									<polyline points="12 5 19 12 12 19"></polyline></svg
-							></a>
-						</div>
-					</article>
-					<article class="blog-card">
-						<div class="blog-card-image">
-							<img src="IMG/natural hair care.webp" alt="Natural Hair Care" />
-						</div>
-						<div class="blog-card-content">
-							<div class="blog-card-meta">
-								<span>April 10, 2026</span>
-								<span>7 min read</span>
-							</div>
-							<h3>Best Protective Styles for Natural Hair Growth</h3>
-							<p>
-								Discover which braiding styles promote healthy hair growth while
-								keeping your edges intact and beautiful.
-							</p>
-							<a
-								href="https://mielleorganics.com/blogs/texture-toolkit/10-protective-styles-for-hair-growth"
-								class="read-more"
-								target="_blank"
-								>Read More
-								<svg
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<line x1="5" y1="12" x2="19" y2="12"></line>
-									<polyline points="12 5 19 12 12 19"></polyline></svg
-							></a>
-						</div>
-					</article>
-					<article class="blog-card">
-						<div class="blog-card-image">
-							<img src="IMG/braiding trends.jpg" alt="Braiding Trends" />
-						</div>
-						<div class="blog-card-content">
-							<div class="blog-card-meta">
-								<span>April 5, 2026</span>
-								<span>4 min read</span>
-							</div>
-							<h3>2026's Hottest Braiding Trends in Nairobi</h3>
-							<p>
-								From knotless braids to Fulani braids, explore the trending
-								styles that are taking over the city this year.
-							</p>
-							<a
-								href="https://www.pinterest.com/mercyyaa41/2026-braids/"
-								class="read-more"
-								target="_blank"
-								>Read More
-								<svg
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-								>
-									<line x1="5" y1="12" x2="19" y2="12"></line>
-									<polyline points="12 5 19 12 12 19"></polyline></svg
-							></a>
-						</div>
-					</article>
+				<div
+					class="blog-scroll-controls animate-on-scroll delay-1"
+					id="blogScrollControls"
+				>
+					<button type="button" class="btn btn-outline" id="blogPrevBtn">
+						<i class="fa-solid fa-arrow-left"></i> Prev
+					</button>
+					<button type="button" class="btn btn-outline" id="blogNextBtn">
+						Next <i class="fa-solid fa-arrow-right"></i>
+					</button>
+				</div>
+				<div class="blog-grid animate-on-scroll delay-1" id="blogGrid">
+					<!-- Blogs rendered from JS -->
+				</div>
+				<div
+					class="reviews-toggle-controls animate-on-scroll delay-1"
+					id="blogToggleControls"
+				>
+					<button type="button" class="btn btn-outline" id="viewAllBlogsBtn">
+						View More Blogs
+					</button>
+					<button
+						type="button"
+						class="btn btn-outline hidden"
+						id="viewLessBlogsBtn"
+					>
+						View Less Blogs
+					</button>
 				</div>
 			</div>
 		</section>

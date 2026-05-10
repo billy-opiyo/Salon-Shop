@@ -145,6 +145,15 @@
 						<button
 							type="button"
 							class="admin-section-tab"
+							data-admin-section-tab="blogs"
+							role="tab"
+							aria-selected="false"
+						>
+							Blogs
+						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
 							data-admin-section-tab="reviews"
 							role="tab"
 							aria-selected="false"
@@ -196,6 +205,123 @@
 							style="display: none"
 						></div>
 						<div class="admin-bookings-list" id="adminBookingsList"></div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="blogs"
+						role="tabpanel"
+					>
+						<div class="admin-gallery-wrap admin-blogs-wrap">
+							<div
+								class="form-message"
+								id="adminBlogsMessage"
+								style="display: none"
+							></div>
+
+							<form class="admin-gallery-form admin-blogs-form" id="adminBlogsForm">
+								<input type="hidden" id="blogEditId" />
+								<div class="admin-gallery-form-head">
+									<h3 id="adminBlogsFormTitle">Add New Blog</h3>
+									<button
+										type="button"
+										class="btn btn-outline"
+										id="adminBlogsCancelEdit"
+										style="display: none"
+									>
+										Cancel Edit
+									</button>
+								</div>
+								<div class="admin-gallery-grid">
+									<div class="form-group full">
+										<label for="blogTitle">Blog Title *</label>
+										<input
+											type="text"
+											id="blogTitle"
+											placeholder="e.g. How to keep knotless braids fresh"
+											required
+										/>
+									</div>
+									<div class="form-group full">
+										<label for="blogExcerpt">Short Description *</label>
+										<textarea
+											id="blogExcerpt"
+											rows="4"
+											placeholder="Summarize the blog in 1-2 sentences..."
+											required
+										></textarea>
+									</div>
+									<div class="form-group">
+										<label for="blogReadTime">Read Time *</label>
+										<input
+											type="text"
+											id="blogReadTime"
+											placeholder="e.g. 5 min read"
+											required
+										/>
+									</div>
+									<div class="form-group">
+										<label for="blogDate">Publish Date *</label>
+										<input type="date" id="blogDate" required />
+									</div>
+									<div class="form-group full">
+										<label for="blogReadMoreUrl">Read More URL *</label>
+										<input
+											type="url"
+											id="blogReadMoreUrl"
+											placeholder="https://..."
+											required
+										/>
+									</div>
+									<div class="form-group full">
+										<label for="blogImage">Blog Image *</label>
+										<input type="file" id="blogImage" accept="image/*" />
+										<small class="admin-field-help"
+											>Image is required for new blog posts and optional while
+											editing.</small
+										>
+									</div>
+								</div>
+								<button
+									type="submit"
+									class="btn btn-primary"
+									id="adminBlogsSaveBtn"
+								>
+									Save Blog
+								</button>
+							</form>
+
+							<div class="admin-gallery-list-wrap">
+								<div class="admin-gallery-list-head">
+									<h3>Existing Blogs</h3>
+									<a
+										class="btn btn-outline"
+										href="index.html#blog"
+										target="_blank"
+										rel="noopener"
+									>
+										Open Live Blog
+									</a>
+								</div>
+								<div class="admin-blog-scroll-controls" id="adminBlogScrollControls">
+									<button
+										type="button"
+										class="admin-action-btn"
+										id="adminBlogsPrevBtn"
+									>
+										<i class="fa-solid fa-arrow-left"></i> Prev
+									</button>
+									<button
+										type="button"
+										class="admin-action-btn"
+										id="adminBlogsNextBtn"
+									>
+										Next <i class="fa-solid fa-arrow-right"></i>
+									</button>
+								</div>
+								<div class="admin-blogs-list" id="adminBlogsList"></div>
+							</div>
+						</div>
 					</section>
 
 					<section
