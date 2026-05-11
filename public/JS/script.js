@@ -794,6 +794,12 @@ function setGoogleAuthButtonsBusy(isBusy) {
 	}
 }
 
+function setAuthSwitchingState(isSwitching) {
+	const active = isSwitching === true
+	authUi.openBtn?.classList.toggle("is-auth-switching", active)
+	authUi.profileTrigger?.classList.toggle("is-auth-switching", active)
+}
+
 function shouldPreferRedirectGoogleAuth() {
 	const ua = navigator.userAgent || ""
 	const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
@@ -809,14 +815,20 @@ async function finalizeGoogleSignInResult(user, context = {}) {
 		throw new Error("Google sign-in did not complete. Please try again.")
 	}
 
-	await upsertUserProfile(user, { provider: "google.com" })
-	await loadUserDashboardData(user)
-	if (context.source === "redirect" && authUi.message) {
-		showTimedAuthMessage("success", "✅ Signed in with Google successfully.")
-	}
+	setDashboardSignedInState(user)
 	closeAuthModal()
 	const loggedInName = getUserDisplayName(user)
 	showFavoritesToast(`You're now Logged In as ${loggedInName}`)
+	focusDashboardAfterAuthIfRequested()
+
+	await Promise.allSettled([
+		upsertUserProfile(user, { provider: "google.com" }),
+		loadUserDashboardData(user),
+	])
+
+	if (context.source === "redirect" && authUi.message) {
+		showTimedAuthMessage("success", "✅ Signed in with Google successfully.")
+	}
 }
 
 async function handleGoogleRedirectResultOnLoad(showNoResult = false) {
@@ -868,6 +880,7 @@ async function initializeFirebaseServices() {
 	}
 
 	auth = firebase.auth()
+	attachAuthStateObserver()
 	try {
 		await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
 	} catch (persistenceError) {
@@ -876,6 +889,15 @@ async function initializeFirebaseServices() {
 	db = firebase.firestore()
 
 	firebaseReady = true
+
+	const persistedUser = auth.currentUser
+	if (persistedUser && !persistedUser.isAnonymous) {
+		setDashboardSignedInState(persistedUser)
+		await Promise.allSettled([
+			upsertUserProfile(persistedUser),
+			loadUserDashboardData(persistedUser),
+		])
+	}
 }
 
 function initAuthUiRefs() {
@@ -962,14 +984,22 @@ function initAuthUiRefs() {
 		"deleteAccountConfirmMessage",
 	)
 	authUi.manageAccountModal = document.getElementById("manageAccountModal")
-	authUi.manageAccountBackdrop = document.getElementById("manageAccountBackdrop")
-	authUi.manageAccountCloseBtn = document.getElementById("manageAccountCloseBtn")
+	authUi.manageAccountBackdrop = document.getElementById(
+		"manageAccountBackdrop",
+	)
+	authUi.manageAccountCloseBtn = document.getElementById(
+		"manageAccountCloseBtn",
+	)
 	authUi.manageAccountMessage = document.getElementById("manageAccountMessage")
 	authUi.manageAccountName = document.getElementById("manageAccountName")
 	authUi.manageAccountEmail = document.getElementById("manageAccountEmail")
-	authUi.manageAccountEmailHint = document.getElementById("manageAccountEmailHint")
+	authUi.manageAccountEmailHint = document.getElementById(
+		"manageAccountEmailHint",
+	)
 	authUi.manageAccountPhone = document.getElementById("manageAccountPhone")
-	authUi.manageAccountPhoneHint = document.getElementById("manageAccountPhoneHint")
+	authUi.manageAccountPhoneHint = document.getElementById(
+		"manageAccountPhoneHint",
+	)
 	authUi.manageAccountAvatarInput = document.getElementById(
 		"manageAccountAvatarInput",
 	)
@@ -1022,14 +1052,18 @@ function initAuthUiRefs() {
 	authUi.manageAccountNotifEmail = document.getElementById(
 		"manageAccountNotifEmail",
 	)
-	authUi.manageAccountNotifSms = document.getElementById("manageAccountNotifSms")
+	authUi.manageAccountNotifSms = document.getElementById(
+		"manageAccountNotifSms",
+	)
 	authUi.manageAccountNotifPush = document.getElementById(
 		"manageAccountNotifPush",
 	)
 	authUi.manageAccountSavePreferencesBtn = document.getElementById(
 		"manageAccountSavePreferencesBtn",
 	)
-	authUi.manageAccountDeleteBtn = document.getElementById("manageAccountDeleteBtn")
+	authUi.manageAccountDeleteBtn = document.getElementById(
+		"manageAccountDeleteBtn",
+	)
 }
 
 function getStoredNotificationPrefs() {
@@ -1131,10 +1165,12 @@ function updateManageHintState(field, hintEl, isValid, validText, invalidText) {
 function updateManagePasswordStrengthUI(password = "") {
 	const { rules, score } = evaluatePasswordRules(password)
 	if (authUi.managePasswordChecks) {
-		authUi.managePasswordChecks.querySelectorAll("li[data-rule]").forEach((item) => {
-			const key = item.dataset.rule
-			item.classList.toggle("met", Boolean(rules[key]))
-		})
+		authUi.managePasswordChecks
+			.querySelectorAll("li[data-rule]")
+			.forEach((item) => {
+				const key = item.dataset.rule
+				item.classList.toggle("met", Boolean(rules[key]))
+			})
 	}
 
 	const pct = Math.min(100, Math.max(0, score * 25))
@@ -1146,7 +1182,11 @@ function updateManagePasswordStrengthUI(password = "") {
 			"strength-strong",
 		)
 		authUi.managePasswordStrengthFill.classList.add(
-			score <= 1 ? "strength-weak" : score <= 3 ? "strength-medium" : "strength-strong",
+			score <= 1
+				? "strength-weak"
+				: score <= 3
+					? "strength-medium"
+					: "strength-strong",
 		)
 	}
 	if (authUi.managePasswordStrengthText) {
@@ -1160,7 +1200,8 @@ function updateManagePasswordStrengthUI(password = "") {
 }
 
 function setManageAvatarPreview(user) {
-	if (!authUi.manageAccountAvatarPreview || !authUi.manageAccountAvatarInitial) return
+	if (!authUi.manageAccountAvatarPreview || !authUi.manageAccountAvatarInitial)
+		return
 	const existingImg = authUi.manageAccountAvatarPreview.querySelector("img")
 	if (existingImg) existingImg.remove()
 	const initial = (getUserDisplayName(user).charAt(0) || "R").toUpperCase()
@@ -1179,7 +1220,8 @@ function setManageAvatarPreview(user) {
 function loadManageAccountForm(user) {
 	if (!user) return
 	if (authUi.manageAccountName)
-		authUi.manageAccountName.value = user.displayName || getUserDisplayName(user)
+		authUi.manageAccountName.value =
+			user.displayName || getUserDisplayName(user)
 	if (authUi.manageAccountEmail)
 		authUi.manageAccountEmail.value = user.email || ""
 	if (authUi.manageAccountPhone) {
@@ -1205,9 +1247,12 @@ function loadManageAccountForm(user) {
 		authUi.manageAccountReducedMotion.checked = access.reducedMotion
 
 	const notif = getStoredNotificationPrefs()
-	if (authUi.manageAccountNotifEmail) authUi.manageAccountNotifEmail.checked = notif.email
-	if (authUi.manageAccountNotifSms) authUi.manageAccountNotifSms.checked = notif.sms
-	if (authUi.manageAccountNotifPush) authUi.manageAccountNotifPush.checked = notif.push
+	if (authUi.manageAccountNotifEmail)
+		authUi.manageAccountNotifEmail.checked = notif.email
+	if (authUi.manageAccountNotifSms)
+		authUi.manageAccountNotifSms.checked = notif.sms
+	if (authUi.manageAccountNotifPush)
+		authUi.manageAccountNotifPush.checked = notif.push
 
 	if (authUi.manageAccountEmail && authUi.manageAccountEmailHint) {
 		updateManageHintState(
@@ -1284,7 +1329,8 @@ async function handleManageAccountSaveProfile() {
 
 	try {
 		const profileUpdate = {}
-		if (name && name !== (user.displayName || "")) profileUpdate.displayName = name
+		if (name && name !== (user.displayName || ""))
+			profileUpdate.displayName = name
 		if (avatarFile) {
 			if (avatarFile.size > 5 * 1024 * 1024) {
 				throw new Error("Profile picture must be 5MB or less.")
@@ -1387,7 +1433,8 @@ async function handleManageAccountChangePassword() {
 
 async function handleManageAccountResetPassword() {
 	if (!firebaseReady || !auth) return
-	const email = authUi.manageAccountEmail?.value?.trim() || auth.currentUser?.email || ""
+	const email =
+		authUi.manageAccountEmail?.value?.trim() || auth.currentUser?.email || ""
 	if (!email) {
 		showTimedFormMessage(
 			authUi.manageAccountMessage,
@@ -1421,7 +1468,8 @@ async function handleManageAccountResetPassword() {
 }
 
 function handleManageAccountSavePreferences() {
-	const theme = authUi.manageAccountThemeSelect?.value === "light" ? "light" : "dark"
+	const theme =
+		authUi.manageAccountThemeSelect?.value === "light" ? "light" : "dark"
 	isDark = theme === "dark"
 	localStorage.setItem("theme", isDark ? "dark" : "light")
 	applyTheme()
@@ -1694,6 +1742,27 @@ function getUserDisplayName(user) {
 	return "Royal Braids Client"
 }
 
+function setHeaderProfileAvatar(user) {
+	if (!authUi.profileTrigger || !authUi.profileInitial) return
+
+	const existingImg = authUi.profileTrigger.querySelector("img")
+	if (existingImg) existingImg.remove()
+
+	const displayName = getUserDisplayName(user)
+	authUi.profileInitial.textContent = (displayName.charAt(0) || "R").toUpperCase()
+
+	if (user?.photoURL) {
+		const img = document.createElement("img")
+		img.src = user.photoURL
+		img.alt = `${displayName} profile photo`
+		img.loading = "lazy"
+		authUi.profileTrigger.appendChild(img)
+		authUi.profileInitial.style.display = "none"
+	} else {
+		authUi.profileInitial.style.display = "inline-flex"
+	}
+}
+
 function setDashboardPromptState() {
 	stopDashboardFavoritesListener()
 	dashboardFavoriteStyles = []
@@ -1702,6 +1771,7 @@ function setDashboardPromptState() {
 	if (authUi.navDashboardLink) authUi.navDashboardLink.classList.add("hidden")
 	if (authUi.openBtn) authUi.openBtn.classList.remove("hidden")
 	if (authUi.profileMenu) authUi.profileMenu.classList.add("hidden")
+	setHeaderProfileAvatar(null)
 	if (authUi.dashboardProfileName)
 		authUi.dashboardProfileName.textContent = "Guest User"
 	if (authUi.dashboardProfileEmail)
@@ -1745,6 +1815,7 @@ function setDashboardSignedInState(user) {
 
 	if (authUi.profileName) authUi.profileName.textContent = displayName
 	if (authUi.profileInitial) authUi.profileInitial.textContent = initial
+	setHeaderProfileAvatar(user)
 	if (authUi.dashboardProfileName)
 		authUi.dashboardProfileName.textContent = displayName
 	if (authUi.dashboardProfileEmail)
@@ -2148,6 +2219,7 @@ async function handleGoogleAuth() {
 
 	googleAuthInProgress = true
 	setGoogleAuthButtonsBusy(true)
+	setAuthSwitchingState(true)
 
 	try {
 		const provider = new firebase.auth.GoogleAuthProvider()
@@ -2233,6 +2305,7 @@ async function handleGoogleAuth() {
 	} finally {
 		googleAuthInProgress = false
 		setGoogleAuthButtonsBusy(false)
+		setAuthSwitchingState(false)
 	}
 }
 
@@ -2264,6 +2337,7 @@ async function handleEmailAuthSubmit(event) {
 		authUi.submitBtn.textContent =
 			authMode === "signup" ? "Creating Account..." : "Signing In..."
 	}
+	setAuthSwitchingState(true)
 
 	try {
 		const currentUser = auth.currentUser
@@ -2271,33 +2345,47 @@ async function handleEmailAuthSubmit(event) {
 			email,
 			password,
 		)
+		let signedInUser = null
 
 		if (authMode === "signup") {
 			if (currentUser?.isAnonymous) {
-				await currentUser.linkWithCredential(credential)
+				const linked = await currentUser.linkWithCredential(credential)
+				signedInUser = linked?.user || currentUser
 			} else {
-				await auth.createUserWithEmailAndPassword(email, password)
+				const created = await auth.createUserWithEmailAndPassword(email, password)
+				signedInUser = created?.user || auth.currentUser
 			}
 
-			if (name && auth.currentUser) {
-				await auth.currentUser.updateProfile({ displayName: name })
+			if (name && signedInUser) {
+				await signedInUser.updateProfile({ displayName: name })
+				signedInUser = {
+					...signedInUser,
+					displayName: name,
+				}
 			}
 		} else {
-			await auth.signInWithEmailAndPassword(email, password)
+			const signedIn = await auth.signInWithEmailAndPassword(email, password)
+			signedInUser = signedIn?.user || auth.currentUser
 		}
 
-		await upsertUserProfile(auth.currentUser, {
+		signedInUser = signedInUser || auth.currentUser
+		if (signedInUser && !signedInUser.isAnonymous) {
+			setDashboardSignedInState(signedInUser)
+			closeAuthModal()
+			const loggedInName = getUserDisplayName(signedInUser)
+			showFavoritesToast(`You're now Logged In as ${loggedInName}`)
+			focusDashboardAfterAuthIfRequested()
+		}
+
+		await upsertUserProfile(signedInUser, {
 			displayName: name,
 			provider: "password",
 		})
-		if (auth.currentUser?.uid) {
-			await loadUserDashboardData(auth.currentUser)
+		if (signedInUser?.uid) {
+			await loadUserDashboardData(signedInUser)
 		}
 
 		if (authUi.emailForm) authUi.emailForm.reset()
-		closeAuthModal()
-		const loggedInName = getUserDisplayName(auth.currentUser)
-		showFavoritesToast(`You're now Logged In as ${loggedInName}`)
 	} catch (error) {
 		console.error("Email auth failed:", error)
 		const code = error?.code || ""
@@ -2370,6 +2458,7 @@ async function handleEmailAuthSubmit(event) {
 			showTimedAuthMessage("error", `❌ ${getFriendlyAuthError(error)}`)
 		}
 	} finally {
+		setAuthSwitchingState(false)
 		if (authUi.submitBtn) {
 			authUi.submitBtn.disabled = false
 			authUi.submitBtn.textContent =
@@ -2599,10 +2688,16 @@ function bindAuthUiEvents() {
 		})
 	}
 	if (authUi.manageAccountBackdrop) {
-		authUi.manageAccountBackdrop.addEventListener("click", closeManageAccountModal)
+		authUi.manageAccountBackdrop.addEventListener(
+			"click",
+			closeManageAccountModal,
+		)
 	}
 	if (authUi.manageAccountCloseBtn) {
-		authUi.manageAccountCloseBtn.addEventListener("click", closeManageAccountModal)
+		authUi.manageAccountCloseBtn.addEventListener(
+			"click",
+			closeManageAccountModal,
+		)
 	}
 	if (authUi.manageAccountSaveProfileBtn) {
 		authUi.manageAccountSaveProfileBtn.addEventListener("click", () => {
@@ -2635,18 +2730,18 @@ function bindAuthUiEvents() {
 		authUi.manageAccountNewPassword.addEventListener("input", () => {
 			updateManagePasswordStrengthUI(authUi.manageAccountNewPassword.value)
 		})
-	setManagePasswordVisibility(
-		authUi.manageAccountCurrentPassword,
-		authUi.manageAccountCurrentPasswordToggle,
-		false,
-		"current password",
-	)
-	setManagePasswordVisibility(
-		authUi.manageAccountNewPassword,
-		authUi.manageAccountNewPasswordToggle,
-		false,
-		"new password",
-	)
+		setManagePasswordVisibility(
+			authUi.manageAccountCurrentPassword,
+			authUi.manageAccountCurrentPasswordToggle,
+			false,
+			"current password",
+		)
+		setManagePasswordVisibility(
+			authUi.manageAccountNewPassword,
+			authUi.manageAccountNewPasswordToggle,
+			false,
+			"new password",
+		)
 	}
 	if (authUi.manageAccountAvatarInput) {
 		authUi.manageAccountAvatarInput.addEventListener("change", () => {
@@ -2665,7 +2760,8 @@ function bindAuthUiEvents() {
 
 			const reader = new FileReader()
 			reader.onload = () => {
-				const existingImg = authUi.manageAccountAvatarPreview.querySelector("img")
+				const existingImg =
+					authUi.manageAccountAvatarPreview.querySelector("img")
 				if (existingImg) existingImg.remove()
 				const previewImg = document.createElement("img")
 				previewImg.src = String(reader.result || "")
@@ -2696,7 +2792,10 @@ function bindAuthUiEvents() {
 			)
 		})
 	}
-	if (authUi.manageAccountNewPasswordToggle && authUi.manageAccountNewPassword) {
+	if (
+		authUi.manageAccountNewPasswordToggle &&
+		authUi.manageAccountNewPassword
+	) {
 		authUi.manageAccountNewPasswordToggle.addEventListener("click", () => {
 			setManagePasswordVisibility(
 				authUi.manageAccountNewPassword,
@@ -4926,5 +5025,4 @@ initializeFirebaseServices().then(async () => {
 	startGalleryRealtimeListener()
 	startBlogsRealtimeListener()
 	startTestimonialsRealtimeListener()
-	attachAuthStateObserver()
 })
