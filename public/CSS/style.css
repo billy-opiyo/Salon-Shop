@@ -97,6 +97,46 @@ button {
     font-family: inherit;
 }
 
+a,
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"] {
+    touch-action: manipulation;
+}
+
+@media (hover: none) and (pointer: coarse) {
+
+    a,
+    button,
+    [role="button"],
+    .btn,
+    .book-btn,
+    .auth-btn,
+    .services-tab,
+    .gallery-filter-chip,
+    .admin-action-btn,
+    .social-link,
+    .nav a {
+        transition: transform 0.12s ease, opacity 0.12s ease;
+    }
+
+    a:active,
+    button:active,
+    [role="button"]:active,
+    .btn:active,
+    .book-btn:active,
+    .auth-btn:active,
+    .services-tab:active,
+    .gallery-filter-chip:active,
+    .admin-action-btn:active,
+    .social-link:active,
+    .nav a:active {
+        transform: scale(0.995);
+        opacity: 0.94;
+    }
+}
+
 input,
 select,
 textarea {
