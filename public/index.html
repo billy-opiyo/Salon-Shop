@@ -697,13 +697,6 @@
 								>
 									Log In to Sync Data
 								</button>
-								<button
-									type="button"
-									class="btn btn-outline dashboard-delete-btn"
-									id="dashboardDeleteAccountBtn"
-								>
-									Delete Account
-								</button>
 							</div>
 						</div>
 					</div>
@@ -1396,6 +1389,164 @@
 					</button>
 				</div>
 				<div class="form-message" id="authMessage"></div>
+			</div>
+		</div>
+
+		<!-- ========== MANAGE ACCOUNT MODAL ========== -->
+		<div class="auth-modal manage-account-modal" id="manageAccountModal" aria-hidden="true">
+			<div class="auth-modal-backdrop" id="manageAccountBackdrop"></div>
+			<div
+				class="auth-card manage-account-card"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="manageAccountTitle"
+			>
+				<button
+					type="button"
+					class="auth-close"
+					id="manageAccountCloseBtn"
+					aria-label="Close manage account"
+				>
+					✕
+				</button>
+
+				<div class="auth-card-head">
+					<p class="section-subtitle">My Dashboard</p>
+					<h3 id="manageAccountTitle">Manage Account</h3>
+				</div>
+
+				<div class="form-message" id="manageAccountMessage"></div>
+
+				<div class="manage-account-body">
+					<section class="manage-account-section">
+						<h4>Profile Info (Personalization)</h4>
+						<div class="manage-account-avatar-row">
+							<div class="manage-account-avatar-preview" id="manageAccountAvatarPreview">
+								<span id="manageAccountAvatarInitial">R</span>
+							</div>
+							<div class="manage-account-avatar-actions">
+								<label class="btn btn-outline manage-account-upload-btn" for="manageAccountAvatarInput">
+									Add / Change Picture
+								</label>
+								<input type="file" id="manageAccountAvatarInput" accept="image/*" />
+								<small>JPG/PNG up to 5MB</small>
+							</div>
+						</div>
+						<div class="form-grid">
+							<div class="form-group">
+								<label for="manageAccountName">Name</label>
+								<input type="text" id="manageAccountName" placeholder="Your full name" />
+							</div>
+							<div class="form-group">
+								<label for="manageAccountEmail">Email</label>
+								<input type="email" id="manageAccountEmail" placeholder="you@email.com" />
+								<small class="manage-account-input-hint" id="manageAccountEmailHint">Use a valid email format (e.g. name@example.com).</small>
+							</div>
+							<div class="form-group full">
+								<label for="manageAccountPhone">Phone Number</label>
+								<input type="tel" id="manageAccountPhone" placeholder="+254 700 123 456" />
+								<small class="manage-account-input-hint" id="manageAccountPhoneHint">Use digits with optional +, spaces, or dashes.</small>
+							</div>
+						</div>
+						<button type="button" class="btn btn-primary" id="manageAccountSaveProfileBtn">
+							Save Profile
+						</button>
+					</section>
+
+					<section class="manage-account-section">
+						<h4>Login &amp; Security (Protection)</h4>
+						<div class="form-grid">
+							<div class="form-group">
+								<label for="manageAccountCurrentPassword">Current Password</label>
+								<div class="auth-password-input-wrap">
+									<input type="password" id="manageAccountCurrentPassword" autocomplete="current-password" placeholder="••••••••" />
+									<button
+										type="button"
+										class="auth-password-toggle"
+										id="manageAccountCurrentPasswordToggle"
+										aria-label="Show current password"
+										aria-pressed="false"
+									>
+										<i class="fa-solid fa-eye" aria-hidden="true"></i>
+									</button>
+								</div>
+							</div>
+							<div class="form-group">
+								<label for="manageAccountNewPassword">New Password</label>
+								<div class="auth-password-input-wrap">
+									<input type="password" id="manageAccountNewPassword" autocomplete="new-password" placeholder="At least 6 characters" />
+									<button
+										type="button"
+										class="auth-password-toggle"
+										id="manageAccountNewPasswordToggle"
+										aria-label="Show new password"
+										aria-pressed="false"
+									>
+										<i class="fa-solid fa-eye" aria-hidden="true"></i>
+									</button>
+								</div>
+								<div class="manage-password-strength" aria-live="polite">
+									<div class="manage-password-strength-bar"><span id="managePasswordStrengthFill"></span></div>
+									<small id="managePasswordStrengthText">Strength: Too weak</small>
+								</div>
+								<ul class="manage-password-checks" id="managePasswordChecks">
+									<li data-rule="length">At least 8 characters</li>
+									<li data-rule="upper">At least 1 uppercase letter</li>
+									<li data-rule="lower">At least 1 lowercase letter</li>
+									<li data-rule="number">At least 1 number</li>
+								</ul>
+							</div>
+						</div>
+						<div class="manage-account-inline-actions">
+							<button type="button" class="btn btn-primary" id="manageAccountChangePasswordBtn">Change Password</button>
+							<button type="button" class="btn btn-outline" id="manageAccountResetPasswordBtn">Send Reset Email</button>
+						</div>
+					</section>
+
+					<section class="manage-account-section">
+						<h4>Account Settings &amp; Customization</h4>
+						<div class="manage-account-subsection">
+							<h5>Appearance</h5>
+							<div class="form-grid">
+								<div class="form-group">
+									<label for="manageAccountThemeSelect">Theme</label>
+									<select id="manageAccountThemeSelect">
+										<option value="dark">Dark</option>
+										<option value="light">Light</option>
+									</select>
+								</div>
+								<div class="form-group">
+									<label for="manageAccountFontSizeSelect">Font Size</label>
+									<select id="manageAccountFontSizeSelect">
+										<option value="normal">Default</option>
+										<option value="large">Large</option>
+										<option value="xlarge">Extra Large</option>
+									</select>
+								</div>
+							</div>
+							<div class="manage-account-checks">
+								<label><input type="checkbox" id="manageAccountHighContrast" /> High Contrast</label>
+								<label><input type="checkbox" id="manageAccountReducedMotion" /> Reduced Motion</label>
+							</div>
+						</div>
+
+						<div class="manage-account-subsection">
+							<h5>Notifications</h5>
+							<div class="manage-account-checks">
+								<label><input type="checkbox" id="manageAccountNotifEmail" /> Email Notifications</label>
+								<label><input type="checkbox" id="manageAccountNotifSms" /> SMS Notifications</label>
+								<label><input type="checkbox" id="manageAccountNotifPush" /> Push Notifications</label>
+							</div>
+							<button type="button" class="btn btn-primary" id="manageAccountSavePreferencesBtn">Save Preferences</button>
+						</div>
+
+						<div class="manage-account-subsection manage-account-danger-zone">
+							<h5>Account Deletion</h5>
+							<p>This action is permanent and cannot be undone.</p>
+							<button type="button" class="btn btn-outline dashboard-delete-btn" id="manageAccountDeleteBtn">Delete Account</button>
+						</div>
+					</section>
+				</div>
 			</div>
 		</div>
 

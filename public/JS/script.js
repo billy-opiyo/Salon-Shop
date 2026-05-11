@@ -395,6 +395,11 @@ const REVIEW_LOCAL_KEYS = {
 	reviewDrafts: "rb_review_drafts",
 }
 
+const MANAGE_ACCOUNT_LOCAL_KEYS = {
+	notifications: "rb_manage_notifications",
+	accessibility: "rb_manage_accessibility",
+}
+
 const DEFAULT_PROFANITY_WORDS = [
 	"fuck",
 	"shit",
@@ -690,6 +695,37 @@ const authUi = {
 	deleteAccountConfirmCancelBtn: null,
 	deleteAccountConfirmProceedBtn: null,
 	deleteAccountConfirmMessage: null,
+	manageAccountModal: null,
+	manageAccountBackdrop: null,
+	manageAccountCloseBtn: null,
+	manageAccountMessage: null,
+	manageAccountName: null,
+	manageAccountEmail: null,
+	manageAccountEmailHint: null,
+	manageAccountPhone: null,
+	manageAccountPhoneHint: null,
+	manageAccountAvatarInput: null,
+	manageAccountAvatarPreview: null,
+	manageAccountAvatarInitial: null,
+	manageAccountSaveProfileBtn: null,
+	manageAccountCurrentPassword: null,
+	manageAccountCurrentPasswordToggle: null,
+	manageAccountNewPassword: null,
+	manageAccountNewPasswordToggle: null,
+	managePasswordStrengthFill: null,
+	managePasswordStrengthText: null,
+	managePasswordChecks: null,
+	manageAccountChangePasswordBtn: null,
+	manageAccountResetPasswordBtn: null,
+	manageAccountThemeSelect: null,
+	manageAccountFontSizeSelect: null,
+	manageAccountHighContrast: null,
+	manageAccountReducedMotion: null,
+	manageAccountNotifEmail: null,
+	manageAccountNotifSms: null,
+	manageAccountNotifPush: null,
+	manageAccountSavePreferencesBtn: null,
+	manageAccountDeleteBtn: null,
 }
 
 function getFriendlyAuthError(error) {
@@ -925,6 +961,490 @@ function initAuthUiRefs() {
 	authUi.deleteAccountConfirmMessage = document.getElementById(
 		"deleteAccountConfirmMessage",
 	)
+	authUi.manageAccountModal = document.getElementById("manageAccountModal")
+	authUi.manageAccountBackdrop = document.getElementById("manageAccountBackdrop")
+	authUi.manageAccountCloseBtn = document.getElementById("manageAccountCloseBtn")
+	authUi.manageAccountMessage = document.getElementById("manageAccountMessage")
+	authUi.manageAccountName = document.getElementById("manageAccountName")
+	authUi.manageAccountEmail = document.getElementById("manageAccountEmail")
+	authUi.manageAccountEmailHint = document.getElementById("manageAccountEmailHint")
+	authUi.manageAccountPhone = document.getElementById("manageAccountPhone")
+	authUi.manageAccountPhoneHint = document.getElementById("manageAccountPhoneHint")
+	authUi.manageAccountAvatarInput = document.getElementById(
+		"manageAccountAvatarInput",
+	)
+	authUi.manageAccountAvatarPreview = document.getElementById(
+		"manageAccountAvatarPreview",
+	)
+	authUi.manageAccountAvatarInitial = document.getElementById(
+		"manageAccountAvatarInitial",
+	)
+	authUi.manageAccountSaveProfileBtn = document.getElementById(
+		"manageAccountSaveProfileBtn",
+	)
+	authUi.manageAccountCurrentPassword = document.getElementById(
+		"manageAccountCurrentPassword",
+	)
+	authUi.manageAccountCurrentPasswordToggle = document.getElementById(
+		"manageAccountCurrentPasswordToggle",
+	)
+	authUi.manageAccountNewPassword = document.getElementById(
+		"manageAccountNewPassword",
+	)
+	authUi.manageAccountNewPasswordToggle = document.getElementById(
+		"manageAccountNewPasswordToggle",
+	)
+	authUi.managePasswordStrengthFill = document.getElementById(
+		"managePasswordStrengthFill",
+	)
+	authUi.managePasswordStrengthText = document.getElementById(
+		"managePasswordStrengthText",
+	)
+	authUi.managePasswordChecks = document.getElementById("managePasswordChecks")
+	authUi.manageAccountChangePasswordBtn = document.getElementById(
+		"manageAccountChangePasswordBtn",
+	)
+	authUi.manageAccountResetPasswordBtn = document.getElementById(
+		"manageAccountResetPasswordBtn",
+	)
+	authUi.manageAccountThemeSelect = document.getElementById(
+		"manageAccountThemeSelect",
+	)
+	authUi.manageAccountFontSizeSelect = document.getElementById(
+		"manageAccountFontSizeSelect",
+	)
+	authUi.manageAccountHighContrast = document.getElementById(
+		"manageAccountHighContrast",
+	)
+	authUi.manageAccountReducedMotion = document.getElementById(
+		"manageAccountReducedMotion",
+	)
+	authUi.manageAccountNotifEmail = document.getElementById(
+		"manageAccountNotifEmail",
+	)
+	authUi.manageAccountNotifSms = document.getElementById("manageAccountNotifSms")
+	authUi.manageAccountNotifPush = document.getElementById(
+		"manageAccountNotifPush",
+	)
+	authUi.manageAccountSavePreferencesBtn = document.getElementById(
+		"manageAccountSavePreferencesBtn",
+	)
+	authUi.manageAccountDeleteBtn = document.getElementById("manageAccountDeleteBtn")
+}
+
+function getStoredNotificationPrefs() {
+	try {
+		const parsed = JSON.parse(
+			localStorage.getItem(MANAGE_ACCOUNT_LOCAL_KEYS.notifications) || "{}",
+		)
+		return {
+			email: parsed.email !== false,
+			sms: parsed.sms === true,
+			push: parsed.push !== false,
+		}
+	} catch (_error) {
+		return { email: true, sms: false, push: true }
+	}
+}
+
+function saveNotificationPrefs(prefs = {}) {
+	localStorage.setItem(
+		MANAGE_ACCOUNT_LOCAL_KEYS.notifications,
+		JSON.stringify({
+			email: prefs.email === true,
+			sms: prefs.sms === true,
+			push: prefs.push === true,
+		}),
+	)
+}
+
+function getStoredAccessibilityPrefs() {
+	try {
+		const parsed = JSON.parse(
+			localStorage.getItem(MANAGE_ACCOUNT_LOCAL_KEYS.accessibility) || "{}",
+		)
+		const fontSize = ["normal", "large", "xlarge"].includes(parsed.fontSize)
+			? parsed.fontSize
+			: "normal"
+		return {
+			highContrast: parsed.highContrast === true,
+			reducedMotion: parsed.reducedMotion === true,
+			fontSize,
+		}
+	} catch (_error) {
+		return { highContrast: false, reducedMotion: false, fontSize: "normal" }
+	}
+}
+
+function applyAccessibilityPrefs(prefs = {}) {
+	document.body.classList.toggle("high-contrast", prefs.highContrast === true)
+	document.body.classList.toggle("reduced-motion", prefs.reducedMotion === true)
+	document.body.classList.remove("font-large", "font-xlarge")
+	if (prefs.fontSize === "large") document.body.classList.add("font-large")
+	if (prefs.fontSize === "xlarge") document.body.classList.add("font-xlarge")
+}
+
+function saveAccessibilityPrefs(prefs = {}) {
+	localStorage.setItem(
+		MANAGE_ACCOUNT_LOCAL_KEYS.accessibility,
+		JSON.stringify({
+			highContrast: prefs.highContrast === true,
+			reducedMotion: prefs.reducedMotion === true,
+			fontSize: ["normal", "large", "xlarge"].includes(prefs.fontSize)
+				? prefs.fontSize
+				: "normal",
+		}),
+	)
+	applyAccessibilityPrefs(prefs)
+}
+
+function isValidEmailFormat(value = "") {
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim())
+}
+
+function isValidPhoneFormat(value = "") {
+	if (!value) return true
+	return /^\+?[0-9][0-9\s-]{6,18}$/.test(String(value).trim())
+}
+
+function evaluatePasswordRules(value = "") {
+	const password = String(value || "")
+	const rules = {
+		length: password.length >= 8,
+		upper: /[A-Z]/.test(password),
+		lower: /[a-z]/.test(password),
+		number: /\d/.test(password),
+	}
+	const score = Object.values(rules).filter(Boolean).length
+	return { rules, score }
+}
+
+function updateManageHintState(field, hintEl, isValid, validText, invalidText) {
+	if (!field || !hintEl) return
+	field.classList.toggle("manage-field-valid", Boolean(isValid))
+	field.classList.toggle("manage-field-invalid", !Boolean(isValid))
+	hintEl.classList.toggle("is-valid", Boolean(isValid))
+	hintEl.classList.toggle("is-invalid", !Boolean(isValid))
+	hintEl.textContent = isValid ? validText : invalidText
+}
+
+function updateManagePasswordStrengthUI(password = "") {
+	const { rules, score } = evaluatePasswordRules(password)
+	if (authUi.managePasswordChecks) {
+		authUi.managePasswordChecks.querySelectorAll("li[data-rule]").forEach((item) => {
+			const key = item.dataset.rule
+			item.classList.toggle("met", Boolean(rules[key]))
+		})
+	}
+
+	const pct = Math.min(100, Math.max(0, score * 25))
+	if (authUi.managePasswordStrengthFill) {
+		authUi.managePasswordStrengthFill.style.width = `${pct}%`
+		authUi.managePasswordStrengthFill.classList.remove(
+			"strength-weak",
+			"strength-medium",
+			"strength-strong",
+		)
+		authUi.managePasswordStrengthFill.classList.add(
+			score <= 1 ? "strength-weak" : score <= 3 ? "strength-medium" : "strength-strong",
+		)
+	}
+	if (authUi.managePasswordStrengthText) {
+		authUi.managePasswordStrengthText.textContent =
+			score <= 1
+				? "Strength: Too weak"
+				: score <= 3
+					? "Strength: Medium"
+					: "Strength: Strong"
+	}
+}
+
+function setManageAvatarPreview(user) {
+	if (!authUi.manageAccountAvatarPreview || !authUi.manageAccountAvatarInitial) return
+	const existingImg = authUi.manageAccountAvatarPreview.querySelector("img")
+	if (existingImg) existingImg.remove()
+	const initial = (getUserDisplayName(user).charAt(0) || "R").toUpperCase()
+	authUi.manageAccountAvatarInitial.textContent = initial
+	if (user?.photoURL) {
+		const img = document.createElement("img")
+		img.src = user.photoURL
+		img.alt = "Profile"
+		authUi.manageAccountAvatarPreview.appendChild(img)
+		authUi.manageAccountAvatarInitial.style.display = "none"
+	} else {
+		authUi.manageAccountAvatarInitial.style.display = "inline-flex"
+	}
+}
+
+function loadManageAccountForm(user) {
+	if (!user) return
+	if (authUi.manageAccountName)
+		authUi.manageAccountName.value = user.displayName || getUserDisplayName(user)
+	if (authUi.manageAccountEmail)
+		authUi.manageAccountEmail.value = user.email || ""
+	if (authUi.manageAccountPhone) {
+		const dashboardPhoneText = String(
+			authUi.dashboardProfilePhone?.textContent || "",
+		).trim()
+		authUi.manageAccountPhone.value =
+			dashboardPhoneText === "Add phone during booking"
+				? ""
+				: dashboardPhoneText
+	}
+	setManageAvatarPreview(user)
+
+	if (authUi.manageAccountThemeSelect) {
+		authUi.manageAccountThemeSelect.value = isDark ? "dark" : "light"
+	}
+	const access = getStoredAccessibilityPrefs()
+	if (authUi.manageAccountFontSizeSelect)
+		authUi.manageAccountFontSizeSelect.value = access.fontSize
+	if (authUi.manageAccountHighContrast)
+		authUi.manageAccountHighContrast.checked = access.highContrast
+	if (authUi.manageAccountReducedMotion)
+		authUi.manageAccountReducedMotion.checked = access.reducedMotion
+
+	const notif = getStoredNotificationPrefs()
+	if (authUi.manageAccountNotifEmail) authUi.manageAccountNotifEmail.checked = notif.email
+	if (authUi.manageAccountNotifSms) authUi.manageAccountNotifSms.checked = notif.sms
+	if (authUi.manageAccountNotifPush) authUi.manageAccountNotifPush.checked = notif.push
+
+	if (authUi.manageAccountEmail && authUi.manageAccountEmailHint) {
+		updateManageHintState(
+			authUi.manageAccountEmail,
+			authUi.manageAccountEmailHint,
+			isValidEmailFormat(authUi.manageAccountEmail.value),
+			"✅ Email looks good.",
+			"Use a valid email format (e.g. name@example.com).",
+		)
+	}
+	if (authUi.manageAccountPhone && authUi.manageAccountPhoneHint) {
+		updateManageHintState(
+			authUi.manageAccountPhone,
+			authUi.manageAccountPhoneHint,
+			isValidPhoneFormat(authUi.manageAccountPhone.value),
+			"✅ Phone format looks good.",
+			"Use digits with optional +, spaces, or dashes.",
+		)
+	}
+	updateManagePasswordStrengthUI(authUi.manageAccountNewPassword?.value || "")
+}
+
+function openManageAccountModal() {
+	if (!isNonGuestSignedIn()) {
+		openAuthModal("signin")
+		return
+	}
+	if (authUi.manageAccountMessage) clearFormMessage(authUi.manageAccountMessage)
+	loadManageAccountForm(auth.currentUser)
+	if (authUi.manageAccountModal) {
+		authUi.manageAccountModal.classList.add("active")
+		authUi.manageAccountModal.setAttribute("aria-hidden", "false")
+		document.body.style.overflow = "hidden"
+	}
+}
+
+function closeManageAccountModal() {
+	if (authUi.manageAccountModal) {
+		authUi.manageAccountModal.classList.remove("active")
+		authUi.manageAccountModal.setAttribute("aria-hidden", "true")
+		document.body.style.overflow = ""
+	}
+}
+
+async function handleManageAccountSaveProfile() {
+	if (!firebaseReady || !auth?.currentUser) return
+	const user = auth.currentUser
+	const name = authUi.manageAccountName?.value?.trim() || ""
+	const email = authUi.manageAccountEmail?.value?.trim() || ""
+	const phone = authUi.manageAccountPhone?.value?.trim() || ""
+	const avatarFile = authUi.manageAccountAvatarInput?.files?.[0] || null
+	if (!isValidEmailFormat(email)) {
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"error",
+			"❌ Please enter a valid email address.",
+		)
+		return
+	}
+	if (!isValidPhoneFormat(phone)) {
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"error",
+			"❌ Please enter a valid phone number format.",
+		)
+		return
+	}
+
+	const btn = authUi.manageAccountSaveProfileBtn
+	if (btn) {
+		btn.disabled = true
+		btn.textContent = "Saving..."
+	}
+
+	try {
+		const profileUpdate = {}
+		if (name && name !== (user.displayName || "")) profileUpdate.displayName = name
+		if (avatarFile) {
+			if (avatarFile.size > 5 * 1024 * 1024) {
+				throw new Error("Profile picture must be 5MB or less.")
+			}
+			const uploadedUrl = await uploadImageToCloudinary(avatarFile)
+			if (uploadedUrl) profileUpdate.photoURL = uploadedUrl
+		}
+		if (Object.keys(profileUpdate).length) {
+			await user.updateProfile(profileUpdate)
+		}
+		if (email && email !== (user.email || "")) {
+			await user.updateEmail(email)
+		}
+		await upsertUserProfile(user, {
+			displayName: name || user.displayName || getUserDisplayName(user),
+			email: email || user.email || "",
+			phone,
+		})
+		setDashboardSignedInState(auth.currentUser)
+		if (authUi.dashboardProfilePhone && phone) {
+			authUi.dashboardProfilePhone.textContent = phone
+		}
+		setManageAvatarPreview(auth.currentUser)
+		if (authUi.manageAccountAvatarInput) {
+			authUi.manageAccountAvatarInput.value = ""
+		}
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"success",
+			"✅ Profile updated successfully.",
+		)
+	} catch (error) {
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"error",
+			`❌ ${getFriendlyAuthError(error)}`,
+		)
+	} finally {
+		if (btn) {
+			btn.disabled = false
+			btn.textContent = "Save Profile"
+		}
+	}
+}
+
+async function handleManageAccountChangePassword() {
+	if (!firebaseReady || !auth?.currentUser) return
+	const user = auth.currentUser
+	const currentPassword = authUi.manageAccountCurrentPassword?.value || ""
+	const newPassword = authUi.manageAccountNewPassword?.value || ""
+	const passwordRules = evaluatePasswordRules(newPassword)
+
+	if (!currentPassword || !newPassword || passwordRules.score < 4) {
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"error",
+			"❌ New password must be 8+ chars with upper, lower, and number.",
+		)
+		return
+	}
+
+	const btn = authUi.manageAccountChangePasswordBtn
+	if (btn) {
+		btn.disabled = true
+		btn.textContent = "Updating..."
+	}
+
+	try {
+		if (!user.email) {
+			throw new Error("Email account required for password change.")
+		}
+		const credential = firebase.auth.EmailAuthProvider.credential(
+			user.email,
+			currentPassword,
+		)
+		await user.reauthenticateWithCredential(credential)
+		await user.updatePassword(newPassword)
+		if (authUi.manageAccountCurrentPassword)
+			authUi.manageAccountCurrentPassword.value = ""
+		if (authUi.manageAccountNewPassword)
+			authUi.manageAccountNewPassword.value = ""
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"success",
+			"✅ Password changed securely.",
+		)
+	} catch (error) {
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"error",
+			`❌ ${getFriendlyAuthError(error)}`,
+		)
+	} finally {
+		if (btn) {
+			btn.disabled = false
+			btn.textContent = "Change Password"
+		}
+	}
+}
+
+async function handleManageAccountResetPassword() {
+	if (!firebaseReady || !auth) return
+	const email = authUi.manageAccountEmail?.value?.trim() || auth.currentUser?.email || ""
+	if (!email) {
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"error",
+			"❌ No email found to send reset link.",
+		)
+		return
+	}
+	if (!isValidEmailFormat(email)) {
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"error",
+			"❌ Please enter a valid email before requesting reset.",
+		)
+		return
+	}
+	try {
+		await auth.sendPasswordResetEmail(email)
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"success",
+			"✅ Password reset email sent.",
+		)
+	} catch (error) {
+		showTimedFormMessage(
+			authUi.manageAccountMessage,
+			"error",
+			`❌ ${getFriendlyAuthError(error)}`,
+		)
+	}
+}
+
+function handleManageAccountSavePreferences() {
+	const theme = authUi.manageAccountThemeSelect?.value === "light" ? "light" : "dark"
+	isDark = theme === "dark"
+	localStorage.setItem("theme", isDark ? "dark" : "light")
+	applyTheme()
+
+	const accessibility = {
+		highContrast: authUi.manageAccountHighContrast?.checked === true,
+		reducedMotion: authUi.manageAccountReducedMotion?.checked === true,
+		fontSize: authUi.manageAccountFontSizeSelect?.value || "normal",
+	}
+	saveAccessibilityPrefs(accessibility)
+
+	const notifications = {
+		email: authUi.manageAccountNotifEmail?.checked === true,
+		sms: authUi.manageAccountNotifSms?.checked === true,
+		push: authUi.manageAccountNotifPush?.checked === true,
+	}
+	saveNotificationPrefs(notifications)
+
+	showTimedFormMessage(
+		authUi.manageAccountMessage,
+		"success",
+		"✅ Preferences saved.",
+	)
 }
 
 function hideAccountDeletedPopup() {
@@ -1079,6 +1599,29 @@ function setAuthPasswordVisibility(isVisible) {
 	}
 }
 
+function setManagePasswordVisibility(
+	inputEl,
+	toggleEl,
+	isVisible = false,
+	fieldLabel = "password",
+) {
+	if (!inputEl || !toggleEl) return
+
+	const shouldShow = isVisible === true
+	inputEl.type = shouldShow ? "text" : "password"
+	toggleEl.setAttribute(
+		"aria-label",
+		`${shouldShow ? "Hide" : "Show"} ${fieldLabel}`,
+	)
+	toggleEl.setAttribute("aria-pressed", shouldShow ? "true" : "false")
+
+	const icon = toggleEl.querySelector("i")
+	if (icon) {
+		icon.classList.toggle("fa-eye", !shouldShow)
+		icon.classList.toggle("fa-eye-slash", shouldShow)
+	}
+}
+
 function clearRegisterPromptHighlight() {
 	authUi.switchToSignupBtn?.classList.remove("auth-register-highlight")
 	authUi.switchToSignupBtn?.removeAttribute("aria-live")
@@ -1173,6 +1716,7 @@ function setDashboardPromptState() {
 		authUi.dashboardDeleteAccountBtn.disabled = false
 		authUi.dashboardDeleteAccountBtn.textContent = "Delete Account"
 	}
+	closeManageAccountModal()
 	if (dashboardFavoritesMessageTimer) {
 		clearTimeout(dashboardFavoritesMessageTimer)
 		dashboardFavoritesMessageTimer = null
@@ -1930,7 +2474,8 @@ async function handleDeleteAccount() {
 	const confirmed = await openDeleteAccountConfirmModal()
 	if (!confirmed) return
 
-	const deleteBtn = authUi.dashboardDeleteAccountBtn
+	const deleteBtn =
+		authUi.manageAccountDeleteBtn || authUi.dashboardDeleteAccountBtn
 	if (deleteBtn) {
 		deleteBtn.disabled = true
 		deleteBtn.textContent = "Deleting..."
@@ -1944,6 +2489,7 @@ async function handleDeleteAccount() {
 		}
 
 		setDashboardPromptState()
+		closeManageAccountModal()
 		closeAuthModal()
 		showAccountDeletedPopup()
 		document.getElementById("home")?.scrollIntoView({
@@ -2044,9 +2590,137 @@ function bindAuthUiEvents() {
 		})
 	}
 	if (authUi.dashboardAuthBtn) {
-		authUi.dashboardAuthBtn.addEventListener("click", () =>
-			openAuthModal("signin"),
+		authUi.dashboardAuthBtn.addEventListener("click", () => {
+			if (isNonGuestSignedIn()) {
+				openManageAccountModal()
+				return
+			}
+			openAuthModal("signin")
+		})
+	}
+	if (authUi.manageAccountBackdrop) {
+		authUi.manageAccountBackdrop.addEventListener("click", closeManageAccountModal)
+	}
+	if (authUi.manageAccountCloseBtn) {
+		authUi.manageAccountCloseBtn.addEventListener("click", closeManageAccountModal)
+	}
+	if (authUi.manageAccountSaveProfileBtn) {
+		authUi.manageAccountSaveProfileBtn.addEventListener("click", () => {
+			void handleManageAccountSaveProfile()
+		})
+	}
+	if (authUi.manageAccountEmail && authUi.manageAccountEmailHint) {
+		authUi.manageAccountEmail.addEventListener("input", () => {
+			updateManageHintState(
+				authUi.manageAccountEmail,
+				authUi.manageAccountEmailHint,
+				isValidEmailFormat(authUi.manageAccountEmail.value),
+				"✅ Email looks good.",
+				"Use a valid email format (e.g. name@example.com).",
+			)
+		})
+	}
+	if (authUi.manageAccountPhone && authUi.manageAccountPhoneHint) {
+		authUi.manageAccountPhone.addEventListener("input", () => {
+			updateManageHintState(
+				authUi.manageAccountPhone,
+				authUi.manageAccountPhoneHint,
+				isValidPhoneFormat(authUi.manageAccountPhone.value),
+				"✅ Phone format looks good.",
+				"Use digits with optional +, spaces, or dashes.",
+			)
+		})
+	}
+	if (authUi.manageAccountNewPassword) {
+		authUi.manageAccountNewPassword.addEventListener("input", () => {
+			updateManagePasswordStrengthUI(authUi.manageAccountNewPassword.value)
+		})
+	setManagePasswordVisibility(
+		authUi.manageAccountCurrentPassword,
+		authUi.manageAccountCurrentPasswordToggle,
+		false,
+		"current password",
+	)
+	setManagePasswordVisibility(
+		authUi.manageAccountNewPassword,
+		authUi.manageAccountNewPasswordToggle,
+		false,
+		"new password",
+	)
+	}
+	if (authUi.manageAccountAvatarInput) {
+		authUi.manageAccountAvatarInput.addEventListener("change", () => {
+			const file = authUi.manageAccountAvatarInput?.files?.[0]
+			if (!file || !authUi.manageAccountAvatarPreview) return
+			if (file.size > 5 * 1024 * 1024) {
+				showTimedFormMessage(
+					authUi.manageAccountMessage,
+					"error",
+					"❌ Profile picture must be 5MB or less.",
+				)
+				authUi.manageAccountAvatarInput.value = ""
+				setManageAvatarPreview(auth.currentUser)
+				return
+			}
+
+			const reader = new FileReader()
+			reader.onload = () => {
+				const existingImg = authUi.manageAccountAvatarPreview.querySelector("img")
+				if (existingImg) existingImg.remove()
+				const previewImg = document.createElement("img")
+				previewImg.src = String(reader.result || "")
+				previewImg.alt = "Profile preview"
+				authUi.manageAccountAvatarPreview.appendChild(previewImg)
+				if (authUi.manageAccountAvatarInitial) {
+					authUi.manageAccountAvatarInitial.style.display = "none"
+				}
+			}
+			reader.readAsDataURL(file)
+		})
+	}
+	if (authUi.manageAccountChangePasswordBtn) {
+		authUi.manageAccountChangePasswordBtn.addEventListener("click", () => {
+			void handleManageAccountChangePassword()
+		})
+	}
+	if (
+		authUi.manageAccountCurrentPasswordToggle &&
+		authUi.manageAccountCurrentPassword
+	) {
+		authUi.manageAccountCurrentPasswordToggle.addEventListener("click", () => {
+			setManagePasswordVisibility(
+				authUi.manageAccountCurrentPassword,
+				authUi.manageAccountCurrentPasswordToggle,
+				authUi.manageAccountCurrentPassword.type === "password",
+				"current password",
+			)
+		})
+	}
+	if (authUi.manageAccountNewPasswordToggle && authUi.manageAccountNewPassword) {
+		authUi.manageAccountNewPasswordToggle.addEventListener("click", () => {
+			setManagePasswordVisibility(
+				authUi.manageAccountNewPassword,
+				authUi.manageAccountNewPasswordToggle,
+				authUi.manageAccountNewPassword.type === "password",
+				"new password",
+			)
+		})
+	}
+	if (authUi.manageAccountResetPasswordBtn) {
+		authUi.manageAccountResetPasswordBtn.addEventListener("click", () => {
+			void handleManageAccountResetPassword()
+		})
+	}
+	if (authUi.manageAccountSavePreferencesBtn) {
+		authUi.manageAccountSavePreferencesBtn.addEventListener(
+			"click",
+			handleManageAccountSavePreferences,
 		)
+	}
+	if (authUi.manageAccountDeleteBtn) {
+		authUi.manageAccountDeleteBtn.addEventListener("click", () => {
+			void handleDeleteAccount()
+		})
 	}
 	if (authUi.dashboardDeleteAccountBtn) {
 		authUi.dashboardDeleteAccountBtn.addEventListener("click", () => {
@@ -3686,6 +4360,7 @@ function applyTheme() {
 	darkModeToggle.classList.toggle("active", isDark)
 }
 applyTheme()
+applyAccessibilityPrefs(getStoredAccessibilityPrefs())
 darkModeToggle.addEventListener("click", () => {
 	isDark = !isDark
 	localStorage.setItem("theme", isDark ? "dark" : "light")
@@ -4029,6 +4704,14 @@ lightbox?.addEventListener("click", (e) => {
 })
 
 document.addEventListener("keydown", (e) => {
+	if (
+		e.key === "Escape" &&
+		authUi.manageAccountModal?.classList.contains("active")
+	) {
+		closeManageAccountModal()
+		return
+	}
+
 	if (!lightbox || !lightbox.classList.contains("active")) return
 
 	const visible = getVisibleGalleryData()
