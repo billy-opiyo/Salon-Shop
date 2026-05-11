@@ -5093,43 +5093,43 @@ select option {
 }
 
 #deleteAccountConfirmModal {
-	--delete-modal-duration: 0.23s;
-	--delete-modal-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --delete-modal-duration: 0.23s;
+    --delete-modal-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 #deleteAccountConfirmModal.active,
 #deleteAccountConfirmModal.is-closing {
-	display: flex;
+    display: flex;
 }
 
 #deleteAccountConfirmModal .auth-modal-backdrop,
 #deleteAccountConfirmModal .auth-card {
-	will-change: opacity, transform;
+    will-change: opacity, transform;
 }
 
 #deleteAccountConfirmModal .auth-modal-backdrop {
-	transition: opacity var(--delete-modal-duration) ease;
+    transition: opacity var(--delete-modal-duration) ease;
 }
 
 #deleteAccountConfirmModal .auth-card {
-	opacity: 0;
-	transform: translateY(14px) scale(0.96);
-	transition: opacity var(--delete-modal-duration) var(--delete-modal-ease),
-		transform var(--delete-modal-duration) var(--delete-modal-ease);
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+    transition: opacity var(--delete-modal-duration) var(--delete-modal-ease),
+        transform var(--delete-modal-duration) var(--delete-modal-ease);
 }
 
 #deleteAccountConfirmModal.active .auth-card {
-	opacity: 1;
-	transform: translateY(0) scale(1);
+    opacity: 1;
+    transform: translateY(0) scale(1);
 }
 
 #deleteAccountConfirmModal.is-closing .auth-modal-backdrop {
-	opacity: 0;
+    opacity: 0;
 }
 
 #deleteAccountConfirmModal.is-closing .auth-card {
-	opacity: 0;
-	transform: translateY(10px) scale(0.975);
+    opacity: 0;
+    transform: translateY(10px) scale(0.975);
 }
 
 .auth-close {
@@ -5326,290 +5326,291 @@ select option {
 }
 
 .delete-account-confirm-card {
-	border-color: rgba(245, 101, 101, 0.35);
-	box-shadow: 0 22px 56px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(245, 101, 101, 0.15);
+    border-color: rgba(245, 101, 101, 0.35);
+    box-shadow: 0 22px 56px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(245, 101, 101, 0.15);
 }
 
 .delete-account-confirm-card .section-subtitle {
-	color: #f8b4b4;
+    color: #f8b4b4;
 }
 
 .delete-account-confirm-card .section-subtitle::before,
 .delete-account-confirm-card .section-subtitle::after {
-	background: #f8b4b4;
+    background: #f8b4b4;
 }
 
 .delete-account-confirm-message {
-	margin: 2px 0 0;
-	color: var(--text-secondary);
-	font-size: 0.93rem;
-	line-height: 1.55;
-	padding: 10px 12px;
-	border: 1px solid rgba(245, 101, 101, 0.3);
-	border-radius: var(--radius-sm);
-	background: rgba(245, 101, 101, 0.08);
+    margin: 2px 0 0;
+    color: var(--text-secondary);
+    font-size: 0.93rem;
+    line-height: 1.55;
+    padding: 10px 12px;
+    border: 1px solid rgba(245, 101, 101, 0.3);
+    border-radius: var(--radius-sm);
+    background: rgba(245, 101, 101, 0.08);
 }
 
 .delete-account-confirm-actions {
-	display: flex;
-	gap: 10px;
-	margin-top: 10px;
-	flex-wrap: wrap;
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
 }
 
 .delete-account-confirm-actions .btn {
-	flex: 1;
-	min-width: 150px;
+    flex: 1;
+    min-width: 150px;
 }
 
 .delete-account-confirm-btn {
-	background: #d64545;
-	color: #fff;
+    background: #d64545;
+    color: #fff;
 }
 
 .delete-account-confirm-btn::before {
-	background: #eb5757;
+    background: #eb5757;
 }
 
 .delete-account-confirm-btn:hover {
-	box-shadow: 0 10px 24px rgba(245, 101, 101, 0.28);
+    box-shadow: 0 10px 24px rgba(245, 101, 101, 0.28);
 }
 
 .manage-account-card {
-	width: min(100%, 760px);
-	max-height: min(88vh, 860px);
-	overflow: hidden;
-	display: flex;
-	flex-direction: column;
+    width: min(100%, 760px);
+    max-height: min(88vh, 860px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .manage-account-body {
-	overflow-y: auto;
-	padding-right: 6px;
-	display: grid;
-	gap: 14px;
+    overflow-y: auto;
+    padding-right: 6px;
+    display: grid;
+    gap: 14px;
 }
 
 .manage-account-section {
-	border: 1px solid var(--border);
-	border-radius: 12px;
-	padding: 14px;
-	background: rgba(255, 255, 255, 0.015);
-	display: grid;
-	gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.015);
+    display: grid;
+    gap: 10px;
 }
 
 .manage-account-section h4,
 .manage-account-subsection h5 {
-	font-family: var(--font-body);
-	font-weight: 700;
-	font-size: 0.95rem;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 0.95rem;
 }
 
 .manage-account-subsection {
-	border: 1px dashed rgba(200, 150, 62, 0.3);
-	border-radius: 10px;
-	padding: 10px;
-	display: grid;
-	gap: 10px;
+    border: 1px dashed rgba(200, 150, 62, 0.3);
+    border-radius: 10px;
+    padding: 10px;
+    display: grid;
+    gap: 10px;
 }
 
 .manage-account-inline-actions {
-	display: flex;
-	gap: 10px;
-	flex-wrap: wrap;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
 .manage-account-inline-actions .btn {
-	flex: 1;
-	min-width: 180px;
+    flex: 1;
+    min-width: 180px;
 }
 
 .manage-account-avatar-row {
-	display: flex;
-	gap: 12px;
-	align-items: center;
-	flex-wrap: wrap;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .manage-account-avatar-preview {
-	width: 64px;
-	height: 64px;
-	border-radius: 999px;
-	border: 1px solid rgba(200, 150, 62, 0.45);
-	background: linear-gradient(135deg, rgba(200, 150, 62, 0.18), rgba(107, 46, 122, 0.16));
-	display: grid;
-	place-items: center;
-	overflow: hidden;
-	font-weight: 700;
-	color: var(--primary-light);
+    width: 64px;
+    height: 64px;
+    border-radius: 999px;
+    border: 1px solid rgba(200, 150, 62, 0.45);
+    background: linear-gradient(135deg, rgba(200, 150, 62, 0.18), rgba(107, 46, 122, 0.16));
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-weight: 700;
+    color: var(--primary-light);
 }
 
 .manage-account-avatar-preview img {
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
-	border-radius: 50%;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 .manage-account-avatar-actions {
-	display: grid;
-	gap: 6px;
+    display: grid;
+    gap: 6px;
 }
 
 .manage-account-avatar-actions small {
-	font-size: 0.75rem;
-	color: var(--text-muted);
+    font-size: 0.75rem;
+    color: var(--text-muted);
 }
 
 .manage-account-input-hint {
-	font-size: 0.75rem;
-	color: var(--text-muted);
-	margin-top: 4px;
-	display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    display: block;
 }
 
 .manage-account-input-hint.is-valid {
-	color: #62d193;
+    color: #62d193;
 }
 
 .manage-account-input-hint.is-invalid {
-	color: #f19a9a;
+    color: #f19a9a;
 }
 
 .manage-account-section input.manage-field-valid {
-	border-color: rgba(98, 209, 147, 0.7);
-	box-shadow: 0 0 0 2px rgba(98, 209, 147, 0.15);
+    border-color: rgba(98, 209, 147, 0.7);
+    box-shadow: 0 0 0 2px rgba(98, 209, 147, 0.15);
 }
 
 .manage-account-section input.manage-field-invalid {
-	border-color: rgba(241, 154, 154, 0.8);
-	box-shadow: 0 0 0 2px rgba(241, 154, 154, 0.14);
+    border-color: rgba(241, 154, 154, 0.8);
+    box-shadow: 0 0 0 2px rgba(241, 154, 154, 0.14);
 }
 
 .manage-password-strength {
-	display: grid;
-	gap: 6px;
-	margin-top: 8px;
+    display: grid;
+    gap: 6px;
+    margin-top: 8px;
 }
 
 .manage-password-strength-bar {
-	height: 8px;
-	border-radius: 999px;
-	background: rgba(255, 255, 255, 0.08);
-	overflow: hidden;
-	border: 1px solid var(--border);
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    border: 1px solid var(--border);
 }
 
 .manage-password-strength-bar span {
-	display: block;
-	height: 100%;
-	width: 0;
-	transition: width 0.25s ease, background-color 0.25s ease;
+    display: block;
+    height: 100%;
+    width: 0;
+    transition: width 0.25s ease, background-color 0.25s ease;
 }
 
 .manage-password-strength-bar span.strength-weak {
-	background: #ef6b6b;
+    background: #ef6b6b;
 }
 
 .manage-password-strength-bar span.strength-medium {
-	background: #f3c15d;
+    background: #f3c15d;
 }
 
 .manage-password-strength-bar span.strength-strong {
-	background: #62d193;
+    background: #62d193;
 }
 
 .manage-password-checks {
-	list-style: none;
-	padding: 0;
-	margin: 6px 0 0;
-	display: grid;
-	gap: 4px;
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0;
+    display: grid;
+    gap: 4px;
 }
 
 .manage-password-checks li {
-	font-size: 0.75rem;
-	color: var(--text-muted);
-	position: relative;
-	padding-left: 16px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    position: relative;
+    padding-left: 16px;
 }
 
 .manage-password-checks li::before {
-	content: "•";
-	position: absolute;
-	left: 4px;
-	color: var(--text-muted);
+    content: "•";
+    position: absolute;
+    left: 4px;
+    color: var(--text-muted);
 }
 
 .manage-password-checks li.met {
-	color: #62d193;
+    color: #62d193;
 }
 
 .manage-password-checks li.met::before {
-	content: "✓";
-	left: 0;
-	color: #62d193;
+    content: "✓";
+    left: 0;
+    color: #62d193;
 }
 
 .manage-account-upload-btn {
-	padding: 8px 14px;
-	font-size: 0.78rem;
+    padding: 8px 14px;
+    font-size: 0.78rem;
 }
 
 #manageAccountAvatarInput {
-	display: none;
+    display: none;
 }
 
 .manage-account-checks {
-	display: grid;
-	gap: 8px;
+    display: grid;
+    gap: 8px;
 }
 
 .manage-account-checks label {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 0.88rem;
-	color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: var(--text-secondary);
 }
 
 .manage-account-checks input[type="checkbox"] {
-	width: 16px;
-	height: 16px;
-	padding: 0;
-	margin: 0;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    margin: 0;
 }
 
 .manage-account-danger-zone {
-	border-color: rgba(245, 101, 101, 0.5);
-	background: rgba(245, 101, 101, 0.06);
+    border-color: rgba(245, 101, 101, 0.5);
+    background: rgba(245, 101, 101, 0.06);
 }
 
 .manage-account-danger-zone p {
-	font-size: 0.84rem;
-	color: #f8b4b4;
+    font-size: 0.84rem;
+    color: #f8b4b4;
 }
 
 @media (max-width: 700px) {
-	#deleteAccountConfirmModal {
-		--delete-modal-duration: 0.2s;
-	}
+    #deleteAccountConfirmModal {
+        --delete-modal-duration: 0.2s;
+    }
 
-	#deleteAccountConfirmModal .auth-card {
-		transform: translateY(10px) scale(0.97);
-	}
+    #deleteAccountConfirmModal .auth-card {
+        transform: translateY(10px) scale(0.97);
+    }
 
-	#deleteAccountConfirmModal.is-closing .auth-card {
-		transform: translateY(8px) scale(0.985);
-	}
+    #deleteAccountConfirmModal.is-closing .auth-card {
+        transform: translateY(8px) scale(0.985);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-	#deleteAccountConfirmModal .auth-modal-backdrop,
-	#deleteAccountConfirmModal .auth-card {
-		transition: none;
-	}
+
+    #deleteAccountConfirmModal .auth-modal-backdrop,
+    #deleteAccountConfirmModal .auth-card {
+        transition: none;
+    }
 }
 
 .client-dashboard {
@@ -5920,33 +5921,33 @@ select option {
 }
 
 body.font-large {
-	font-size: 17px;
+    font-size: 17px;
 }
 
 body.font-xlarge {
-	font-size: 18px;
+    font-size: 18px;
 }
 
 body.high-contrast {
-	--bg-primary: #000;
-	--bg-secondary: #050505;
-	--bg-card: #0b0b0b;
-	--text-primary: #fff;
-	--text-secondary: #f1f1f1;
-	--text-muted: #d7d7d7;
-	--border: #f2cf7f;
-	--primary: #ffd45f;
-	--primary-light: #ffeaab;
-	--shadow: rgba(255, 212, 95, 0.35);
+    --bg-primary: #000;
+    --bg-secondary: #050505;
+    --bg-card: #0b0b0b;
+    --text-primary: #fff;
+    --text-secondary: #f1f1f1;
+    --text-muted: #d7d7d7;
+    --border: #f2cf7f;
+    --primary: #ffd45f;
+    --primary-light: #ffeaab;
+    --shadow: rgba(255, 212, 95, 0.35);
 }
 
 body.reduced-motion *,
 body.reduced-motion *::before,
 body.reduced-motion *::after {
-	animation-duration: 0.001ms !important;
-	animation-iteration-count: 1 !important;
-	transition-duration: 0.001ms !important;
-	scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
 }
 
 .post-booking-auth-prompt {
