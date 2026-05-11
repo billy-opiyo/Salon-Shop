@@ -5045,6 +5045,46 @@ select option {
     transform: translateY(0) scale(1);
 }
 
+#deleteAccountConfirmModal {
+	--delete-modal-duration: 0.23s;
+	--delete-modal-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+#deleteAccountConfirmModal.active,
+#deleteAccountConfirmModal.is-closing {
+	display: flex;
+}
+
+#deleteAccountConfirmModal .auth-modal-backdrop,
+#deleteAccountConfirmModal .auth-card {
+	will-change: opacity, transform;
+}
+
+#deleteAccountConfirmModal .auth-modal-backdrop {
+	transition: opacity var(--delete-modal-duration) ease;
+}
+
+#deleteAccountConfirmModal .auth-card {
+	opacity: 0;
+	transform: translateY(14px) scale(0.96);
+	transition: opacity var(--delete-modal-duration) var(--delete-modal-ease),
+		transform var(--delete-modal-duration) var(--delete-modal-ease);
+}
+
+#deleteAccountConfirmModal.active .auth-card {
+	opacity: 1;
+	transform: translateY(0) scale(1);
+}
+
+#deleteAccountConfirmModal.is-closing .auth-modal-backdrop {
+	opacity: 0;
+}
+
+#deleteAccountConfirmModal.is-closing .auth-card {
+	opacity: 0;
+	transform: translateY(10px) scale(0.975);
+}
+
 .auth-close {
     position: absolute;
     top: 12px;
@@ -5236,6 +5276,77 @@ select option {
 .auth-links button.auth-register-highlight:focus-visible {
     outline: 2px solid var(--primary-light);
     outline-offset: 2px;
+}
+
+.delete-account-confirm-card {
+	border-color: rgba(245, 101, 101, 0.35);
+	box-shadow: 0 22px 56px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(245, 101, 101, 0.15);
+}
+
+.delete-account-confirm-card .section-subtitle {
+	color: #f8b4b4;
+}
+
+.delete-account-confirm-card .section-subtitle::before,
+.delete-account-confirm-card .section-subtitle::after {
+	background: #f8b4b4;
+}
+
+.delete-account-confirm-message {
+	margin: 2px 0 0;
+	color: var(--text-secondary);
+	font-size: 0.93rem;
+	line-height: 1.55;
+	padding: 10px 12px;
+	border: 1px solid rgba(245, 101, 101, 0.3);
+	border-radius: var(--radius-sm);
+	background: rgba(245, 101, 101, 0.08);
+}
+
+.delete-account-confirm-actions {
+	display: flex;
+	gap: 10px;
+	margin-top: 10px;
+	flex-wrap: wrap;
+}
+
+.delete-account-confirm-actions .btn {
+	flex: 1;
+	min-width: 150px;
+}
+
+.delete-account-confirm-btn {
+	background: #d64545;
+	color: #fff;
+}
+
+.delete-account-confirm-btn::before {
+	background: #eb5757;
+}
+
+.delete-account-confirm-btn:hover {
+	box-shadow: 0 10px 24px rgba(245, 101, 101, 0.28);
+}
+
+@media (max-width: 700px) {
+	#deleteAccountConfirmModal {
+		--delete-modal-duration: 0.2s;
+	}
+
+	#deleteAccountConfirmModal .auth-card {
+		transform: translateY(10px) scale(0.97);
+	}
+
+	#deleteAccountConfirmModal.is-closing .auth-card {
+		transform: translateY(8px) scale(0.985);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	#deleteAccountConfirmModal .auth-modal-backdrop,
+	#deleteAccountConfirmModal .auth-card {
+		transition: none;
+	}
 }
 
 .client-dashboard {
@@ -5518,6 +5629,31 @@ select option {
 
 .dashboard-actions {
     margin-top: 14px;
+    display: grid;
+    gap: 10px;
+}
+
+.dashboard-delete-btn {
+    border-color: rgba(245, 101, 101, 0.55);
+    color: #f8b4b4;
+    background: rgba(245, 101, 101, 0.08);
+}
+
+.dashboard-delete-btn::before {
+    background: rgba(245, 101, 101, 0.95);
+}
+
+.dashboard-delete-btn:hover {
+    color: #fff;
+    border-color: rgba(245, 101, 101, 0.95);
+    box-shadow: 0 10px 24px rgba(245, 101, 101, 0.2);
+}
+
+.dashboard-delete-btn:disabled {
+    opacity: 0.72;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .post-booking-auth-prompt {

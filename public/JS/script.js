@@ -386,6 +386,9 @@ let reviewsToggleAnimationTimer = null
 let favoritesToastTimer = null
 let dashboardFavoritesMessageTimer = null
 let authMessageTimer = null
+let accountDeletePopupTimer = null
+let pendingDeleteAccountResolver = null
+let deleteAccountConfirmCloseTimer = null
 const formMessageTimers = new WeakMap()
 const REVIEW_LOCAL_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
@@ -662,6 +665,7 @@ const authUi = {
 	navDashboardLink: null,
 	clientDashboard: null,
 	dashboardAuthBtn: null,
+	dashboardDeleteAccountBtn: null,
 	dashboardMessage: null,
 	dashboardBookingsList: null,
 	dashboardReviewsList: null,
@@ -679,6 +683,13 @@ const authUi = {
 	reviewSubmitAuthGate: null,
 	reviewSubmitAuthGateBtn: null,
 	favoritesToast: null,
+	accountDeleteSuccessPopup: null,
+	deleteAccountConfirmModal: null,
+	deleteAccountConfirmBackdrop: null,
+	deleteAccountConfirmCloseBtn: null,
+	deleteAccountConfirmCancelBtn: null,
+	deleteAccountConfirmProceedBtn: null,
+	deleteAccountConfirmMessage: null,
 }
 
 function getFriendlyAuthError(error) {
@@ -722,6 +733,10 @@ function getFriendlyAuthError(error) {
 
 	if (error?.code === "auth/operation-not-allowed") {
 		return "This sign-in method is not enabled. Enable Anonymous provider in Firebase Authentication settings."
+	}
+
+	if (code === "auth/requires-recent-login") {
+		return "For your security, please log in again before deleting your account."
 	}
 
 	return error?.message || "Authentication failed"
@@ -855,6 +870,9 @@ function initAuthUiRefs() {
 	authUi.navDashboardLink = document.getElementById("navDashboardLink")
 	authUi.clientDashboard = document.getElementById("clientDashboard")
 	authUi.dashboardAuthBtn = document.getElementById("dashboardAuthBtn")
+	authUi.dashboardDeleteAccountBtn = document.getElementById(
+		"dashboardDeleteAccountBtn",
+	)
 	authUi.dashboardMessage = document.getElementById("dashboardMessage")
 	authUi.dashboardBookingsList = document.getElementById(
 		"dashboardBookingsList",
@@ -886,6 +904,99 @@ function initAuthUiRefs() {
 		"reviewSubmitAuthGateBtn",
 	)
 	authUi.favoritesToast = document.getElementById("favoritesToast")
+	authUi.accountDeleteSuccessPopup = document.getElementById(
+		"accountDeleteSuccessPopup",
+	)
+	authUi.deleteAccountConfirmModal = document.getElementById(
+		"deleteAccountConfirmModal",
+	)
+	authUi.deleteAccountConfirmBackdrop = document.getElementById(
+		"deleteAccountConfirmBackdrop",
+	)
+	authUi.deleteAccountConfirmCloseBtn = document.getElementById(
+		"deleteAccountConfirmCloseBtn",
+	)
+	authUi.deleteAccountConfirmCancelBtn = document.getElementById(
+		"deleteAccountConfirmCancelBtn",
+	)
+	authUi.deleteAccountConfirmProceedBtn = document.getElementById(
+		"deleteAccountConfirmProceedBtn",
+	)
+	authUi.deleteAccountConfirmMessage = document.getElementById(
+		"deleteAccountConfirmMessage",
+	)
+}
+
+function hideAccountDeletedPopup() {
+	if (!authUi.accountDeleteSuccessPopup) return
+	authUi.accountDeleteSuccessPopup.classList.remove("show")
+	if (accountDeletePopupTimer) {
+		clearTimeout(accountDeletePopupTimer)
+		accountDeletePopupTimer = null
+	}
+}
+
+function showAccountDeletedPopup() {
+	if (!authUi.accountDeleteSuccessPopup) return
+	authUi.accountDeleteSuccessPopup.classList.add("show")
+	if (accountDeletePopupTimer) {
+		clearTimeout(accountDeletePopupTimer)
+	}
+	accountDeletePopupTimer = setTimeout(() => {
+		hideAccountDeletedPopup()
+	}, 4200)
+}
+
+function closeDeleteAccountConfirmModal(confirmed = false) {
+	const modal = authUi.deleteAccountConfirmModal
+	if (modal) {
+		if (deleteAccountConfirmCloseTimer) {
+			clearTimeout(deleteAccountConfirmCloseTimer)
+			deleteAccountConfirmCloseTimer = null
+		}
+
+		modal.classList.remove("active")
+		modal.classList.add("is-closing")
+		modal.setAttribute("aria-hidden", "true")
+
+		deleteAccountConfirmCloseTimer = setTimeout(() => {
+			modal.classList.remove("is-closing")
+			deleteAccountConfirmCloseTimer = null
+		}, 230)
+	}
+
+	if (pendingDeleteAccountResolver) {
+		pendingDeleteAccountResolver(Boolean(confirmed))
+		pendingDeleteAccountResolver = null
+	}
+}
+
+function openDeleteAccountConfirmModal() {
+	return new Promise((resolve) => {
+		if (!authUi.deleteAccountConfirmModal) {
+			resolve(false)
+			return
+		}
+
+		if (pendingDeleteAccountResolver) {
+			pendingDeleteAccountResolver(false)
+		}
+		pendingDeleteAccountResolver = resolve
+
+		if (deleteAccountConfirmCloseTimer) {
+			clearTimeout(deleteAccountConfirmCloseTimer)
+			deleteAccountConfirmCloseTimer = null
+		}
+
+		if (authUi.deleteAccountConfirmMessage) {
+			authUi.deleteAccountConfirmMessage.textContent =
+				"This action is permanent and cannot be undone."
+		}
+
+		authUi.deleteAccountConfirmModal.classList.remove("is-closing")
+		authUi.deleteAccountConfirmModal.classList.add("active")
+		authUi.deleteAccountConfirmModal.setAttribute("aria-hidden", "false")
+	})
 }
 
 function updateReviewAuthHintVisibility() {
@@ -1057,6 +1168,11 @@ function setDashboardPromptState() {
 	if (authUi.dashboardAuthBtn) {
 		authUi.dashboardAuthBtn.textContent = "Log In to Sync Data"
 	}
+	if (authUi.dashboardDeleteAccountBtn) {
+		authUi.dashboardDeleteAccountBtn.classList.add("hidden")
+		authUi.dashboardDeleteAccountBtn.disabled = false
+		authUi.dashboardDeleteAccountBtn.textContent = "Delete Account"
+	}
 	if (dashboardFavoritesMessageTimer) {
 		clearTimeout(dashboardFavoritesMessageTimer)
 		dashboardFavoritesMessageTimer = null
@@ -1091,6 +1207,11 @@ function setDashboardSignedInState(user) {
 		authUi.dashboardProfileEmail.textContent = user?.email || "No email"
 	if (authUi.dashboardAuthBtn) {
 		authUi.dashboardAuthBtn.textContent = "Manage Account"
+	}
+	if (authUi.dashboardDeleteAccountBtn) {
+		authUi.dashboardDeleteAccountBtn.classList.remove("hidden")
+		authUi.dashboardDeleteAccountBtn.disabled = false
+		authUi.dashboardDeleteAccountBtn.textContent = "Delete Account"
 	}
 	updateReviewSubmissionVisibility()
 	setPostBookingPromptVisible(false)
@@ -1791,6 +1912,61 @@ async function handleContinueAsGuest() {
 	}
 }
 
+async function handleDeleteAccount() {
+	if (!firebaseReady || !auth) return
+
+	const user = auth.currentUser
+	if (!user || user.isAnonymous) {
+		if (authUi.dashboardMessage) {
+			showTimedFormMessage(
+				authUi.dashboardMessage,
+				"error",
+				"⚠️ Please log in first to delete your account.",
+			)
+		}
+		return
+	}
+
+	const confirmed = await openDeleteAccountConfirmModal()
+	if (!confirmed) return
+
+	const deleteBtn = authUi.dashboardDeleteAccountBtn
+	if (deleteBtn) {
+		deleteBtn.disabled = true
+		deleteBtn.textContent = "Deleting..."
+	}
+
+	try {
+		await user.delete()
+
+		if (!auth.currentUser) {
+			await auth.signInAnonymously()
+		}
+
+		setDashboardPromptState()
+		closeAuthModal()
+		showAccountDeletedPopup()
+		document.getElementById("home")?.scrollIntoView({
+			behavior: "smooth",
+			block: "start",
+		})
+	} catch (error) {
+		console.error("Delete account failed:", error)
+		if (authUi.dashboardMessage) {
+			showTimedFormMessage(
+				authUi.dashboardMessage,
+				"error",
+				`❌ ${getFriendlyAuthError(error)}`,
+			)
+		}
+	} finally {
+		if (deleteBtn) {
+			deleteBtn.disabled = false
+			deleteBtn.textContent = "Delete Account"
+		}
+	}
+}
+
 function bindAuthUiEvents() {
 	if (authUi.openBtn) {
 		authUi.openBtn.addEventListener("click", () => openAuthModal("signin"))
@@ -1871,6 +2047,31 @@ function bindAuthUiEvents() {
 		authUi.dashboardAuthBtn.addEventListener("click", () =>
 			openAuthModal("signin"),
 		)
+	}
+	if (authUi.dashboardDeleteAccountBtn) {
+		authUi.dashboardDeleteAccountBtn.addEventListener("click", () => {
+			void handleDeleteAccount()
+		})
+	}
+	if (authUi.deleteAccountConfirmBackdrop) {
+		authUi.deleteAccountConfirmBackdrop.addEventListener("click", () => {
+			closeDeleteAccountConfirmModal(false)
+		})
+	}
+	if (authUi.deleteAccountConfirmCloseBtn) {
+		authUi.deleteAccountConfirmCloseBtn.addEventListener("click", () => {
+			closeDeleteAccountConfirmModal(false)
+		})
+	}
+	if (authUi.deleteAccountConfirmCancelBtn) {
+		authUi.deleteAccountConfirmCancelBtn.addEventListener("click", () => {
+			closeDeleteAccountConfirmModal(false)
+		})
+	}
+	if (authUi.deleteAccountConfirmProceedBtn) {
+		authUi.deleteAccountConfirmProceedBtn.addEventListener("click", () => {
+			closeDeleteAccountConfirmModal(true)
+		})
 	}
 	if (authUi.dashboardFavoritesList) {
 		authUi.dashboardFavoritesList.addEventListener("click", (event) => {
