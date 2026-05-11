@@ -78,6 +78,10 @@ The README now reflects **current implementation**, including:
 - Added/updated **Cloud Function email automation**:
   - On booking create, sends confirmation email through Resend
   - Writes send status fields (`emailStatus`, timestamps, errors)
+- Added **Manage Account + Delete Account confirmation modal UI** on the public app:
+  - New account settings sections in `index.html`/`style.css` for profile, security, preferences, and account deletion
+  - Includes UI elements for avatar upload, password strength checks, accessibility/notification preferences, and a dedicated delete-confirm dialog
+  - Current state: markup + styling are present; JS wiring for full runtime behavior is still pending
 
 ---
 
@@ -235,6 +239,12 @@ The README now reflects **current implementation**, including:
   - Favorite styles list + count
   - Favorite actions (book/remove)
   - Profile summary (name/email/phone)
+- Manage Account modal UI includes:
+  - **Profile Info:** avatar picker, name/email/phone fields with input hints
+  - **Login & Security:** current/new password fields, password strength + rule checklist, change/reset actions
+  - **Preferences:** theme/font size selectors, accessibility toggles, notification toggles
+  - **Danger Zone:** delete account trigger + dedicated confirmation modal
+  - **Implementation status:** current update is UI structure/styling in HTML/CSS
 
 ---
 
@@ -437,6 +447,7 @@ Deploy specific components:
 4. Cloudinary uploads are unsigned; keep upload preset tightly restricted.
 5. Booking UI mentions SMS reminders, but implemented automation is email confirmation function.
 6. Contact form has `formsubmit.co` attributes in HTML, but active flow is JS + Firestore (`preventDefault`).
+7. Manage Account/Delete Account modal UI is included in `index.html` + `CSS/style.css`; runtime JS handlers are not yet implemented in `JS/script.js`.
 
 ---
 
