@@ -1749,7 +1749,9 @@ function setHeaderProfileAvatar(user) {
 	if (existingImg) existingImg.remove()
 
 	const displayName = getUserDisplayName(user)
-	authUi.profileInitial.textContent = (displayName.charAt(0) || "R").toUpperCase()
+	authUi.profileInitial.textContent = (
+		displayName.charAt(0) || "R"
+	).toUpperCase()
 
 	if (user?.photoURL) {
 		const img = document.createElement("img")
@@ -2352,7 +2354,10 @@ async function handleEmailAuthSubmit(event) {
 				const linked = await currentUser.linkWithCredential(credential)
 				signedInUser = linked?.user || currentUser
 			} else {
-				const created = await auth.createUserWithEmailAndPassword(email, password)
+				const created = await auth.createUserWithEmailAndPassword(
+					email,
+					password,
+				)
 				signedInUser = created?.user || auth.currentUser
 			}
 
@@ -2501,6 +2506,7 @@ async function handleLogout() {
 		await auth.signOut()
 		closeAuthModal()
 		setDashboardPromptState()
+		showFavoritesToast("You're now continuing as guest")
 	} catch (error) {
 		console.error("Logout failed:", error)
 	}
