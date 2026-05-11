@@ -4531,9 +4531,41 @@ document.querySelectorAll(".services-tab").forEach((tab) => {
 })
 
 // ============ BOOKING ============
+function focusBookingFormCard({ behavior = "smooth", block = "start" } = {}) {
+	const bookingForm = document.getElementById("bookingForm")
+	const bookingSection = document.getElementById("booking")
+	const bookingSuccess = document.getElementById("bookingSuccess")
+	if (!bookingForm && !bookingSection) return
+
+	if (bookingForm && bookingForm.style.display === "none") {
+		bookingForm.style.display = "block"
+	}
+	if (bookingSuccess && bookingSuccess.style.display !== "none") {
+		bookingSuccess.style.display = "none"
+	}
+
+	const target =
+		bookingForm && bookingForm.style.display !== "none"
+			? bookingForm
+			: bookingSection
+
+	target?.scrollIntoView({ behavior, block })
+
+	if (target === bookingForm) {
+		bookingForm.classList.remove("booking-form--focus-flash")
+		// Force reflow so the animation can replay on repeated taps
+		void bookingForm.offsetWidth
+		bookingForm.classList.add("booking-form--focus-flash")
+
+		setTimeout(() => {
+			bookingForm.classList.remove("booking-form--focus-flash")
+		}, 1600)
+	}
+}
+
 function selectService(name) {
 	document.getElementById("serviceSelect").value = name
-	document.getElementById("booking").scrollIntoView({ behavior: "smooth" })
+	focusBookingFormCard({ behavior: "smooth", block: "center" })
 	// Update min date to today
 	document.getElementById("datePicker").min = new Date()
 		.toISOString()
@@ -4637,12 +4669,17 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 			})
 
 			form.style.display = "none"
-			document.getElementById("bookingSuccess").style.display = "block"
+			const bookingSuccess = document.getElementById("bookingSuccess")
+			bookingSuccess.style.display = "block"
 			showTimedFormMessage(
 				msg,
 				"success",
 				"✅ Booking confirmed and saved in realtime!",
 			)
+
+			bookingSuccess.setAttribute("tabindex", "-1")
+			bookingSuccess.scrollIntoView({ behavior: "smooth", block: "center" })
+			bookingSuccess.focus({ preventScroll: true })
 
 			setPostBookingPromptVisible(Boolean(auth.currentUser?.isAnonymous))
 			if (signedInUser && activeUid) {
@@ -4962,7 +4999,15 @@ if (contactSuccessPopupClose) {
 // ============ SMOOTH SCROLL FOR ALL ANCHOR LINKS ============
 document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
 	anchor.addEventListener("click", function (e) {
-		const target = document.querySelector(this.getAttribute("href"))
+		const href = this.getAttribute("href")
+
+		if (href === "#booking") {
+			e.preventDefault()
+			focusBookingFormCard({ behavior: "smooth", block: "center" })
+			return
+		}
+
+		const target = document.querySelector(href)
 		if (target) {
 			e.preventDefault()
 			target.scrollIntoView({ behavior: "smooth", block: "start" })
