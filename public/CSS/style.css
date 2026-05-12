@@ -520,14 +520,74 @@ h6 {
 }
 
 .logo-icon {
-    width: 65px;
-    height: 65px;
+    --logo-cube-size: 72px;
+    --logo-cube-depth: calc(var(--logo-cube-size) / 2);
+    width: var(--logo-cube-size);
+    height: var(--logo-cube-size);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--gradient-gold);
-    border-radius: var(--radius-sm);
-    -webkit-text-fill-color: #0A0A0A;
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    perspective: 900px;
+    transform-style: preserve-3d;
+    isolation: isolate;
+    box-shadow: 0 10px 24px rgba(12, 10, 7, 0.34),
+        0 0 0 1px rgba(255, 225, 170, 0.22) inset;
+    background: rgba(0, 0, 0, 0.2);
+    transition: border-radius 1.25s cubic-bezier(0.23, 0.75, 0.28, 1),
+        box-shadow 1.25s cubic-bezier(0.23, 0.75, 0.28, 1);
+}
+
+.logo-cube.is-morphing {
+    border-radius: 48% 52% 50% 50% / 44% 50% 50% 56%;
+    box-shadow: 0 12px 26px rgba(12, 10, 7, 0.42),
+        0 0 0 1px rgba(255, 225, 170, 0.28) inset;
+}
+
+.logo-cube-track {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    display: grid;
+    place-items: center;
+}
+
+#logoCubeImage {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+    object-position: center;
+    transform: rotateY(0deg) scale(0.96);
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    opacity: 1;
+    filter: saturate(1.08) contrast(1.04);
+    background: #140f09;
+    will-change: transform, opacity;
+    transition: transform 0.82s cubic-bezier(0.25, 0.72, 0.24, 1),
+        opacity 0.82s cubic-bezier(0.28, 0.7, 0.25, 1);
+}
+
+#logoCubeImage.is-flip-out {
+    transform: rotateY(78deg) scale(0.9);
+    opacity: 0.14;
+}
+
+#logoCubeImage.is-flip-in {
+    transform: rotateY(-78deg) scale(0.9);
+    opacity: 0.14;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #logoCubeImage {
+        transition: none;
+        transform: none !important;
+        opacity: 1 !important;
+    }
 }
 
 .nav {
@@ -695,8 +755,7 @@ h6 {
     }
 
     .logo-icon {
-        width: 56px;
-        height: 56px;
+        --logo-cube-size: 62px;
     }
 
     .header-actions {
@@ -751,8 +810,7 @@ h6 {
     }
 
     .logo-icon {
-        width: 42px;
-        height: 42px;
+        --logo-cube-size: 48px;
     }
 
     .header-actions {
@@ -4257,8 +4315,7 @@ h6 {
     }
 
     .logo-icon {
-        width: 36px;
-        height: 36px;
+        --logo-cube-size: 40px;
     }
 
     .header-actions {
@@ -6101,8 +6158,7 @@ body.reduced-motion *::after {
     }
 
     .logo-icon {
-        width: 32px;
-        height: 32px;
+        --logo-cube-size: 36px;
     }
 
     .header-actions {

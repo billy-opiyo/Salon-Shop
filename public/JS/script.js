@@ -5028,6 +5028,64 @@ const mutationObserver = new MutationObserver((mutations) => {
 })
 mutationObserver.observe(document.body, { childList: true, subtree: true })
 
+// ============ HEADER LOGO 3D CUBE FLIP ROTATION ============
+function initAnimatedHeaderLogo() {
+	const logoCube = document.querySelector("#header .logo .logo-cube")
+	const cubeTrack = document.getElementById("logoCubeTrack")
+	const logoImage = document.getElementById("logoCubeImage")
+	if (!logoCube || !cubeTrack || !logoImage) return
+
+	const logoImages = [
+		"IMG/logo.png",
+		"IMG/logo 2.jpg",
+		"IMG/logo 3.png",
+		"IMG/logo 4.png",
+		"IMG/logo 5.png",
+	]
+
+	let imageIndex = 0
+	let isTransitioning = false
+	const swapIntervalMs = 5000
+	const halfFlipMs = 560
+	const totalTransitionMs = 1400
+
+	logoImages.forEach((src) => {
+		const preload = new Image()
+		preload.src = src
+	})
+
+	logoImage.src = logoImages[imageIndex]
+
+	const runLogoFlip = () => {
+		if (isTransitioning) return
+		isTransitioning = true
+
+		logoCube.classList.add("is-morphing")
+		logoImage.classList.remove("is-flip-in")
+		logoImage.classList.add("is-flip-out")
+
+		window.setTimeout(() => {
+			imageIndex = (imageIndex + 1) % logoImages.length
+			logoImage.src = logoImages[imageIndex]
+			logoImage.classList.remove("is-flip-out")
+			logoImage.classList.add("is-flip-in")
+
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					logoImage.classList.remove("is-flip-in")
+				})
+			})
+		}, halfFlipMs)
+
+		window.setTimeout(() => {
+			logoCube.classList.remove("is-morphing")
+			isTransitioning = false
+		}, totalTransitionMs)
+	}
+
+	window.setInterval(runLogoFlip, swapIntervalMs)
+}
+
 // ============ INITIALIZE ============
 initAuthUiRefs()
 setAuthMode("signin")
@@ -5058,6 +5116,7 @@ updateReviewSubmissionVisibility()
 populateReviewServiceSelect()
 populateServiceSelect()
 populateTimeSlots()
+initAnimatedHeaderLogo()
 
 // Initialize booking integrations
 initializeFirebaseServices().then(async () => {

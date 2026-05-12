@@ -43,7 +43,18 @@
 		<header class="header" id="header">
 			<div class="container header-inner">
 				<a href="#home" class="logo">
-					<img src="IMG/logo.png" alt="Braid Logo" class="logo-icon" />
+					<span
+						class="logo-icon logo-cube"
+						aria-label="Royal Braids rotating logo"
+					>
+						<span class="logo-cube-track" id="logoCubeTrack">
+							<img
+								id="logoCubeImage"
+								src="IMG/logo.png"
+								alt="Royal Braids rotating logo"
+							/>
+						</span>
+					</span>
 					ROYAL<br />BRAIDS
 				</a>
 
@@ -93,7 +104,7 @@
 						<div class="auth-profile-dropdown" id="authProfileDropdown">
 							<p id="authProfileName">Welcome back</p>
 							<a href="#clientDashboard">My Dashboard</a>
-							<button type="button" id="logoutBtn">Logout</button>
+							<button type="button" id="logoutBtn">Log Out</button>
 						</div>
 					</div>
 					<button class="nav-toggle" id="navToggle" aria-label="Menu">
