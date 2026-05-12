@@ -565,11 +565,12 @@ h6 {
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
     opacity: 1;
-    filter: saturate(1.08) contrast(1.04);
+    filter: saturate(1.08) contrast(1.04) blur(0px) brightness(1);
     background: #140f09;
-    will-change: transform, opacity;
+    will-change: transform, opacity, filter;
     transition: transform 0.82s cubic-bezier(0.25, 0.72, 0.24, 1),
-        opacity 0.82s cubic-bezier(0.28, 0.7, 0.25, 1);
+        opacity 0.82s cubic-bezier(0.28, 0.7, 0.25, 1),
+        filter 0.62s cubic-bezier(0.25, 0.72, 0.24, 1);
 }
 
 #logoCubeImage.is-flip-out {
@@ -580,6 +581,11 @@ h6 {
 #logoCubeImage.is-flip-in {
     transform: rotateY(-78deg) scale(0.9);
     opacity: 0.14;
+}
+
+#logoCubeImage.is-mid-blend {
+    filter: saturate(1.05) contrast(1.02) blur(1.2px) brightness(1.05);
+    opacity: 0.22;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -5037,10 +5037,12 @@ function initAnimatedHeaderLogo() {
 
 	const logoImages = [
 		"IMG/logo.png",
+		"IMG/logo 1.png",
 		"IMG/logo 2.jpg",
 		"IMG/logo 3.png",
 		"IMG/logo 4.png",
 		"IMG/logo 5.png",
+		"IMG/logo 6.jpg",
 	]
 
 	let imageIndex = 0
@@ -5048,6 +5050,8 @@ function initAnimatedHeaderLogo() {
 	const swapIntervalMs = 5000
 	const halfFlipMs = 560
 	const totalTransitionMs = 1400
+	const blendLeadMs = 90
+	const blendHoldMs = 220
 
 	logoImages.forEach((src) => {
 		const preload = new Image()
@@ -5061,14 +5065,23 @@ function initAnimatedHeaderLogo() {
 		isTransitioning = true
 
 		logoCube.classList.add("is-morphing")
+		logoImage.classList.remove("is-mid-blend")
 		logoImage.classList.remove("is-flip-in")
 		logoImage.classList.add("is-flip-out")
+
+		window.setTimeout(() => {
+			logoImage.classList.add("is-mid-blend")
+		}, Math.max(0, halfFlipMs - blendLeadMs))
 
 		window.setTimeout(() => {
 			imageIndex = (imageIndex + 1) % logoImages.length
 			logoImage.src = logoImages[imageIndex]
 			logoImage.classList.remove("is-flip-out")
 			logoImage.classList.add("is-flip-in")
+
+			window.setTimeout(() => {
+				logoImage.classList.remove("is-mid-blend")
+			}, blendHoldMs)
 
 			requestAnimationFrame(() => {
 				requestAnimationFrame(() => {
