@@ -1939,6 +1939,46 @@ function normalizeBookingStatus(status = "") {
 	return "pending"
 }
 
+const KNOWN_STYLIST_KEYS = new Set([
+	"any",
+	"fatima",
+	"zainab",
+	"grace",
+	"amina",
+	"sarah",
+])
+
+const STYLIST_LABEL_BY_KEY = {
+	any: "Any Available",
+	fatima: "Fatima Hassan - Master Braider",
+	zainab: "Zainab Mohamed - Senior Stylist",
+	grace: "Grace Wanjiku - Natural Hair Expert",
+	amina: "Amina Diallo - Braiding Specialist",
+	sarah: "Sarah Omondi - Kids Specialist",
+}
+
+function normalizeStylistKey(value = "") {
+	const raw = String(value || "")
+		.trim()
+		.toLowerCase()
+
+	if (!raw || raw === "any" || raw === "any available") return "any"
+	if (KNOWN_STYLIST_KEYS.has(raw)) return raw
+
+	if (raw.includes("fatima")) return "fatima"
+	if (raw.includes("zainab")) return "zainab"
+	if (raw.includes("grace")) return "grace"
+	if (raw.includes("amina")) return "amina"
+	if (raw.includes("sarah")) return "sarah"
+
+	return "any"
+}
+
+function getStylistDisplayName(value = "") {
+	const key = normalizeStylistKey(value)
+	return STYLIST_LABEL_BY_KEY[key] || STYLIST_LABEL_BY_KEY.any
+}
+
 function parseBookingDateTimeMs(dateValue = "", timeValue = "") {
 	const rawDate = String(dateValue || "").trim()
 	const rawTime = String(timeValue || "").trim()
@@ -1999,9 +2039,7 @@ function renderDashboardBookingRows(bookings = []) {
 			const disabledAttr = active ? "" : "disabled"
 			const id = escapeHtml(booking.id || "")
 			const stylistLabel = escapeHtml(
-				booking.stylist && String(booking.stylist).trim()
-					? String(booking.stylist).trim()
-					: "Any Available",
+				getStylistDisplayName(booking.stylistKey || booking.stylist),
 			)
 			return `
       <li>
@@ -2050,9 +2088,9 @@ function subscribeToDashboardRescheduleAvailability(
 				snapshot.forEach((doc) => {
 					if (currentSlotId && doc.id === currentSlotId) return
 					const data = doc.data() || {}
-					const docStylist = String(data.stylistKey || "any")
-						.trim()
-						.toLowerCase()
+					const docStylist = normalizeStylistKey(
+						data.stylistKey || data.stylist || "any",
+					)
 					const blocksSelectedStylist =
 						normalizedStylist === "any"
 							? true
@@ -2072,16 +2110,41 @@ function subscribeToDashboardRescheduleAvailability(
 					authUi.dashboardRescheduleTime.appendChild(opt)
 				})
 
-				if (
-					dashboardRescheduleTarget?.time &&
-					String(dashboardRescheduleTarget.date || "") ===
-						String(dateValue || "")
-				) {
-					const currentTime = String(dashboardRescheduleTarget.time)
-					const hasCurrent = Array.from(
+				const previousSelection = String(
+					authUi.dashboardRescheduleTime.value || "",
+				).trim()
+				if (previousSelection) {
+					const hasPreviousSelection = Array.from(
 						authUi.dashboardRescheduleTime.options,
-					).some((option) => option.value === currentTime)
-					if (hasCurrent) authUi.dashboardRescheduleTime.value = currentTime
+					).some((option) => option.value === previousSelection)
+					if (hasPreviousSelection) {
+						authUi.dashboardRescheduleTime.value = previousSelection
+					}
+				}
+
+				if (authUi.dashboardRescheduleTime.options.length <= 1) {
+					setDashboardRescheduleMessage(
+						"error",
+						"No available time slots for this date/stylist. Please choose another date or stylist.",
+					)
+				} else {
+					setDashboardRescheduleMessage(
+						"",
+						"",
+					)
+					if (
+						dashboardRescheduleTarget?.time &&
+						String(dashboardRescheduleTarget.date || "") ===
+							String(dateValue || "")
+					) {
+						const currentTime = String(dashboardRescheduleTarget.time || "")
+						if (!authUi.dashboardRescheduleTime.value && currentTime) {
+							setDashboardRescheduleMessage(
+								"error",
+								"Please select a new time to continue rescheduling.",
+							)
+						}
+					}
 				}
 			},
 			(error) => {
@@ -2115,10 +2178,10 @@ function openDashboardRescheduleModal(booking) {
 		authUi.dashboardRescheduleDate.value = initialDate
 	}
 
-	const stylistKey = String(booking.stylistKey || "any")
+	const stylistKey = normalizeStylistKey(booking.stylistKey || booking.stylist)
 	if (authUi.dashboardRescheduleStylist) {
 		authUi.dashboardRescheduleStylist.value = stylistKey
-		authUi.dashboardRescheduleStylist.disabled = true
+		authUi.dashboardRescheduleStylist.disabled = false
 	}
 
 	if (authUi.dashboardRescheduleTime) {
@@ -2181,14 +2244,18 @@ async function saveDashboardRescheduleChanges() {
 
 	const nextDate = String(authUi.dashboardRescheduleDate?.value || "").trim()
 	const nextTime = String(authUi.dashboardRescheduleTime?.value || "").trim()
-	const stylistKey = String(dashboardRescheduleTarget.stylistKey || "any")
+	const nextStylistKey = normalizeStylistKey(
+		authUi.dashboardRescheduleStylist?.value ||
+			dashboardRescheduleTarget.stylistKey ||
+			dashboardRescheduleTarget.stylist,
+	)
 
 	if (!nextDate || !nextTime) {
 		setDashboardRescheduleMessage("error", "Select both date and time.")
 		return
 	}
 
-	const nextSlotId = getSlotId(nextDate, stylistKey, nextTime)
+	const nextSlotId = getSlotId(nextDate, nextStylistKey, nextTime)
 	const currentSlotId = String(dashboardRescheduleTarget.slotId || "")
 	if (nextSlotId === currentSlotId) {
 		setDashboardRescheduleMessage(
@@ -2239,7 +2306,7 @@ async function saveDashboardRescheduleChanges() {
 				taken: true,
 				date: nextDate,
 				time: nextTime,
-				stylistKey,
+				stylistKey: nextStylistKey,
 				bookingId,
 				uid: auth.currentUser.uid,
 				createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2251,6 +2318,11 @@ async function saveDashboardRescheduleChanges() {
 				{
 					date: nextDate,
 					time: nextTime,
+					stylistKey: nextStylistKey,
+					stylist:
+						nextStylistKey === "any"
+							? ""
+							: getStylistDisplayName(nextStylistKey),
 					slotId: nextSlotId,
 					status:
 						normalizedCurrentStatus === "pending" ? "pending" : "confirmed",
@@ -3361,7 +3433,17 @@ function bindAuthUiEvents() {
 			if (!dashboardRescheduleTarget) return
 			subscribeToDashboardRescheduleAvailability(
 				authUi.dashboardRescheduleDate.value,
-				String(dashboardRescheduleTarget.stylistKey || "any"),
+				normalizeStylistKey(authUi.dashboardRescheduleStylist?.value || "any"),
+				String(dashboardRescheduleTarget.slotId || ""),
+			)
+		})
+	}
+	if (authUi.dashboardRescheduleStylist) {
+		authUi.dashboardRescheduleStylist.addEventListener("change", () => {
+			if (!dashboardRescheduleTarget) return
+			subscribeToDashboardRescheduleAvailability(
+				String(authUi.dashboardRescheduleDate?.value || "").trim(),
+				normalizeStylistKey(authUi.dashboardRescheduleStylist.value || "any"),
 				String(dashboardRescheduleTarget.slotId || ""),
 			)
 		})

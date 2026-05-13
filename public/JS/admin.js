@@ -224,8 +224,16 @@ function toTimestampMs(value) {
 
 function formatAdminDate(value) {
 	if (!value) return "N/A"
+	const raw = String(value).trim()
+	if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+		const [year, month, day] = raw.split("-").map(Number)
+		const localDate = new Date(year, month - 1, day)
+		if (!Number.isNaN(localDate.getTime())) {
+			return localDate.toLocaleDateString()
+		}
+	}
 	const ms = toTimestampMs(value)
-	if (!ms) return String(value)
+	if (!ms) return raw
 	return new Date(ms).toLocaleString()
 }
 
@@ -904,7 +912,7 @@ function renderAdminBookings(docs) {
           <div class="admin-booking-meta">
             <div><span>Service:</span> ${b.service || "N/A"}</div>
             <div><span>Stylist:</span> ${b.stylist || "Any Available"}</div>
-            <div><span>Date:</span> ${formatAdminDate(b.date)}</div>
+			<div><span>Date:</span> ${formatAdminDate(b.date)}</div>
             <div><span>Time:</span> ${b.time || "N/A"}</div>
             <div><span>Email:</span> ${b.email || "N/A"}</div>
             <div><span>Phone:</span> ${b.phone || "N/A"}</div>

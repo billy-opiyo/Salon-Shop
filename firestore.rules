@@ -65,6 +65,8 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).changedKeys().hasOnly([
         'date',
         'time',
+        'stylist',
+        'stylistKey',
         'slotId',
         'status',
         'updatedAt'
@@ -74,10 +76,12 @@ service cloud.firestore {
     function bookingOwnerRescheduleIsValid() {
       let changed = request.resource.data.diff(resource.data).changedKeys();
       return changed.hasAny(['date', 'time', 'slotId'])
-        && changed.hasAny(['date', 'time'])
+        && changed.hasAny(['date', 'time', 'stylistKey'])
         && changed.hasAny(['slotId'])
         && request.resource.data.date is string
         && request.resource.data.time is string
+        && request.resource.data.stylist is string
+        && request.resource.data.stylistKey is string
         && request.resource.data.slotId is string
         && request.resource.data.date != ''
         && request.resource.data.time != ''
@@ -99,7 +103,7 @@ service cloud.firestore {
 
     function bookingOwnerUpdateIsValid() {
       let changed = request.resource.data.diff(resource.data).changedKeys();
-      let touchesSlotFields = changed.hasAny(['date', 'time', 'slotId']);
+      let touchesSlotFields = changed.hasAny(['date', 'time', 'stylist', 'stylistKey', 'slotId']);
       return isSignedIn()
         && resource.data.uid == request.auth.uid
         && bookingOwnerUpdateHasAllowedKeys()

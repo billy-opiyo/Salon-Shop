@@ -5979,7 +5979,66 @@ select option {
 }
 
 #dashboardRescheduleModal .auth-modal-dialog {
+    position: relative;
+    width: min(100%, 640px);
     max-width: 640px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: 0 22px 56px rgba(0, 0, 0, 0.45);
+    z-index: 1;
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+    transition: opacity 0.24s ease, transform 0.24s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#dashboardRescheduleModal.active .auth-modal-dialog {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+#dashboardRescheduleModal .auth-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 18px 20px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+#dashboardRescheduleModal .auth-modal-header h3 {
+    margin: 0;
+    font-size: 1.08rem;
+}
+
+#dashboardRescheduleModal .auth-modal-close {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease,
+        color 0.2s ease;
+}
+
+#dashboardRescheduleModal .auth-modal-close:hover {
+    background: rgba(200, 150, 62, 0.18);
+    color: var(--primary);
+    border-color: var(--primary);
+    transform: scale(1.03);
+}
+
+#dashboardRescheduleModal .auth-modal-body {
+    padding: 16px 20px 20px;
 }
 
 #dashboardRescheduleModal .form-grid {
@@ -5991,6 +6050,14 @@ select option {
 }
 
 @media (max-width: 700px) {
+    #dashboardRescheduleModal .auth-modal-header {
+        padding: 16px 16px 10px;
+    }
+
+    #dashboardRescheduleModal .auth-modal-body {
+        padding: 14px 16px 16px;
+    }
+
     #dashboardRescheduleModal .form-grid {
         grid-template-columns: 1fr;
     }
