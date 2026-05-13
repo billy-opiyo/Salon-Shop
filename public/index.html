@@ -237,15 +237,15 @@
 					style="margin-top: 60px"
 				>
 					<div class="hero-stat">
-						<div class="number" data-count="1000">0</div>
+						<div class="number" data-count="500">0</div>
 						<div class="label">Happy Clients</div>
 					</div>
 					<div class="hero-stat">
-						<div class="number" data-count="12">0</div>
+						<div class="number" data-count="5">0</div>
 						<div class="label">Expert Braiders</div>
 					</div>
 					<div class="hero-stat">
-						<div class="number" data-count="50">0</div>
+						<div class="number" data-count="20">0</div>
 						<div class="label">Braiding Styles</div>
 					</div>
 					<div class="hero-stat">
@@ -663,6 +663,10 @@
 							<ul id="dashboardBookingsList" class="dashboard-list">
 								<li>No appointments yet.</li>
 							</ul>
+							<div class="dashboard-inline-note">
+								You can reschedule or cancel active bookings before appointment
+								time.
+							</div>
 						</div>
 
 						<div class="dashboard-card">
@@ -714,6 +718,78 @@
 				</div>
 			</div>
 		</section>
+
+		<div class="auth-modal" id="dashboardRescheduleModal" aria-hidden="true">
+			<div class="auth-modal-backdrop" id="dashboardRescheduleBackdrop"></div>
+			<div
+				class="auth-modal-dialog"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="dashboardRescheduleTitle"
+			>
+				<div class="auth-modal-header">
+					<h3 id="dashboardRescheduleTitle">Reschedule Booking</h3>
+					<button
+						type="button"
+						class="auth-modal-close"
+						id="dashboardRescheduleCloseBtn"
+						aria-label="Close"
+					>
+						×
+					</button>
+				</div>
+				<div class="auth-modal-body">
+					<div
+						class="form-message"
+						id="dashboardRescheduleMessage"
+						style="display: none"
+					></div>
+					<div class="form-grid">
+						<div class="form-group">
+							<label for="dashboardRescheduleDate">New Date *</label>
+							<input type="date" id="dashboardRescheduleDate" />
+						</div>
+						<div class="form-group">
+							<label for="dashboardRescheduleStylist">Stylist</label>
+							<select id="dashboardRescheduleStylist">
+								<option value="any">Any Available</option>
+								<option value="fatima">Fatima Hassan - Master Braider</option>
+								<option value="zainab">Zainab Mohamed - Senior Stylist</option>
+								<option value="grace">
+									Grace Wanjiku - Natural Hair Expert
+								</option>
+								<option value="amina">
+									Amina Diallo - Braiding Specialist
+								</option>
+								<option value="sarah">Sarah Omondi - Kids Specialist</option>
+							</select>
+						</div>
+						<div class="form-group full">
+							<label for="dashboardRescheduleTime">New Time *</label>
+							<select id="dashboardRescheduleTime">
+								<option value="">Select Time</option>
+							</select>
+						</div>
+					</div>
+					<div class="dashboard-actions" style="margin-top: 12px">
+						<button
+							type="button"
+							class="btn btn-outline"
+							id="dashboardRescheduleCancelBtn"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							class="btn btn-primary"
+							id="dashboardRescheduleSaveBtn"
+						>
+							Save Changes
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
 
 		<!-- ========== TESTIMONIALS ========== -->
 		<section class="testimonials" id="testimonials">

@@ -61,6 +61,56 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid;
     }
 
+    function bookingOwnerUpdateHasAllowedKeys() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        'date',
+        'time',
+        'slotId',
+        'status',
+        'updatedAt'
+      ]);
+    }
+
+    function bookingOwnerRescheduleIsValid() {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
+      return changed.hasAny(['date', 'time', 'slotId'])
+        && changed.hasAny(['date', 'time'])
+        && changed.hasAny(['slotId'])
+        && request.resource.data.date is string
+        && request.resource.data.time is string
+        && request.resource.data.slotId is string
+        && request.resource.data.date != ''
+        && request.resource.data.time != ''
+        && request.resource.data.slotId != ''
+        && request.resource.data.slotId != resource.data.slotId
+        && request.resource.data.status in ['pending', 'confirmed']
+        && resource.data.status in ['pending', 'confirmed']
+        && request.resource.data.status == resource.data.status;
+    }
+
+    function bookingOwnerCancelIsValid() {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
+      return !changed.hasAny(['date', 'time', 'slotId'])
+        && changed.hasOnly(['status', 'updatedAt'])
+        && changed.hasAny(['status'])
+        && request.resource.data.status == 'cancelled'
+        && resource.data.status in ['pending', 'confirmed'];
+    }
+
+    function bookingOwnerUpdateIsValid() {
+      let changed = request.resource.data.diff(resource.data).changedKeys();
+      let touchesSlotFields = changed.hasAny(['date', 'time', 'slotId']);
+      return isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && bookingOwnerUpdateHasAllowedKeys()
+        && (bookingOwnerRescheduleIsValid() || bookingOwnerCancelIsValid())
+        && (
+          touchesSlotFields
+            ? !changed.hasAny(['status']) || request.resource.data.status == 'confirmed'
+            : true
+        );
+    }
+
     match /bookings/{bookingId} {
       allow create: if isSignedIn() && bookingCreateIsValid();
       allow read: if isSignedIn() && (
@@ -75,11 +125,13 @@ service cloud.firestore {
         isAdmin()
       );
 
-      allow update: if isAdmin()
+      allow update: if (
+        isAdmin()
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'status',
           'updatedAt'
-        ]);
+        ])
+      ) || bookingOwnerUpdateIsValid();
 
       allow delete: if false;
     }
@@ -108,9 +160,9 @@ service cloud.firestore {
       // Needed for realtime availability query in the public booking form.
       allow read: if true;
 
-      // Prevent users from editing or releasing slot locks directly.
+      // Prevent users from editing slot locks directly.
       allow update: if false;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
     }
 
     match /galleryStyles/{styleId} {

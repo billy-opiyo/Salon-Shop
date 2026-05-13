@@ -253,6 +253,9 @@ let galleryRealtimeUnsubscribe = null
 let dashboardFavoritesUnsubscribe = null
 let dashboardFavoriteStyles = []
 let activeDashboardUid = ""
+let dashboardBookingDocs = []
+let dashboardRescheduleTarget = null
+let dashboardRescheduleAvailabilityUnsubscribe = null
 let gallerySortBy = "recommended"
 const galleryFiltersState = {
 	length: "all",
@@ -679,6 +682,15 @@ const authUi = {
 	dashboardProfileName: null,
 	dashboardProfileEmail: null,
 	dashboardProfilePhone: null,
+	dashboardRescheduleModal: null,
+	dashboardRescheduleBackdrop: null,
+	dashboardRescheduleCloseBtn: null,
+	dashboardRescheduleCancelBtn: null,
+	dashboardRescheduleSaveBtn: null,
+	dashboardRescheduleMessage: null,
+	dashboardRescheduleDate: null,
+	dashboardRescheduleStylist: null,
+	dashboardRescheduleTime: null,
 	postBookingAuthPrompt: null,
 	postBookingGoogleBtn: null,
 	postBookingLaterBtn: null,
@@ -948,6 +960,33 @@ function initAuthUiRefs() {
 	)
 	authUi.dashboardProfilePhone = document.getElementById(
 		"dashboardProfilePhone",
+	)
+	authUi.dashboardRescheduleModal = document.getElementById(
+		"dashboardRescheduleModal",
+	)
+	authUi.dashboardRescheduleBackdrop = document.getElementById(
+		"dashboardRescheduleBackdrop",
+	)
+	authUi.dashboardRescheduleCloseBtn = document.getElementById(
+		"dashboardRescheduleCloseBtn",
+	)
+	authUi.dashboardRescheduleCancelBtn = document.getElementById(
+		"dashboardRescheduleCancelBtn",
+	)
+	authUi.dashboardRescheduleSaveBtn = document.getElementById(
+		"dashboardRescheduleSaveBtn",
+	)
+	authUi.dashboardRescheduleMessage = document.getElementById(
+		"dashboardRescheduleMessage",
+	)
+	authUi.dashboardRescheduleDate = document.getElementById(
+		"dashboardRescheduleDate",
+	)
+	authUi.dashboardRescheduleStylist = document.getElementById(
+		"dashboardRescheduleStylist",
+	)
+	authUi.dashboardRescheduleTime = document.getElementById(
+		"dashboardRescheduleTime",
 	)
 	authUi.postBookingAuthPrompt = document.getElementById(
 		"postBookingAuthPrompt",
@@ -1767,7 +1806,10 @@ function setHeaderProfileAvatar(user) {
 
 function setDashboardPromptState() {
 	stopDashboardFavoritesListener()
+	stopDashboardRescheduleAvailabilityListener()
+	closeDashboardRescheduleModal()
 	dashboardFavoriteStyles = []
+	dashboardBookingDocs = []
 	activeDashboardUid = ""
 	if (authUi.clientDashboard) authUi.clientDashboard.classList.add("hidden")
 	if (authUi.navDashboardLink) authUi.navDashboardLink.classList.add("hidden")
@@ -1880,6 +1922,362 @@ function renderDashboardList(mount, items, emptyText) {
 		return
 	}
 	mount.innerHTML = items.map((item) => `<li>${item}</li>`).join("")
+}
+
+function normalizeBookingStatus(status = "") {
+	const raw = String(status || "pending")
+		.trim()
+		.toLowerCase()
+	if (raw === "complete") return "completed"
+	if (raw === "canceled") return "cancelled"
+	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
+		return "confirmed"
+	}
+	if (["pending", "confirmed", "completed", "cancelled"].includes(raw)) {
+		return raw
+	}
+	return "pending"
+}
+
+function parseBookingDateTimeMs(dateValue = "", timeValue = "") {
+	const rawDate = String(dateValue || "").trim()
+	const rawTime = String(timeValue || "").trim()
+	if (!rawDate || !rawTime) return 0
+	const parsed = Date.parse(`${rawDate} ${rawTime}`)
+	if (!Number.isNaN(parsed)) return parsed
+	const parsedIso = Date.parse(`${rawDate}T${rawTime}`)
+	return Number.isNaN(parsedIso) ? 0 : parsedIso
+}
+
+function isBookingActionable(booking = {}) {
+	const status = normalizeBookingStatus(booking.status)
+	if (!(status === "pending" || status === "confirmed")) return false
+	const scheduledAt = parseBookingDateTimeMs(booking.date, booking.time)
+	if (!scheduledAt) return true
+	return scheduledAt > Date.now()
+}
+
+function stopDashboardRescheduleAvailabilityListener() {
+	if (typeof dashboardRescheduleAvailabilityUnsubscribe === "function") {
+		dashboardRescheduleAvailabilityUnsubscribe()
+		dashboardRescheduleAvailabilityUnsubscribe = null
+	}
+}
+
+function setDashboardRescheduleMessage(type = "", text = "") {
+	const msg = authUi.dashboardRescheduleMessage
+	if (!msg) return
+	if (!type || !text) {
+		clearFormMessage(msg)
+		return
+	}
+	showFormMessage(msg, type, text)
+}
+
+function closeDashboardRescheduleModal() {
+	stopDashboardRescheduleAvailabilityListener()
+	dashboardRescheduleTarget = null
+	setDashboardRescheduleMessage("", "")
+	if (authUi.dashboardRescheduleModal) {
+		authUi.dashboardRescheduleModal.classList.remove("active")
+		authUi.dashboardRescheduleModal.setAttribute("aria-hidden", "true")
+	}
+	document.body.style.overflow = ""
+}
+
+function renderDashboardBookingRows(bookings = []) {
+	if (!authUi.dashboardBookingsList) return
+	if (!Array.isArray(bookings) || !bookings.length) {
+		authUi.dashboardBookingsList.innerHTML = "<li>No appointments yet.</li>"
+		return
+	}
+
+	authUi.dashboardBookingsList.innerHTML = bookings
+		.map((booking) => {
+			const status = normalizeBookingStatus(booking.status)
+			const active = isBookingActionable(booking)
+			const disabledAttr = active ? "" : "disabled"
+			const id = escapeHtml(booking.id || "")
+			const stylistLabel = escapeHtml(
+				booking.stylist && String(booking.stylist).trim()
+					? String(booking.stylist).trim()
+					: "Any Available",
+			)
+			return `
+      <li>
+        <strong>${escapeHtml(booking.service || "Service")}</strong><br />
+        ${escapeHtml(booking.date || "No date")} at ${escapeHtml(booking.time || "No time")}<br />
+        Stylist: ${stylistLabel}<br />
+        Status: ${escapeHtml(status)}
+        ${
+					active
+						? `<div class="admin-booking-actions" style="margin-top:10px">
+            <button type="button" class="admin-action-btn" data-dashboard-booking-action="reschedule" data-booking-id="${id}" ${disabledAttr}>Reschedule</button>
+            <button type="button" class="admin-action-btn danger" data-dashboard-booking-action="cancel" data-booking-id="${id}" ${disabledAttr}>Cancel</button>
+          </div>`
+						: ""
+				}
+      </li>
+    `
+		})
+		.join("")
+}
+
+function subscribeToDashboardRescheduleAvailability(
+	dateValue,
+	stylistKey,
+	currentSlotId,
+) {
+	if (!firebaseReady || !db || !dateValue || !authUi.dashboardRescheduleTime)
+		return
+
+	stopDashboardRescheduleAvailabilityListener()
+
+	const normalizedStylist =
+		String(stylistKey || "")
+			.trim()
+			.toLowerCase() || "any"
+	const datePrefix = `${dateValue}__`
+	const datePrefixEnd = `${dateValue}__\uf8ff`
+
+	dashboardRescheduleAvailabilityUnsubscribe = db
+		.collection("bookingSlots")
+		.where(firebase.firestore.FieldPath.documentId(), ">=", datePrefix)
+		.where(firebase.firestore.FieldPath.documentId(), "<=", datePrefixEnd)
+		.onSnapshot(
+			(snapshot) => {
+				const taken = new Set()
+				snapshot.forEach((doc) => {
+					if (currentSlotId && doc.id === currentSlotId) return
+					const data = doc.data() || {}
+					const docStylist = String(data.stylistKey || "any")
+						.trim()
+						.toLowerCase()
+					const blocksSelectedStylist =
+						normalizedStylist === "any"
+							? true
+							: docStylist === normalizedStylist || docStylist === "any"
+					if (blocksSelectedStylist && data.taken && data.time) {
+						taken.add(String(data.time))
+					}
+				})
+
+				authUi.dashboardRescheduleTime.innerHTML =
+					'<option value="">Select Time</option>'
+				timeSlots.forEach((slot) => {
+					if (taken.has(slot)) return
+					const opt = document.createElement("option")
+					opt.value = slot
+					opt.textContent = slot
+					authUi.dashboardRescheduleTime.appendChild(opt)
+				})
+
+				if (
+					dashboardRescheduleTarget?.time &&
+					String(dashboardRescheduleTarget.date || "") ===
+						String(dateValue || "")
+				) {
+					const currentTime = String(dashboardRescheduleTarget.time)
+					const hasCurrent = Array.from(
+						authUi.dashboardRescheduleTime.options,
+					).some((option) => option.value === currentTime)
+					if (hasCurrent) authUi.dashboardRescheduleTime.value = currentTime
+				}
+			},
+			(error) => {
+				console.error("Dashboard reschedule availability failed:", error)
+				setDashboardRescheduleMessage(
+					"error",
+					"Could not load times right now. Please try again.",
+				)
+			},
+		)
+}
+
+function openDashboardRescheduleModal(booking) {
+	if (!booking || !authUi.dashboardRescheduleModal) return
+	if (!isBookingActionable(booking)) {
+		showTimedDashboardFavoritesMessage(
+			"error",
+			"❌ This booking can no longer be rescheduled.",
+		)
+		return
+	}
+	dashboardRescheduleTarget = { ...booking }
+	setDashboardRescheduleMessage("", "")
+
+	const minDate = new Date().toISOString().split("T")[0]
+	const bookingDate = String(booking.date || "").trim()
+	const initialDate =
+		bookingDate && bookingDate >= minDate ? bookingDate : minDate
+	if (authUi.dashboardRescheduleDate) {
+		authUi.dashboardRescheduleDate.min = minDate
+		authUi.dashboardRescheduleDate.value = initialDate
+	}
+
+	const stylistKey = String(booking.stylistKey || "any")
+	if (authUi.dashboardRescheduleStylist) {
+		authUi.dashboardRescheduleStylist.value = stylistKey
+		authUi.dashboardRescheduleStylist.disabled = true
+	}
+
+	if (authUi.dashboardRescheduleTime) {
+		authUi.dashboardRescheduleTime.innerHTML =
+			'<option value="">Select Time</option>'
+		authUi.dashboardRescheduleTime.value = ""
+	}
+
+	subscribeToDashboardRescheduleAvailability(
+		initialDate,
+		stylistKey,
+		String(booking.slotId || ""),
+	)
+
+	authUi.dashboardRescheduleModal.classList.add("active")
+	authUi.dashboardRescheduleModal.setAttribute("aria-hidden", "false")
+	document.body.style.overflow = "hidden"
+}
+
+async function cancelDashboardBooking(bookingId) {
+	if (!firebaseReady || !db || !auth?.currentUser || !bookingId) return
+
+	const bookingRef = db.collection("bookings").doc(bookingId)
+	await db.runTransaction(async (transaction) => {
+		const bookingDoc = await transaction.get(bookingRef)
+		if (!bookingDoc.exists) {
+			throw new Error("Booking no longer exists.")
+		}
+
+		const booking = { id: bookingDoc.id, ...(bookingDoc.data() || {}) }
+		if (String(booking.uid || "") !== String(auth.currentUser.uid || "")) {
+			throw new Error("You can only cancel your own booking.")
+		}
+		if (!isBookingActionable(booking)) {
+			throw new Error("This booking can no longer be cancelled.")
+		}
+
+		if (booking.slotId) {
+			const slotRef = db.collection("bookingSlots").doc(String(booking.slotId))
+			transaction.delete(slotRef)
+		}
+
+		transaction.set(
+			bookingRef,
+			{
+				status: "cancelled",
+				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		)
+	})
+}
+
+async function saveDashboardRescheduleChanges() {
+	if (!firebaseReady || !db || !auth?.currentUser || !dashboardRescheduleTarget)
+		return
+
+	const bookingId = String(dashboardRescheduleTarget.id || "")
+	if (!bookingId) return
+
+	const nextDate = String(authUi.dashboardRescheduleDate?.value || "").trim()
+	const nextTime = String(authUi.dashboardRescheduleTime?.value || "").trim()
+	const stylistKey = String(dashboardRescheduleTarget.stylistKey || "any")
+
+	if (!nextDate || !nextTime) {
+		setDashboardRescheduleMessage("error", "Select both date and time.")
+		return
+	}
+
+	const nextSlotId = getSlotId(nextDate, stylistKey, nextTime)
+	const currentSlotId = String(dashboardRescheduleTarget.slotId || "")
+	if (nextSlotId === currentSlotId) {
+		setDashboardRescheduleMessage(
+			"error",
+			"Please choose a different time from your current booking.",
+		)
+		return
+	}
+
+	const saveBtn = authUi.dashboardRescheduleSaveBtn
+	if (saveBtn) {
+		saveBtn.disabled = true
+		saveBtn.textContent = "Saving..."
+	}
+
+	try {
+		const bookingRef = db.collection("bookings").doc(bookingId)
+		const nextSlotRef = db.collection("bookingSlots").doc(nextSlotId)
+
+		await db.runTransaction(async (transaction) => {
+			const bookingDoc = await transaction.get(bookingRef)
+			if (!bookingDoc.exists) {
+				throw new Error("Booking no longer exists.")
+			}
+
+			const booking = { id: bookingDoc.id, ...(bookingDoc.data() || {}) }
+			const normalizedCurrentStatus = normalizeBookingStatus(booking.status)
+			if (String(booking.uid || "") !== String(auth.currentUser.uid || "")) {
+				throw new Error("You can only reschedule your own booking.")
+			}
+			if (!isBookingActionable(booking)) {
+				throw new Error("This booking can no longer be rescheduled.")
+			}
+
+			const nextSlotDoc = await transaction.get(nextSlotRef)
+			if (nextSlotDoc.exists && nextSlotDoc.data()?.taken) {
+				throw new Error("Selected slot is no longer available.")
+			}
+
+			if (booking.slotId) {
+				const previousSlotRef = db
+					.collection("bookingSlots")
+					.doc(String(booking.slotId))
+				transaction.delete(previousSlotRef)
+			}
+
+			transaction.set(nextSlotRef, {
+				taken: true,
+				date: nextDate,
+				time: nextTime,
+				stylistKey,
+				bookingId,
+				uid: auth.currentUser.uid,
+				createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+			})
+
+			transaction.set(
+				bookingRef,
+				{
+					date: nextDate,
+					time: nextTime,
+					slotId: nextSlotId,
+					status:
+						normalizedCurrentStatus === "pending" ? "pending" : "confirmed",
+					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+				},
+				{ merge: true },
+			)
+		})
+
+		closeDashboardRescheduleModal()
+		await loadUserDashboardData(auth.currentUser)
+		showTimedDashboardFavoritesMessage(
+			"success",
+			"✅ Booking rescheduled successfully.",
+		)
+	} catch (error) {
+		console.error("Reschedule failed:", error)
+		setDashboardRescheduleMessage(
+			"error",
+			`❌ ${error?.message || "Could not reschedule right now."}`,
+		)
+	} finally {
+		if (saveBtn) {
+			saveBtn.disabled = false
+			saveBtn.textContent = "Save Changes"
+		}
+	}
 }
 
 function getGalleryIdentity(style = {}) {
@@ -2142,6 +2540,7 @@ async function loadUserDashboardData(userOrUid) {
 		}
 
 		const bookingItems = []
+		dashboardBookingDocs = []
 		let latestPhone = ""
 		const bookingDocMap = new Map()
 		;(bookingsByUidSnap?.docs || []).forEach((doc) => {
@@ -2160,6 +2559,7 @@ async function loadUserDashboardData(userOrUid) {
 		bookingsDocs.slice(0, 5).forEach((doc) => {
 			const data = doc.data() || {}
 			if (!latestPhone && data.phone) latestPhone = data.phone
+			dashboardBookingDocs.push({ id: doc.id, ...data })
 			bookingItems.push(
 				`${escapeHtml(data.service || "Service")} • ${escapeHtml(data.date || "No date")} at ${escapeHtml(data.time || "No time")} • ${escapeHtml(data.status || "pending")}`,
 			)
@@ -2178,11 +2578,7 @@ async function loadUserDashboardData(userOrUid) {
 			)
 		})
 
-		renderDashboardList(
-			authUi.dashboardBookingsList,
-			bookingItems,
-			"No appointments yet.",
-		)
+		renderDashboardBookingRows(dashboardBookingDocs)
 		renderDashboardList(
 			authUi.dashboardReviewsList,
 			reviewItems,
@@ -2891,6 +3287,88 @@ function bindAuthUiEvents() {
 				authUi.profileMenu.classList.remove("open")
 				authUi.profileTrigger?.setAttribute("aria-expanded", "false")
 			}
+		})
+	}
+
+	if (authUi.dashboardBookingsList) {
+		authUi.dashboardBookingsList.addEventListener("click", (event) => {
+			const actionBtn = event.target.closest("[data-dashboard-booking-action]")
+			if (!actionBtn || !isNonGuestSignedIn()) return
+
+			const action = String(actionBtn.dataset.dashboardBookingAction || "")
+			const bookingId = String(actionBtn.dataset.bookingId || "")
+			if (!action || !bookingId) return
+
+			const booking = dashboardBookingDocs.find((item) => item.id === bookingId)
+			if (!booking) return
+			if (!isBookingActionable(booking)) {
+				showTimedDashboardFavoritesMessage(
+					"error",
+					"❌ This booking is no longer active.",
+				)
+				return
+			}
+
+			if (action === "reschedule") {
+				openDashboardRescheduleModal(booking)
+				return
+			}
+
+			if (action === "cancel") {
+				actionBtn.disabled = true
+				void cancelDashboardBooking(bookingId)
+					.then(async () => {
+						await loadUserDashboardData(auth.currentUser)
+						showTimedDashboardFavoritesMessage(
+							"success",
+							"✅ Booking cancelled and slot released.",
+						)
+					})
+					.catch((error) => {
+						console.error("Cancel booking failed:", error)
+						showTimedDashboardFavoritesMessage(
+							"error",
+							`❌ ${error?.message || "Could not cancel booking."}`,
+						)
+					})
+					.finally(() => {
+						actionBtn.disabled = false
+					})
+			}
+		})
+	}
+
+	if (authUi.dashboardRescheduleBackdrop) {
+		authUi.dashboardRescheduleBackdrop.addEventListener(
+			"click",
+			closeDashboardRescheduleModal,
+		)
+	}
+	if (authUi.dashboardRescheduleCloseBtn) {
+		authUi.dashboardRescheduleCloseBtn.addEventListener(
+			"click",
+			closeDashboardRescheduleModal,
+		)
+	}
+	if (authUi.dashboardRescheduleCancelBtn) {
+		authUi.dashboardRescheduleCancelBtn.addEventListener(
+			"click",
+			closeDashboardRescheduleModal,
+		)
+	}
+	if (authUi.dashboardRescheduleDate) {
+		authUi.dashboardRescheduleDate.addEventListener("change", () => {
+			if (!dashboardRescheduleTarget) return
+			subscribeToDashboardRescheduleAvailability(
+				authUi.dashboardRescheduleDate.value,
+				String(dashboardRescheduleTarget.stylistKey || "any"),
+				String(dashboardRescheduleTarget.slotId || ""),
+			)
+		})
+	}
+	if (authUi.dashboardRescheduleSaveBtn) {
+		authUi.dashboardRescheduleSaveBtn.addEventListener("click", () => {
+			void saveDashboardRescheduleChanges()
 		})
 	}
 }
@@ -5069,9 +5547,12 @@ function initAnimatedHeaderLogo() {
 		logoImage.classList.remove("is-flip-in")
 		logoImage.classList.add("is-flip-out")
 
-		window.setTimeout(() => {
-			logoImage.classList.add("is-mid-blend")
-		}, Math.max(0, halfFlipMs - blendLeadMs))
+		window.setTimeout(
+			() => {
+				logoImage.classList.add("is-mid-blend")
+			},
+			Math.max(0, halfFlipMs - blendLeadMs),
+		)
 
 		window.setTimeout(() => {
 			imageIndex = (imageIndex + 1) % logoImages.length

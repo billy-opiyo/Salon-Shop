@@ -5762,6 +5762,10 @@ select option {
     border: 1px solid var(--border);
     background: var(--bg-card);
     box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+    --dashboard-visible-cards: 4;
+    --dashboard-item-height: 78px;
+    --dashboard-list-gap: 10px;
+    --dashboard-list-max-height: calc((var(--dashboard-item-height) * var(--dashboard-visible-cards)) + (var(--dashboard-list-gap) * (var(--dashboard-visible-cards) - 1)));
 }
 
 .dashboard-grid {
@@ -5769,6 +5773,7 @@ select option {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
     margin-top: 20px;
+    align-items: start;
 }
 
 .dashboard-card {
@@ -5776,6 +5781,7 @@ select option {
     background: rgba(10, 10, 10, 0.3);
     border: 1px solid var(--border);
     border-radius: 14px;
+    height: fit-content;
     transition: transform 0.24s ease, border-color 0.24s ease, box-shadow 0.24s ease,
         background-color 0.24s ease;
 }
@@ -5818,9 +5824,7 @@ select option {
 
 #dashboardBookingsList,
 #dashboardReviewsList {
-    --dashboard-visible-cards: 4;
-    --dashboard-item-height: 78px;
-    max-height: calc((var(--dashboard-item-height) * var(--dashboard-visible-cards)) + (10px * (var(--dashboard-visible-cards) - 1)));
+    max-height: var(--dashboard-list-max-height);
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 6px;
@@ -5831,11 +5835,9 @@ select option {
 
 #dashboardFavoritesList {
     display: grid;
-    --dashboard-visible-cards: 2;
-    --dashboard-item-height: 148px;
-    --dashboard-list-gap: 12px;
+    --dashboard-list-gap: 10px;
     gap: var(--dashboard-list-gap);
-    max-height: calc((var(--dashboard-item-height) * var(--dashboard-visible-cards)) + (var(--dashboard-list-gap) * (var(--dashboard-visible-cards) - 1)));
+    max-height: var(--dashboard-list-max-height);
     overflow-y: auto;
     overflow-x: hidden;
     padding: 2px 8px 2px 0;
@@ -5887,10 +5889,24 @@ select option {
     color: var(--text-secondary);
 }
 
+#dashboardBookingsList li {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+}
+
+#dashboardBookingsList li .admin-booking-actions {
+    margin-top: 8px !important;
+}
+
 #dashboardBookingsList li,
-#dashboardReviewsList li,
-#dashboardFavoritesList li {
+#dashboardReviewsList li {
     min-height: var(--dashboard-item-height);
+}
+
+#dashboardFavoritesList li {
+    min-height: 0;
+    height: auto;
 }
 
 .dashboard-favorite-card {
@@ -5904,7 +5920,7 @@ select option {
     grid-template-columns: 72px minmax(0, 1fr);
     gap: 12px;
     align-items: center;
-    min-height: 132px;
+    min-height: 0;
     padding: 14px;
     border-radius: 12px;
     border: 1px solid rgba(200, 150, 62, 0.32);
@@ -5956,6 +5972,30 @@ select option {
     margin-top: 4px;
 }
 
+.dashboard-inline-note {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+#dashboardRescheduleModal .auth-modal-dialog {
+    max-width: 640px;
+}
+
+#dashboardRescheduleModal .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#dashboardRescheduleModal .form-group.full {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 700px) {
+    #dashboardRescheduleModal .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .dashboard-favorite-actions .btn {
     padding: 6px 12px;
     font-size: 0.76rem;
@@ -5963,8 +6003,7 @@ select option {
 
 @media (max-width: 700px) {
     #dashboardFavoritesList {
-        --dashboard-item-height: 156px;
-        --dashboard-list-gap: 12px;
+        --dashboard-list-gap: 10px;
     }
 
     .dashboard-favorite-item {
