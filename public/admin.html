@@ -51,7 +51,7 @@
 					<div class="section-subtitle">Admin Console</div>
 					<h1 class="section-title">Content & Booking Management</h1>
 					<p class="section-desc">
-						Log in with your admin account to manage Bookings, Gallery, Blogs,
+						Log in with your admin account to manage Bookings, Schedules, Gallery, Blogs,
 						Reviews and Messages from one categorized control panel.
 					</p>
 					<br />
@@ -137,6 +137,15 @@
 						<button
 							type="button"
 							class="admin-section-tab"
+							data-admin-section-tab="schedule"
+							role="tab"
+							aria-selected="false"
+						>
+							Schedule
+						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
 							data-admin-section-tab="gallery"
 							role="tab"
 							aria-selected="false"
@@ -206,6 +215,87 @@
 							style="display: none"
 						></div>
 						<div class="admin-bookings-list" id="adminBookingsList"></div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="schedule"
+						role="tabpanel"
+					>
+						<div class="admin-schedule-wrap">
+							<div class="admin-schedule-toolbar">
+								<div class="admin-schedule-nav">
+									<button
+										type="button"
+										class="admin-action-btn"
+										id="adminSchedulePrev"
+									>
+										<i class="fa-solid fa-chevron-left"></i>
+									</button>
+									<button
+										type="button"
+										class="admin-action-btn"
+										id="adminScheduleToday"
+									>
+										Today
+									</button>
+									<button
+										type="button"
+										class="admin-action-btn"
+										id="adminScheduleNext"
+									>
+										<i class="fa-solid fa-chevron-right"></i>
+									</button>
+								</div>
+								<div class="admin-schedule-range" id="adminScheduleRangeLabel">
+									Schedule
+								</div>
+								<div
+									class="admin-schedule-view-toggle"
+									role="tablist"
+									aria-label="Schedule views"
+								>
+									<button
+										type="button"
+										class="admin-action-btn"
+										data-schedule-view="day"
+										aria-pressed="false"
+									>
+										Day
+									</button>
+									<button
+										type="button"
+										class="admin-action-btn active"
+										data-schedule-view="week"
+										aria-pressed="true"
+									>
+										Week
+									</button>
+								</div>
+							</div>
+
+							<div class="admin-schedule-legend" aria-label="Status colors">
+								<span><i class="admin-status-dot pending"></i>Pending</span>
+								<span><i class="admin-status-dot confirmed"></i>Confirmed</span>
+								<span><i class="admin-status-dot completed"></i>Completed</span>
+								<span><i class="admin-status-dot cancelled"></i>Cancelled</span>
+							</div>
+
+							<div class="admin-schedule-grid" id="adminScheduleGrid"></div>
+
+							<div
+								class="form-message"
+								id="adminScheduleMessage"
+								style="display: none"
+							></div>
+
+							<div class="admin-schedule-details" id="adminScheduleDetails">
+								<div class="admin-empty-state">
+									Click a calendar event to view booking details and quick
+									actions.
+								</div>
+							</div>
+						</div>
 					</section>
 
 					<section

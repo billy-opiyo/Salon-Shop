@@ -2586,7 +2586,19 @@ h6 {
     background: rgba(236, 201, 75, 0.12);
 }
 
+.admin-action-btn[data-schedule-action="pending"]:hover {
+    border-color: #ecc94b;
+    color: #ecc94b;
+    background: rgba(236, 201, 75, 0.12);
+}
+
 .admin-action-btn[data-action="confirmed"]:hover {
+    border-color: #48bb78;
+    color: #48bb78;
+    background: rgba(72, 187, 120, 0.12);
+}
+
+.admin-action-btn[data-schedule-action="confirmed"]:hover {
     border-color: #48bb78;
     color: #48bb78;
     background: rgba(72, 187, 120, 0.12);
@@ -2610,7 +2622,19 @@ h6 {
     background: rgba(66, 153, 225, 0.12);
 }
 
+.admin-action-btn[data-schedule-action="completed"]:hover {
+    border-color: #4299e1;
+    color: #4299e1;
+    background: rgba(66, 153, 225, 0.12);
+}
+
 .admin-action-btn[data-action="cancel-release"]:hover {
+    border-color: #f56565;
+    color: #f56565;
+    background: rgba(245, 101, 101, 0.12);
+}
+
+.admin-action-btn[data-schedule-action="cancel-release"]:hover {
     border-color: #f56565;
     color: #f56565;
     background: rgba(245, 101, 101, 0.12);
@@ -2675,6 +2699,274 @@ h6 {
     border: 1px dashed var(--border);
     border-radius: var(--radius);
     color: var(--text-muted);
+}
+
+.admin-schedule-wrap {
+    display: grid;
+    gap: 14px;
+}
+
+.admin-schedule-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.admin-schedule-nav,
+.admin-schedule-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-schedule-view-toggle .admin-action-btn.active {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(200, 150, 62, 0.14);
+}
+
+.admin-schedule-range {
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--text-primary);
+}
+
+.admin-schedule-legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    color: var(--text-secondary);
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.admin-schedule-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.admin-status-dot.pending {
+    background: #ecc94b;
+}
+
+.admin-status-dot.confirmed {
+    background: #48bb78;
+}
+
+.admin-status-dot.completed {
+    background: #4299e1;
+}
+
+.admin-status-dot.cancelled {
+    background: #f56565;
+}
+
+.admin-schedule-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.admin-schedule-grid.is-week-view {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.admin-schedule-grid.is-week-view .admin-schedule-day-header {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--bg-secondary);
+    box-shadow: 0 2px 0 rgba(200, 150, 62, 0.1);
+}
+
+.admin-schedule-day-column {
+    --admin-schedule-visible-cards: 3;
+    --admin-schedule-event-height: 74px;
+    --admin-schedule-event-gap: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-secondary);
+    min-height: 180px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+}
+
+.admin-schedule-day-header {
+    padding: 10px 10px 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.admin-schedule-day-header h4 {
+    margin: 0;
+    font-size: 0.92rem;
+}
+
+.admin-schedule-day-header p {
+    margin: 3px 0 0;
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+}
+
+.admin-schedule-day-events {
+    padding: 10px;
+    display: grid;
+    gap: var(--admin-schedule-event-gap);
+    align-content: start;
+    max-height: calc((var(--admin-schedule-event-height) * var(--admin-schedule-visible-cards)) + (var(--admin-schedule-event-gap) * (var(--admin-schedule-visible-cards) - 1)));
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #c8963e #1b1712;
+}
+
+.admin-schedule-day-events::-webkit-scrollbar {
+    width: 8px;
+}
+
+.admin-schedule-day-events::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #17120d, #20180f);
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.18);
+}
+
+.admin-schedule-day-events::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f2d08a, #c8963e, #a6792d);
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.55);
+}
+
+.admin-schedule-day-events::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #ffd98f, #d6a74f, #b9832f);
+}
+
+.admin-schedule-bucket {
+    display: grid;
+    gap: 6px;
+}
+
+.admin-schedule-bucket + .admin-schedule-bucket {
+    margin-top: 2px;
+}
+
+.admin-schedule-bucket-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: var(--primary-light);
+    padding: 4px 8px;
+    border: 1px dashed rgba(200, 150, 62, 0.35);
+    border-radius: var(--radius-sm);
+    background: rgba(200, 150, 62, 0.08);
+}
+
+.admin-schedule-empty-day {
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.admin-schedule-event {
+    width: 100%;
+    min-height: var(--admin-schedule-event-height);
+    text-align: left;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    border-left-width: 4px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: 8px;
+    display: grid;
+    gap: 3px;
+    transition: var(--transition-fast);
+}
+
+.admin-schedule-event:hover {
+    transform: translateY(-1px);
+    border-color: var(--primary);
+}
+
+.admin-schedule-event.is-selected {
+    outline: 2px solid rgba(200, 150, 62, 0.55);
+    outline-offset: 1px;
+    box-shadow: 0 8px 18px rgba(200, 150, 62, 0.16);
+}
+
+.admin-schedule-event-time {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.admin-schedule-event-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.admin-schedule-event-service {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+
+.admin-schedule-event.admin-status-pending {
+    border-left-color: #ecc94b;
+}
+
+.admin-schedule-event.admin-status-confirmed {
+    border-left-color: #48bb78;
+}
+
+.admin-schedule-event.admin-status-completed {
+    border-left-color: #4299e1;
+}
+
+.admin-schedule-event.admin-status-cancelled {
+    border-left-color: #f56565;
+}
+
+.admin-schedule-details {
+    margin-top: 4px;
+}
+
+.admin-schedule-detail-card {
+    min-height: 0;
+}
+
+.admin-schedule-detail-actions {
+    margin-top: 10px;
+}
+
+.admin-schedule-prev-btn,
+.admin-schedule-next-btn {
+    background: rgba(200, 150, 62, 0.14);
+    border-color: rgba(200, 150, 62, 0.55);
+    color: var(--primary-light);
+}
+
+.admin-schedule-prev-btn:hover,
+.admin-schedule-next-btn:hover {
+    background: rgba(200, 150, 62, 0.24);
+    border-color: var(--primary);
+    color: var(--primary);
 }
 
 .admin-confirm-modal {
@@ -2811,6 +3103,10 @@ h6 {
     .admin-booking-meta {
         grid-template-columns: 1fr;
     }
+
+    .admin-schedule-grid.is-week-view {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 600px) {
@@ -2932,6 +3228,25 @@ h6 {
 
     .admin-confirm-actions .btn {
         width: 100%;
+    }
+
+    .admin-schedule-toolbar {
+        align-items: stretch;
+    }
+
+    .admin-schedule-nav,
+    .admin-schedule-view-toggle {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .admin-schedule-range {
+        width: 100%;
+        text-align: center;
+    }
+
+    .admin-schedule-grid.is-week-view {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -3108,6 +3423,14 @@ h6 {
     .admin-blog-scroll-controls .admin-action-btn {
         width: 100%;
         min-width: 0;
+    }
+
+    .admin-schedule-event {
+        padding: 9px;
+    }
+
+    .admin-schedule-event-name {
+        font-size: 0.82rem;
     }
 }
 

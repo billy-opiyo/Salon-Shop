@@ -19,9 +19,19 @@ let adminBlogDocs = []
 let adminReviewDocs = []
 let adminReviewRawDocs = []
 let adminContactDocs = []
+let adminBookingDocs = []
 let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
 let adminGalleryPreviewObjectUrl = ""
+const ADMIN_SCHEDULE_VIEWS = {
+	day: "day",
+	week: "week",
+}
+let adminScheduleView = ADMIN_SCHEDULE_VIEWS.week
+let adminScheduleSelectedBookingId = ""
+let adminScheduleVisibleBookingIds = []
+let adminScheduleAnchorDate = new Date()
+adminScheduleAnchorDate.setHours(0, 0, 0, 0)
 const adminMessageTimers = new Map()
 const adminMessageHideTimers = new Map()
 const defaultAdminSection = "bookings"
@@ -237,6 +247,431 @@ function formatAdminDate(value) {
 	return new Date(ms).toLocaleString()
 }
 
+function normalizeAdminScheduleView(view) {
+	return view === ADMIN_SCHEDULE_VIEWS.day
+		? ADMIN_SCHEDULE_VIEWS.day
+		: ADMIN_SCHEDULE_VIEWS.week
+}
+
+function formatAdminDateKey(dateValue) {
+	const date = new Date(dateValue)
+	if (Number.isNaN(date.getTime())) return ""
+	const year = date.getFullYear()
+	const month = String(date.getMonth() + 1).padStart(2, "0")
+	const day = String(date.getDate()).padStart(2, "0")
+	return `${year}-${month}-${day}`
+}
+
+function parseAdminBookingDate(value) {
+	if (!value) return null
+	const raw = String(value).trim()
+	if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+		const [year, month, day] = raw.split("-").map(Number)
+		const date = new Date(year, month - 1, day)
+		if (!Number.isNaN(date.getTime())) {
+			date.setHours(0, 0, 0, 0)
+			return date
+		}
+	}
+
+	const ms = toTimestampMs(value)
+	if (!ms) return null
+	const parsed = new Date(ms)
+	if (Number.isNaN(parsed.getTime())) return null
+	parsed.setHours(0, 0, 0, 0)
+	return parsed
+}
+
+function parseAdminBookingTimeToMinutes(value) {
+	const text = String(value || "")
+		.trim()
+		.toLowerCase()
+	if (!text) return 9 * 60
+
+	const compact = text.replace(/\./g, "").replace(/\s+/g, "")
+	const match = compact.match(/^(\d{1,2})(?::?(\d{2}))?(am|pm)?$/)
+	if (!match) return 9 * 60
+
+	let hours = Number(match[1])
+	const minutes = Number(match[2] || 0)
+	const meridiem = match[3] || ""
+
+	if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 9 * 60
+	if (minutes < 0 || minutes > 59) return 9 * 60
+
+	if (meridiem === "pm" && hours < 12) hours += 12
+	if (meridiem === "am" && hours === 12) hours = 0
+
+	if (!meridiem && hours === 24 && minutes === 0) hours = 0
+	if (hours < 0 || hours > 23) return 9 * 60
+
+	return hours * 60 + minutes
+}
+
+function getAdminBookingStartDate(booking = {}) {
+	const dateSource =
+		booking.date ??
+		booking.bookingDate ??
+		booking.appointmentDate ??
+		booking.serviceDate ??
+		booking.slotDate ??
+		booking.createdAt
+	const dayDate = parseAdminBookingDate(dateSource)
+	if (!dayDate) return null
+
+	const minutes = parseAdminBookingTimeToMinutes(
+		booking.time ?? booking.bookingTime ?? booking.slotTime ?? "",
+	)
+	const startDate = new Date(dayDate)
+	startDate.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
+	return startDate
+}
+
+function getAdminBookingCustomerName(booking = {}) {
+	return (
+		`${booking.firstName || ""} ${booking.lastName || ""}`.trim() ||
+		String(booking.name || "").trim() ||
+		"Unknown Customer"
+	)
+}
+
+function getAdminScheduleWeekStart(dateValue) {
+	const date = new Date(dateValue)
+	date.setHours(0, 0, 0, 0)
+	const day = date.getDay()
+	const diff = day === 0 ? -6 : 1 - day
+	date.setDate(date.getDate() + diff)
+	return date
+}
+
+function getAdminVisibleScheduleDates() {
+	const anchor = parseAdminBookingDate(adminScheduleAnchorDate) || new Date()
+	anchor.setHours(0, 0, 0, 0)
+
+	if (normalizeAdminScheduleView(adminScheduleView) === ADMIN_SCHEDULE_VIEWS.day) {
+		return [anchor]
+	}
+
+	const start = getAdminScheduleWeekStart(anchor)
+	return Array.from({ length: 7 }, (_, idx) => {
+		const day = new Date(start)
+		day.setDate(start.getDate() + idx)
+		return day
+	})
+}
+
+function formatAdminScheduleRangeLabel(visibleDates = []) {
+	if (!visibleDates.length) return "Schedule"
+	if (visibleDates.length === 1) {
+		return visibleDates[0].toLocaleDateString(undefined, {
+			weekday: "long",
+			month: "long",
+			day: "numeric",
+			year: "numeric",
+		})
+	}
+
+	const start = visibleDates[0]
+	const end = visibleDates[visibleDates.length - 1]
+	const sameYear = start.getFullYear() === end.getFullYear()
+	const startLabel = start.toLocaleDateString(undefined, {
+		month: "short",
+		day: "numeric",
+		...(sameYear ? {} : { year: "numeric" }),
+	})
+	const endLabel = end.toLocaleDateString(undefined, {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	})
+	return `${startLabel} - ${endLabel}`
+}
+
+function moveAdminScheduleAnchorByDays(days = 0) {
+	const anchor = parseAdminBookingDate(adminScheduleAnchorDate) || new Date()
+	anchor.setDate(anchor.getDate() + Number(days || 0))
+	anchor.setHours(0, 0, 0, 0)
+	adminScheduleAnchorDate = anchor
+}
+
+function getAdminScheduleTimeBucketLabel(dateValue) {
+	const date = new Date(dateValue)
+	const hour = Number.isNaN(date.getTime()) ? 9 : date.getHours()
+
+	if (hour < 6) return "Late Night"
+	if (hour < 12) return "Morning"
+	if (hour < 17) return "Afternoon"
+	if (hour < 22) return "Evening"
+	return "Late Night"
+}
+
+function selectPreviousAdminScheduleBooking() {
+	const ids = Array.isArray(adminScheduleVisibleBookingIds)
+		? adminScheduleVisibleBookingIds.filter(Boolean)
+		: []
+
+	if (!ids.length) {
+		adminScheduleSelectedBookingId = ""
+		renderAdminSchedule()
+		return
+	}
+
+	const currentId = String(adminScheduleSelectedBookingId || "")
+	const currentIndex = currentId ? ids.indexOf(currentId) : -1
+	const prevIndex =
+		currentIndex >= 0
+			? (currentIndex - 1 + ids.length) % ids.length
+			: ids.length - 1
+
+	adminScheduleSelectedBookingId = ids[prevIndex]
+	renderAdminSchedule()
+}
+
+function selectNextAdminScheduleBooking() {
+	const ids = Array.isArray(adminScheduleVisibleBookingIds)
+		? adminScheduleVisibleBookingIds.filter(Boolean)
+		: []
+
+	if (!ids.length) {
+		adminScheduleSelectedBookingId = ""
+		renderAdminSchedule()
+		return
+	}
+
+	const currentId = String(adminScheduleSelectedBookingId || "")
+	const currentIndex = currentId ? ids.indexOf(currentId) : -1
+	const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % ids.length : 0
+
+	adminScheduleSelectedBookingId = ids[nextIndex]
+	renderAdminSchedule()
+}
+
+function renderAdminScheduleDetails(booking = null) {
+	const details = document.getElementById("adminScheduleDetails")
+	if (!details) return
+
+	if (!booking) {
+		details.innerHTML =
+			'<div class="admin-empty-state">Click a calendar event to view booking details and quick actions.</div>'
+		return
+	}
+
+	const status = normalizeStatus(extractRawStatus(booking))
+	const customerName = getAdminBookingCustomerName(booking)
+	const specialRequest = String(booking.notes || booking.specialRequest || "").trim()
+	const inspirationImageUrl = String(
+		booking.inspirationImageUrl ||
+			booking.inspirationImage ||
+			booking.referenceImageUrl ||
+			"",
+	).trim()
+
+	details.innerHTML = `
+		<article class="admin-booking-item admin-schedule-detail-card">
+			<div class="admin-booking-item-head">
+				<div>
+					<div class="admin-booking-name">${escapeHtml(customerName)}</div>
+					<div class="admin-booking-id">Booking ID: ${escapeHtml(booking.id || "N/A")}</div>
+				</div>
+				<span class="admin-status-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+			</div>
+
+			<div class="admin-booking-meta">
+				<div><span>Service:</span> ${escapeHtml(booking.service || "N/A")}</div>
+				<div><span>Stylist:</span> ${escapeHtml(booking.stylist || "Any Available")}</div>
+				<div><span>Date:</span> ${escapeHtml(formatAdminDate(booking.date))}</div>
+				<div><span>Time:</span> ${escapeHtml(booking.time || "N/A")}</div>
+				<div><span>Email:</span> ${escapeHtml(booking.email || "N/A")}</div>
+				<div><span>Phone:</span> ${escapeHtml(booking.phone || "N/A")}</div>
+			</div>
+
+			<div class="admin-booking-special-request">
+				<span>Special Request:</span>
+				<p>${specialRequest ? escapeHtml(specialRequest) : "No special request provided."}</p>
+			</div>
+
+			<div class="admin-booking-inspiration">
+				<div><span>Inspiration Image:</span> ${inspirationImageUrl ? `<a class="admin-inline-link" href="${escapeHtml(inspirationImageUrl)}" target="_blank" rel="noopener">Open full image</a>` : "Not provided"}</div>
+			</div>
+
+			<div class="admin-booking-actions admin-schedule-detail-actions">
+				<button class="admin-action-btn admin-schedule-prev-btn" data-schedule-nav="previous">← Previous Booking</button>
+				<button class="admin-action-btn admin-schedule-next-btn" data-schedule-nav="next">Next Booking →</button>
+				<button class="admin-action-btn" data-schedule-action="pending" data-id="${escapeHtml(booking.id || "")}">Set Pending</button>
+				<button class="admin-action-btn" data-schedule-action="confirmed" data-id="${escapeHtml(booking.id || "")}">Confirm</button>
+				<button class="admin-action-btn" data-schedule-action="completed" data-id="${escapeHtml(booking.id || "")}">Complete</button>
+				<button class="admin-action-btn danger" data-schedule-action="cancel-release" data-id="${escapeHtml(booking.id || "")}">Cancel + Release Slot</button>
+			</div>
+		</article>
+	`
+}
+
+function renderAdminSchedule() {
+	const grid = document.getElementById("adminScheduleGrid")
+	const rangeLabel = document.getElementById("adminScheduleRangeLabel")
+	if (!grid) return
+
+	const view = normalizeAdminScheduleView(adminScheduleView)
+	adminScheduleView = view
+
+	const viewButtons = document.querySelectorAll("[data-schedule-view]")
+	viewButtons.forEach((button) => {
+		const active = button.dataset.scheduleView === view
+		button.classList.toggle("active", active)
+		button.setAttribute("aria-pressed", active ? "true" : "false")
+	})
+
+	const visibleDates = getAdminVisibleScheduleDates()
+	if (rangeLabel) {
+		rangeLabel.textContent = formatAdminScheduleRangeLabel(visibleDates)
+	}
+
+	const normalizedDocs = (Array.isArray(adminBookingDocs) ? adminBookingDocs : []).map(
+		(booking) => ({
+			...booking,
+			status: normalizeStatus(extractRawStatus(booking)),
+		}),
+	)
+
+	const grouped = new Map()
+	visibleDates.forEach((date) => {
+		grouped.set(formatAdminDateKey(date), [])
+	})
+
+	let selectedBooking = null
+	normalizedDocs.forEach((booking) => {
+		const startDate = getAdminBookingStartDate(booking)
+		if (!startDate) return
+
+		const dateKey = formatAdminDateKey(startDate)
+		if (!grouped.has(dateKey)) return
+
+		const scheduleBooking = {
+			...booking,
+			__scheduleStart: startDate,
+		}
+		grouped.get(dateKey).push(scheduleBooking)
+
+		if (booking.id && booking.id === adminScheduleSelectedBookingId) {
+			selectedBooking = scheduleBooking
+		}
+	})
+
+	grouped.forEach((items) => {
+		items.sort((a, b) => a.__scheduleStart.getTime() - b.__scheduleStart.getTime())
+	})
+
+	if (adminScheduleSelectedBookingId && !selectedBooking) {
+		adminScheduleSelectedBookingId = ""
+	}
+
+	const orderedVisibleBookings = []
+	visibleDates.forEach((date) => {
+		const items = grouped.get(formatAdminDateKey(date)) || []
+		orderedVisibleBookings.push(...items)
+	})
+
+	adminScheduleVisibleBookingIds = orderedVisibleBookings
+		.map((booking) => String(booking.id || "").trim())
+		.filter(Boolean)
+
+	if (!selectedBooking) {
+		const firstVisible = orderedVisibleBookings[0] || null
+		if (firstVisible) {
+			selectedBooking = firstVisible
+			adminScheduleSelectedBookingId = String(firstVisible.id || "")
+		}
+	}
+
+	grid.classList.toggle("is-week-view", view === ADMIN_SCHEDULE_VIEWS.week)
+	grid.innerHTML = visibleDates
+		.map((date) => {
+			const dateKey = formatAdminDateKey(date)
+			const items = grouped.get(dateKey) || []
+			const dayLabel = date.toLocaleDateString(undefined, { weekday: "short" })
+			const dateLabel = date.toLocaleDateString(undefined, {
+				month: "short",
+				day: "numeric",
+			})
+
+			const itemsHtml = items.length
+				? (() => {
+						const bucketOrder = [
+							"Morning",
+							"Afternoon",
+							"Evening",
+							"Late Night",
+						]
+						const groupedByBucket = new Map()
+
+						items.forEach((booking) => {
+							const bucket = getAdminScheduleTimeBucketLabel(
+								booking.__scheduleStart,
+							)
+							if (!groupedByBucket.has(bucket)) {
+								groupedByBucket.set(bucket, [])
+							}
+							groupedByBucket.get(bucket).push(booking)
+						})
+
+						return bucketOrder
+							.filter((bucket) => groupedByBucket.has(bucket))
+							.map((bucket) => {
+								const bucketItems = groupedByBucket.get(bucket) || []
+								const eventsHtml = bucketItems
+									.map((booking) => {
+										const status = normalizeStatus(extractRawStatus(booking))
+										const selectedClass =
+											booking.id === adminScheduleSelectedBookingId
+												? " is-selected"
+												: ""
+										const displayTime =
+											String(booking.time || "").trim() ||
+											booking.__scheduleStart.toLocaleTimeString(undefined, {
+												hour: "2-digit",
+												minute: "2-digit",
+											})
+
+										return `
+											<button
+												type="button"
+												class="admin-schedule-event ${getStatusClass(status)}${selectedClass}"
+												data-schedule-booking="${escapeHtml(booking.id || "")}" 
+											>
+												<div class="admin-schedule-event-time">${escapeHtml(displayTime)}</div>
+												<div class="admin-schedule-event-name">${escapeHtml(getAdminBookingCustomerName(booking))}</div>
+												<div class="admin-schedule-event-service">${escapeHtml(booking.service || "Service not set")}</div>
+											</button>
+										`
+									})
+									.join("")
+
+								return `
+									<div class="admin-schedule-bucket">
+										<div class="admin-schedule-bucket-label">${escapeHtml(bucket)}</div>
+										${eventsHtml}
+									</div>
+								`
+							})
+							.join("")
+				  })()
+				: '<div class="admin-schedule-empty-day">No bookings</div>'
+
+			return `
+				<section class="admin-schedule-day-column">
+					<header class="admin-schedule-day-header">
+						<h4>${escapeHtml(dayLabel)}</h4>
+						<p>${escapeHtml(dateLabel)}</p>
+					</header>
+					<div class="admin-schedule-day-events">${itemsHtml}</div>
+				</section>
+			`
+		})
+		.join("")
+
+	renderAdminScheduleDetails(selectedBooking)
+}
+
 function stopAdminBookingsListener() {
 	if (typeof adminBookingsUnsubscribe === "function") {
 		adminBookingsUnsubscribe()
@@ -364,6 +799,10 @@ function setAdminUnlockedState(value) {
 		setAdminMessage("", "", "adminBlogsMessage")
 		setAdminMessage("", "", "adminReviewsMessage")
 		setAdminMessage("", "", "adminContactMessage")
+		setAdminMessage("", "", "adminScheduleMessage")
+		adminBookingDocs = []
+		adminScheduleSelectedBookingId = ""
+		renderAdminSchedule()
 	} else {
 		startAdminBookingsListener()
 		startAdminGalleryListener()
@@ -846,6 +1285,7 @@ function renderAdminBookings(docs) {
 		...b,
 		status: normalizeStatus(extractRawStatus(b)),
 	}))
+	adminBookingDocs = normalizedDocs
 
 	const total = normalizedDocs.length
 	const pending = normalizedDocs.filter((b) => b.status === "pending").length
@@ -874,6 +1314,7 @@ function renderAdminBookings(docs) {
 	if (!normalizedDocs.length) {
 		list.innerHTML =
 			'<div class="admin-empty-state">No bookings yet. New bookings will appear in realtime.</div>'
+		renderAdminSchedule()
 		return
 	}
 
@@ -890,8 +1331,7 @@ function renderAdminBookings(docs) {
 	list.innerHTML = sortedDocs
 		.map((b) => {
 			const status = normalizeStatus(extractRawStatus(b))
-			const customerName =
-				`${b.firstName || ""} ${b.lastName || ""}`.trim() || "Unknown Customer"
+			const customerName = getAdminBookingCustomerName(b)
 			const specialRequest = String(b.notes || b.specialRequest || "").trim()
 			const inspirationImageUrl = String(
 				b.inspirationImageUrl ||
@@ -941,6 +1381,8 @@ function renderAdminBookings(docs) {
       `
 		})
 		.join("")
+
+	renderAdminSchedule()
 }
 
 function galleryDocToViewModel(doc) {
@@ -1920,6 +2362,12 @@ function initializeAdminPanel() {
 	const loginBtn = document.getElementById("adminLoginBtn")
 	const passwordToggleBtn = document.getElementById("adminPasswordToggle")
 	const bookingList = document.getElementById("adminBookingsList")
+	const scheduleGrid = document.getElementById("adminScheduleGrid")
+	const scheduleDetails = document.getElementById("adminScheduleDetails")
+	const schedulePrevBtn = document.getElementById("adminSchedulePrev")
+	const scheduleTodayBtn = document.getElementById("adminScheduleToday")
+	const scheduleNextBtn = document.getElementById("adminScheduleNext")
+	const scheduleViewButtons = document.querySelectorAll("[data-schedule-view]")
 	const blogsForm = document.getElementById("adminBlogsForm")
 	const blogsList = document.getElementById("adminBlogsList")
 	const blogsCancelEditBtn = document.getElementById("adminBlogsCancelEdit")
@@ -2058,6 +2506,107 @@ function initializeAdminPanel() {
 			button.disabled = false
 		}
 	})
+
+	if (schedulePrevBtn) {
+		schedulePrevBtn.addEventListener("click", () => {
+			moveAdminScheduleAnchorByDays(
+				adminScheduleView === ADMIN_SCHEDULE_VIEWS.day ? -1 : -7,
+			)
+			renderAdminSchedule()
+		})
+	}
+
+	if (scheduleTodayBtn) {
+		scheduleTodayBtn.addEventListener("click", () => {
+			const today = new Date()
+			today.setHours(0, 0, 0, 0)
+			adminScheduleAnchorDate = today
+			renderAdminSchedule()
+		})
+	}
+
+	if (scheduleNextBtn) {
+		scheduleNextBtn.addEventListener("click", () => {
+			moveAdminScheduleAnchorByDays(
+				adminScheduleView === ADMIN_SCHEDULE_VIEWS.day ? 1 : 7,
+			)
+			renderAdminSchedule()
+		})
+	}
+
+	if (scheduleViewButtons.length) {
+		scheduleViewButtons.forEach((button) => {
+			button.addEventListener("click", () => {
+				adminScheduleView = normalizeAdminScheduleView(
+					button.dataset.scheduleView,
+				)
+				renderAdminSchedule()
+			})
+		})
+	}
+
+	if (scheduleGrid) {
+		scheduleGrid.addEventListener("click", (event) => {
+			const eventBtn = event.target.closest("[data-schedule-booking]")
+			if (!eventBtn) return
+
+			const bookingId = String(eventBtn.dataset.scheduleBooking || "").trim()
+			if (!bookingId) return
+
+			adminScheduleSelectedBookingId = bookingId
+			renderAdminSchedule()
+		})
+	}
+
+	if (scheduleDetails) {
+		scheduleDetails.addEventListener("click", async (event) => {
+			const navButton = event.target.closest("button[data-schedule-nav]")
+			if (navButton) {
+				if (navButton.dataset.scheduleNav === "previous") {
+					selectPreviousAdminScheduleBooking()
+				}
+				if (navButton.dataset.scheduleNav === "next") {
+					selectNextAdminScheduleBooking()
+				}
+				return
+			}
+
+			const button = event.target.closest("button[data-schedule-action]")
+			if (!button || !adminUnlocked || !auth?.currentUser) return
+
+			const action = button.dataset.scheduleAction
+			const bookingId = button.dataset.id
+			if (!action || !bookingId) return
+
+			button.disabled = true
+			try {
+				if (action === "cancel-release") {
+					await cancelBookingAndReleaseSlot(bookingId)
+					setAdminMessage(
+						"success",
+						"✅ Booking cancelled and slot released successfully.",
+						"adminScheduleMessage",
+					)
+				} else {
+					await updateBookingStatus(bookingId, action)
+					setAdminMessage(
+						"success",
+						`✅ Booking updated to ${action}.`,
+						"adminScheduleMessage",
+					)
+				}
+			} catch (error) {
+				console.error("Schedule quick action failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Action failed: ${error.message || "unknown error"}`,
+					"adminScheduleMessage",
+				)
+			} finally {
+				button.disabled = false
+			}
+		})
+	}
 
 	if (galleryForm) {
 		// Defensive: always block native form navigation/reload on gallery save
@@ -2314,6 +2863,8 @@ function initializeAdminPanel() {
 			closeAdminConfirmModal(false)
 		}
 	})
+
+	renderAdminSchedule()
 
 	setAdminUnlockedState(false)
 }
