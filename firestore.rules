@@ -33,6 +33,8 @@ service cloud.firestore {
         'notes',
         'inspirationImageUrl',
         'status',
+		'whatsappStatus',
+		'reminderSentAt',
         'uid',
         'createdAt',
         'updatedAt'
@@ -58,6 +60,9 @@ service cloud.firestore {
         && request.resource.data.time != ''
         && request.resource.data.slotId != ''
         && request.resource.data.status == 'confirmed'
+        && request.resource.data.whatsappStatus is string
+        && request.resource.data.whatsappStatus == 'pending'
+        && request.resource.data.reminderSentAt == null
         && request.resource.data.uid == request.auth.uid;
     }
 

@@ -2128,10 +2128,7 @@ function subscribeToDashboardRescheduleAvailability(
 						"No available time slots for this date/stylist. Please choose another date or stylist.",
 					)
 				} else {
-					setDashboardRescheduleMessage(
-						"",
-						"",
-					)
+					setDashboardRescheduleMessage("", "")
 					if (
 						dashboardRescheduleTarget?.time &&
 						String(dashboardRescheduleTarget.date || "") ===
@@ -5222,6 +5219,8 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 					notes: data.notes || "",
 					inspirationImageUrl,
 					status: "confirmed",
+					whatsappStatus: "pending",
+					reminderSentAt: null,
 					uid: activeUid,
 					createdAt: firebase.firestore.FieldValue.serverTimestamp(),
 					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),

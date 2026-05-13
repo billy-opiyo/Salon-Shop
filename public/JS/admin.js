@@ -916,6 +916,8 @@ function renderAdminBookings(docs) {
             <div><span>Time:</span> ${b.time || "N/A"}</div>
             <div><span>Email:</span> ${b.email || "N/A"}</div>
             <div><span>Phone:</span> ${b.phone || "N/A"}</div>
+            <div><span>WhatsApp:</span> ${b.whatsappStatus || "pending"}</div>
+            <div><span>Reminder Sent:</span> ${b.reminderSentAt ? formatAdminDate(b.reminderSentAt) : "Not sent"}</div>
           </div>
           <div class="admin-booking-special-request">
             <span>Special Request:</span>
