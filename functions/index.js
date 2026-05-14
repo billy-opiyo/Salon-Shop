@@ -20,39 +20,41 @@ const NAIROBI_UTC_OFFSET_HOURS = 3
 const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
 const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
 
-function buildRateLimitDocId(kind = "", uid = "") {
-	const safeKind = String(kind || "")
-		.trim()
-		.toLowerCase()
+function buildRateLimitDocId(uid = "") {
 	const safeUid = String(uid || "").trim()
-	if (!safeKind || !safeUid) return ""
-	return `${safeKind}_${safeUid}`
+	if (!safeUid) return ""
+	return safeUid
 }
 
 async function upsertRateLimit({ kind = "", uid = "", cooldownMs = 0 } = {}) {
-	const docId = buildRateLimitDocId(kind, uid)
+	const safeKind = String(kind || "")
+		.trim()
+		.toLowerCase()
+	const docId = buildRateLimitDocId(uid)
 	if (!docId) return
 
 	const cooldownUntil = admin.firestore.Timestamp.fromMillis(
 		Date.now() + Math.max(0, Number(cooldownMs || 0)),
 	)
+	const payload = {
+		uid: String(uid || "").trim(),
+		lastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
+		updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+	}
+
+	if (safeKind === "review") {
+		payload.reviewCooldownUntil = cooldownUntil
+	} else if (safeKind === "contact") {
+		payload.contactCooldownUntil = cooldownUntil
+	} else {
+		return
+	}
 
 	await admin
 		.firestore()
 		.collection("rateLimits")
 		.doc(docId)
-		.set(
-			{
-				kind: String(kind || "")
-					.trim()
-					.toLowerCase(),
-				uid: String(uid || "").trim(),
-				cooldownUntil,
-				lastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
-				updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-			},
-			{ merge: true },
-		)
+		.set(payload, { merge: true })
 }
 
 function buildCustomerName(booking = {}) {

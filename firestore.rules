@@ -19,23 +19,23 @@ service cloud.firestore {
     }
 
     function reviewRateLimitDocPath() {
-      return /databases/$(database)/documents/rateLimits/review_$(request.auth.uid);
+      return /databases/$(database)/documents/rateLimits/$(request.auth.uid);
     }
 
     function contactRateLimitDocPath() {
-      return /databases/$(database)/documents/rateLimits/contact_$(request.auth.uid);
+      return /databases/$(database)/documents/rateLimits/$(request.auth.uid);
     }
 
     function reviewRateLimitAllowsCreate() {
       return !exists(reviewRateLimitDocPath())
-        || !(get(reviewRateLimitDocPath()).data.cooldownUntil is timestamp)
-        || get(reviewRateLimitDocPath()).data.cooldownUntil <= request.time;
+        || !(get(reviewRateLimitDocPath()).data.reviewCooldownUntil is timestamp)
+        || get(reviewRateLimitDocPath()).data.reviewCooldownUntil <= request.time;
     }
 
     function contactRateLimitAllowsCreate() {
       return !exists(contactRateLimitDocPath())
-        || !(get(contactRateLimitDocPath()).data.cooldownUntil is timestamp)
-        || get(contactRateLimitDocPath()).data.cooldownUntil <= request.time;
+        || !(get(contactRateLimitDocPath()).data.contactCooldownUntil is timestamp)
+        || get(contactRateLimitDocPath()).data.contactCooldownUntil <= request.time;
     }
 
     function bookingCreateHasAllowedKeys() {
@@ -229,7 +229,7 @@ service cloud.firestore {
         && request.resource.data.lastName is string
         && request.resource.data.email is string
         && request.resource.data.phone is string
-        && request.resource.data.service is string
+        && request.resource.data['service'] is string
         && request.resource.data.stylist is string
         && request.resource.data.stylistKey is string
         && request.resource.data.preferredDate is string

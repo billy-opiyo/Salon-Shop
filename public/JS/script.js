@@ -646,6 +646,8 @@ const timeSlots = [
 	"7:00 PM",
 ]
 
+const CUSTOM_SERVICE_OPTION_VALUE = "__custom_service__"
+
 // ============ FIREBASE + CLOUDINARY CONFIG ============
 const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
@@ -5070,6 +5072,11 @@ function startTestimonialsRealtimeListener() {
 
 function populateServiceSelect() {
 	const select = document.getElementById("serviceSelect")
+	if (!select) return
+	select
+		.querySelectorAll("optgroup, option[data-dynamic-service='true']")
+		.forEach((node) => node.remove())
+
 	const categories = ["all", ...new Set(servicesData.map((s) => s.category))]
 	categories.forEach((cat) => {
 		if (cat === "all") return
@@ -5084,6 +5091,62 @@ function populateServiceSelect() {
 		})
 		select.appendChild(optgroup)
 	})
+
+	const customOption = document.createElement("option")
+	customOption.value = CUSTOM_SERVICE_OPTION_VALUE
+	customOption.textContent = "Other (Type Service)"
+	customOption.dataset.dynamicService = "true"
+	select.appendChild(customOption)
+}
+
+function toggleCustomServiceInput() {
+	const serviceSelect = document.getElementById("serviceSelect")
+	const customServiceGroup = document.getElementById("customServiceGroup")
+	const customServiceInput = document.getElementById("customServiceInput")
+	if (!serviceSelect || !customServiceGroup || !customServiceInput) return
+
+	const isCustom = serviceSelect.value === CUSTOM_SERVICE_OPTION_VALUE
+	customServiceGroup.classList.toggle("hidden", !isCustom)
+	customServiceInput.required = isCustom
+
+	if (!isCustom) {
+		customServiceInput.value = ""
+	}
+}
+
+function setBookingServiceValue(serviceName = "") {
+	const serviceSelect = document.getElementById("serviceSelect")
+	const customServiceInput = document.getElementById("customServiceInput")
+	if (!serviceSelect) return
+
+	const normalizedService = String(serviceName || "").trim()
+	if (!normalizedService) {
+		serviceSelect.value = ""
+		if (customServiceInput) customServiceInput.value = ""
+		toggleCustomServiceInput()
+		return
+	}
+
+	const hasMatchingOption = Array.from(serviceSelect.options).some(
+		(option) => option.value === normalizedService,
+	)
+
+	if (hasMatchingOption) {
+		serviceSelect.value = normalizedService
+		if (customServiceInput) customServiceInput.value = ""
+	} else {
+		serviceSelect.value = CUSTOM_SERVICE_OPTION_VALUE
+		if (customServiceInput) customServiceInput.value = normalizedService
+	}
+
+	toggleCustomServiceInput()
+}
+
+function initializeCustomServiceInput() {
+	const serviceSelect = document.getElementById("serviceSelect")
+	if (!serviceSelect) return
+	serviceSelect.addEventListener("change", toggleCustomServiceInput)
+	toggleCustomServiceInput()
 }
 
 function populateTimeSlots() {
@@ -5255,7 +5318,7 @@ function focusBookingFormCard({ behavior = "smooth", block = "start" } = {}) {
 }
 
 function selectService(name) {
-	document.getElementById("serviceSelect").value = name
+	setBookingServiceValue(name)
 	focusBookingFormCard({ behavior: "smooth", block: "center" })
 	// Update min date to today
 	document.getElementById("datePicker").min = new Date()
@@ -5272,6 +5335,20 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 	const imageInput = document.getElementById("inspirationImage")
 
 	const data = Object.fromEntries(new FormData(form).entries())
+	const customServiceInput = document.getElementById("customServiceInput")
+	const customServiceValue = String(customServiceInput?.value || "").trim()
+	if (data.service === CUSTOM_SERVICE_OPTION_VALUE) {
+		if (!customServiceValue) {
+			showTimedFormMessage(
+				msg,
+				"error",
+				"⚠️ Please type the service you would like to book.",
+			)
+			return
+		}
+		data.service = customServiceValue
+	}
+
 	const stylistKey = data.stylist && data.stylist.trim() ? data.stylist : "any"
 	const slotId = getSlotId(data.date, stylistKey, data.time)
 
@@ -5438,6 +5515,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 function resetBooking() {
 	document.getElementById("bookingForm").reset()
 	populateTimeSlots()
+	toggleCustomServiceInput()
 	document.getElementById("bookingForm").style.display = "block"
 	document.getElementById("bookingSuccess").style.display = "none"
 	clearFormMessage(document.getElementById("bookingMessage"))
@@ -5518,10 +5596,7 @@ function updateLightbox() {
 
 	if (lightboxBookNow) {
 		lightboxBookNow.onclick = () => {
-			const serviceSelect = document.getElementById("serviceSelect")
-			if (serviceSelect) {
-				serviceSelect.value = item.styleName || item.styleType || ""
-			}
+			setBookingServiceValue(item.styleName || item.styleType || "")
 			if (lightbox) lightbox.classList.remove("active")
 			document.body.style.overflow = ""
 		}
@@ -5861,6 +5936,7 @@ bindReviewForm()
 updateReviewSubmissionVisibility()
 populateReviewServiceSelect()
 populateServiceSelect()
+initializeCustomServiceInput()
 populateTimeSlots()
 initAnimatedHeaderLogo()
 
