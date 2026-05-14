@@ -2439,7 +2439,7 @@ function renderDashboardFavorites(mount, styles = [], emptyText) {
         <div class="dashboard-favorite-media">
           ${
 						imageUrl
-							? `<img src="${imageUrl}" alt="${styleName}" loading="lazy" />`
+							? `<img src="${imageUrl}" alt="${styleName}" loading="lazy" decoding="async" fetchpriority="low" />`
 							: "<span>Style</span>"
 					}
         </div>
@@ -3939,11 +3939,11 @@ function renderGallery() {
 					hasBeforeAfterPair
 						? `
       <div class="gallery-slideshow" aria-label="${item.styleName} before and after slideshow">
-        <img class="gallery-slideshow-image gallery-slideshow-before" src="${item.beforeImageUrl}" alt="${item.styleName} before" loading="lazy">
-        <img class="gallery-slideshow-image gallery-slideshow-after" src="${item.imageUrl}" alt="${item.styleName} after" loading="lazy">
+		<img class="gallery-slideshow-image gallery-slideshow-before" src="${item.beforeImageUrl}" alt="${item.styleName} before" loading="lazy" decoding="async" fetchpriority="low">
+		<img class="gallery-slideshow-image gallery-slideshow-after" src="${item.imageUrl}" alt="${item.styleName} after" loading="lazy" decoding="async" fetchpriority="low">
       </div>
       `
-						: `<img src="${item.imageUrl}" alt="${item.styleName}" loading="lazy">`
+						: `<img src="${item.imageUrl}" alt="${item.styleName}" loading="lazy" decoding="async" fetchpriority="low">`
 				}
       <div class="gallery-overlay">
         <h4>${item.styleName}</h4>
@@ -4302,6 +4302,8 @@ function renderBlogs(list = blogsData) {
           src="${escapeHtml(blog.imageUrl || BLOG_CARD_IMAGE_FALLBACK)}"
           alt="${escapeHtml(blog.title)}"
           loading="lazy"
+          decoding="async"
+          fetchpriority="low"
           onerror="if(!this.dataset.fallbackApplied){this.dataset.fallbackApplied='true';this.src='${escapeHtml(BLOG_CARD_IMAGE_FALLBACK)}';}"
         />
       </div>
@@ -4615,7 +4617,7 @@ function renderTestimonials(list = testimonialsData) {
       ${t.service ? `<div class="admin-gallery-tags" style="margin-bottom:8px"><span>${escapeHtml(t.service)}</span></div>` : ""}
       ${t.verifiedBooking ? '<div class="admin-gallery-tags" style="margin-bottom:8px"><span>✅ Verified Booking</span></div>' : ""}
       <p class="testimonial-text">"${t.text}"</p>
-	      ${t.photoUrl ? `<div class="testimonial-review-photo-wrap"><img src="${escapeHtml(t.photoUrl)}" alt="Review photo" class="testimonial-review-photo" /></div>` : ""}
+	      ${t.photoUrl ? `<div class="testimonial-review-photo-wrap"><img src="${escapeHtml(t.photoUrl)}" alt="Review photo" class="testimonial-review-photo" loading="lazy" decoding="async" fetchpriority="low" /></div>` : ""}
       ${t.adminReply ? `<p class="testimonial-text" style="font-style:normal;border-left:3px solid var(--primary);padding-left:10px"><strong>Admin Reply:</strong> ${escapeHtml(t.adminReply)}</p>` : ""}
       <div class="testimonial-author">
         <div class="testimonial-avatar">${t.avatar}</div>

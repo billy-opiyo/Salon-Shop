@@ -1167,7 +1167,7 @@ function renderAdminReviews(docs) {
         </div>
         <p class="admin-review-text">"${escapeHtml(item.text || "")}"</p>
         <textarea class="form-control" data-review-edit-text="${item.id}" rows="3">${escapeHtml(item.text || "")}</textarea>
-        ${item.photoUrl ? `<div style="margin:8px 0"><img src="${escapeHtml(item.photoUrl)}" alt="Review Photo" style="max-width:180px;border-radius:8px"/></div>` : ""}
+		${item.photoUrl ? `<div style="margin:8px 0"><img src="${escapeHtml(item.photoUrl)}" alt="Review Photo" loading="lazy" decoding="async" fetchpriority="low" style="max-width:180px;border-radius:8px"/></div>` : ""}
         ${isNegative ? `<textarea class="form-control" data-review-reply-text="${item.id}" rows="2" placeholder="Admin reply for negative feedback...">${escapeHtml(item.adminReply || "")}</textarea>` : ""}
         <div class="admin-booking-actions">
           <button class="admin-action-btn" data-review-action="save-edit" data-id="${item.id}">Save Edit</button>
@@ -1367,7 +1367,7 @@ function renderAdminBookings(docs) {
             <div><span>Inspiration Image:</span> ${inspirationImageUrl ? `<a href="${escapeHtml(inspirationImageUrl)}" target="_blank" rel="noopener">Open full image</a>` : "Not provided"}</div>
             ${
 							inspirationImageUrl
-								? `<a class="admin-booking-inspiration-link" href="${escapeHtml(inspirationImageUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(inspirationImageUrl)}" alt="Inspiration image for ${escapeHtml(customerName)}" class="admin-booking-inspiration-image" /></a>`
+								? `<a class="admin-booking-inspiration-link" href="${escapeHtml(inspirationImageUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(inspirationImageUrl)}" alt="Inspiration image for ${escapeHtml(customerName)}" class="admin-booking-inspiration-image" loading="lazy" decoding="async" fetchpriority="low" /></a>`
 								: ""
 						}
           </div>
@@ -1532,7 +1532,7 @@ function renderAdminBlogs(docs) {
 			(item) => `
       <article class="admin-blog-item">
         <div class="admin-blog-thumb-wrap">
-          ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}" class="admin-blog-thumb" />` : '<div class="admin-blog-thumb admin-blog-thumb--empty">No Image</div>'}
+			${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.title)}" class="admin-blog-thumb" loading="lazy" decoding="async" fetchpriority="low" />` : '<div class="admin-blog-thumb admin-blog-thumb--empty">No Image</div>'}
         </div>
         <div class="admin-blog-content">
           <h4>${escapeHtml(item.title)}</h4>
@@ -1858,7 +1858,7 @@ function renderAdminGallery(docs) {
 			(item) => `
       <article class="admin-gallery-item">
         <div class="admin-gallery-thumb-wrap">
-          ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.styleName}" class="admin-gallery-thumb" />` : '<div class="admin-gallery-thumb admin-gallery-thumb--empty">No Image</div>'}
+			${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.styleName}" class="admin-gallery-thumb" loading="lazy" decoding="async" fetchpriority="low" />` : '<div class="admin-gallery-thumb admin-gallery-thumb--empty">No Image</div>'}
           ${item.hasBeforeAfter ? '<span class="admin-gallery-badge">Before & After</span>' : ""}
         </div>
         <div class="admin-gallery-content">
