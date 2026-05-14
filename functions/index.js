@@ -12,9 +12,11 @@ admin.initializeApp()
 
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY")
 const RESEND_FROM_EMAIL = defineSecret("RESEND_FROM_EMAIL")
-const TWILIO_ACCOUNT_SID = defineSecret("TWILIO_ACCOUNT_SID")
-const TWILIO_AUTH_TOKEN = defineSecret("TWILIO_AUTH_TOKEN")
-const TWILIO_WHATSAPP_FROM = defineSecret("TWILIO_WHATSAPP_FROM")
+const WHATSAPP_CLOUD_ACCESS_TOKEN = defineSecret("WHATSAPP_CLOUD_ACCESS_TOKEN")
+const WHATSAPP_CLOUD_PHONE_NUMBER_ID = defineSecret(
+	"WHATSAPP_CLOUD_PHONE_NUMBER_ID",
+)
+const WHATSAPP_CLOUD_API_VERSION = "v20.0"
 const NAIROBI_TIMEZONE = "Africa/Nairobi"
 const NAIROBI_UTC_OFFSET_HOURS = 3
 const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
@@ -153,42 +155,48 @@ function toMillis(value) {
 	if (!value) return 0
 	if (typeof value?.toMillis === "function") return value.toMillis()
 	if (typeof value === "number" && Number.isFinite(value)) return value
-	if (value?.seconds && Number.isFinite(value.seconds)) return value.seconds * 1000
+	if (value?.seconds && Number.isFinite(value.seconds))
+		return value.seconds * 1000
 	const parsed = Date.parse(String(value))
 	return Number.isNaN(parsed) ? 0 : parsed
 }
 
 async function sendWhatsAppMessage({ toPhoneNumber, messageBody }) {
-	const accountSid = TWILIO_ACCOUNT_SID.value()
-	const authToken = TWILIO_AUTH_TOKEN.value()
-	const from = TWILIO_WHATSAPP_FROM.value()
+	const accessToken = WHATSAPP_CLOUD_ACCESS_TOKEN.value()
+	const phoneNumberId = WHATSAPP_CLOUD_PHONE_NUMBER_ID.value()
+	const destination = String(toPhoneNumber || "").replace(/^\+/, "")
 
 	if (typeof fetch !== "function") {
 		throw new Error("Global fetch is not available in this Node runtime")
 	}
+	if (!destination) {
+		throw new Error("WhatsApp destination phone number is missing")
+	}
 
-	const endpoint = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
-	const authHeader = Buffer.from(`${accountSid}:${authToken}`).toString(
-		"base64",
-	)
+	const endpoint = `https://graph.facebook.com/${WHATSAPP_CLOUD_API_VERSION}/${phoneNumberId}/messages`
 
 	const response = await fetch(endpoint, {
 		method: "POST",
 		headers: {
-			Authorization: `Basic ${authHeader}`,
-			"Content-Type": "application/x-www-form-urlencoded",
+			Authorization: `Bearer ${accessToken}`,
+			"Content-Type": "application/json",
 		},
-		body: new URLSearchParams({
-			From: from,
-			To: `whatsapp:${toPhoneNumber}`,
-			Body: messageBody,
+		body: JSON.stringify({
+			messaging_product: "whatsapp",
+			recipient_type: "individual",
+			to: destination,
+			type: "text",
+			text: {
+				preview_url: false,
+				body: messageBody,
+			},
 		}),
 	})
 
 	const responseText = await response.text()
 	if (!response.ok) {
 		throw new Error(
-			`Twilio WhatsApp send failed (${response.status}): ${responseText.slice(0, 500)}`,
+			`WhatsApp Cloud API send failed (${response.status}): ${responseText.slice(0, 500)}`,
 		)
 	}
 
@@ -290,7 +298,7 @@ exports.sendBookingConfirmationEmail = onDocumentCreated(
 exports.sendBookingConfirmationWhatsApp = onDocumentCreated(
 	{
 		document: "bookings/{bookingId}",
-		secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM],
+		secrets: [WHATSAPP_CLOUD_ACCESS_TOKEN, WHATSAPP_CLOUD_PHONE_NUMBER_ID],
 		region: "us-central1",
 	},
 	async (event) => {
@@ -368,7 +376,7 @@ exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 		schedule: "every 15 minutes",
 		timeZone: "Africa/Nairobi",
 		region: "us-central1",
-		secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_FROM],
+		secrets: [WHATSAPP_CLOUD_ACCESS_TOKEN, WHATSAPP_CLOUD_PHONE_NUMBER_ID],
 	},
 	async () => {
 		const nowMs = Date.now()
@@ -482,7 +490,8 @@ exports.initializeBookingSystemFields = onDocumentCreated(
 
 		const data = snapshot.data() || {}
 		const patch = {}
-		if (typeof data.whatsappStatus !== "string") patch.whatsappStatus = "pending"
+		if (typeof data.whatsappStatus !== "string")
+			patch.whatsappStatus = "pending"
 		if (!("reminderSentAt" in data)) patch.reminderSentAt = null
 
 		if (!Object.keys(patch).length) return
@@ -534,9 +543,8 @@ exports.notifyWaitlistOnSlotOpen = onDocumentDeleted(
 		secrets: [
 			RESEND_API_KEY,
 			RESEND_FROM_EMAIL,
-			TWILIO_ACCOUNT_SID,
-			TWILIO_AUTH_TOKEN,
-			TWILIO_WHATSAPP_FROM,
+			WHATSAPP_CLOUD_ACCESS_TOKEN,
+			WHATSAPP_CLOUD_PHONE_NUMBER_ID,
 		],
 	},
 	async (event) => {
@@ -582,11 +590,13 @@ exports.notifyWaitlistOnSlotOpen = onDocumentDeleted(
 
 		const nextEntryDoc = waitlistDocs[0]
 		const entry = nextEntryDoc.data() || {}
-		const fullName = `${entry.firstName || ""} ${entry.lastName || ""}`.trim() ||
-			"Client"
+		const fullName =
+			`${entry.firstName || ""} ${entry.lastName || ""}`.trim() || "Client"
 		const dateLabel = String(slotData.date || entry.preferredDate || "N/A")
 		const timeLabel = String(slotData.time || entry.preferredTime || "N/A")
-		const stylistLabel = String(entry.stylist || slotData.stylistKey || "Any Available")
+		const stylistLabel = String(
+			entry.stylist || slotData.stylistKey || "Any Available",
+		)
 		const serviceLabel = String(entry.service || "your selected service")
 
 		const textBody = [
