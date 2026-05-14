@@ -4826,6 +4826,17 @@ async function submitReview(event) {
 			})
 		}
 
+		if (isNonGuestSignedIn()) {
+			try {
+				await loadUserDashboardData(auth.currentUser)
+			} catch (dashboardRefreshError) {
+				console.warn(
+					"Dashboard refresh after review submit failed:",
+					dashboardRefreshError,
+				)
+			}
+		}
+
 		form.reset()
 		const reviewEditIdInput = document.getElementById("reviewEditId")
 		const cancelEditBtn = document.getElementById("cancelReviewEditBtn")
