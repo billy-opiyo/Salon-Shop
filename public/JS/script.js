@@ -256,6 +256,7 @@ let activeDashboardUid = ""
 let dashboardBookingDocs = []
 let dashboardRescheduleTarget = null
 let dashboardRescheduleAvailabilityUnsubscribe = null
+let gallerySlideshowTimers = []
 let gallerySortBy = "recommended"
 const galleryFiltersState = {
 	length: "all",
@@ -3867,21 +3868,60 @@ function renderGallery() {
 
 	grid.innerHTML = dataToShow
 		.map(
-			(item, i) => `
+			(item, i) => {
+				const hasBeforeAfterPair = Boolean(item.beforeImageUrl && item.imageUrl)
+				return `
     <div class="gallery-item" onclick="openLightbox(${i})" style="animation-delay: ${i * 0.1}s">
-      <img src="${item.imageUrl}" alt="${item.styleName}" loading="lazy">
+      ${
+					hasBeforeAfterPair
+						? `
+      <div class="gallery-slideshow" aria-label="${item.styleName} before and after slideshow">
+        <img class="gallery-slideshow-image gallery-slideshow-before" src="${item.beforeImageUrl}" alt="${item.styleName} before" loading="lazy">
+        <img class="gallery-slideshow-image gallery-slideshow-after" src="${item.imageUrl}" alt="${item.styleName} after" loading="lazy">
+      </div>
+      `
+						: `<img src="${item.imageUrl}" alt="${item.styleName}" loading="lazy">`
+				}
       <div class="gallery-overlay">
         <h4>${item.styleName}</h4>
         <p>${item.styleType} • by ${item.stylistName}</p>
-        ${item.hasBeforeAfter ? '<span class="before-after">Before & After</span>' : ""}
+        ${hasBeforeAfterPair ? '<span class="before-after">Before & After</span>' : ""}
         <button type="button" class="gallery-save-favorite-btn" data-fav-style-id="${escapeHtml(item.id || "")}" aria-pressed="false">♡ Save</button>
       </div>
     </div>
-  `,
+  `
+			},
 		)
 		.join("")
 
+	initializeGallerySlideshows()
 	updateFavoriteButtonsUI()
+}
+
+function clearGallerySlideshows() {
+	if (!Array.isArray(gallerySlideshowTimers) || !gallerySlideshowTimers.length) return
+	gallerySlideshowTimers.forEach((timerId) => clearInterval(timerId))
+	gallerySlideshowTimers = []
+}
+
+function initializeGallerySlideshows() {
+	clearGallerySlideshows()
+
+	document.querySelectorAll(".gallery-slideshow").forEach((slideshow) => {
+		const beforeImage = slideshow.querySelector(".gallery-slideshow-before")
+		const afterImage = slideshow.querySelector(".gallery-slideshow-after")
+		if (!beforeImage || !afterImage) return
+
+		let showingAfter = false
+		slideshow.classList.remove("is-showing-after")
+
+		const timerId = setInterval(() => {
+			showingAfter = !showingAfter
+			slideshow.classList.toggle("is-showing-after", showingAfter)
+		}, 5000)
+
+		gallerySlideshowTimers.push(timerId)
+	})
 }
 
 function toggleGalleryView() {
