@@ -3,10 +3,10 @@
 Production-ready Firebase salon platform for **Royal Braids** with:
 
 - Public website (`public/index.html`) for services, gallery, booking, reviews, blog, and contact
-- Client authentication + personal dashboard (appointments, reviews, favorites)
-- Admin console (`public/admin.html`) for bookings, gallery, blogs, reviews, and messages
+- Client authentication + personal dashboard (appointments, reviews, favorites, account settings)
+- Admin console (`public/admin.html`) for bookings, schedule view, gallery, blogs, reviews, and messages
 - Firestore realtime data pipelines
-- Cloud Function automation for booking confirmation emails via Resend
+- Cloud Functions automation for email + WhatsApp booking notifications and waitlist alerts
 
 ---
 
@@ -25,8 +25,9 @@ Production-ready Firebase salon platform for **Royal Braids** with:
 11. [Cloud Functions](#11-cloud-functions)
 12. [Local Setup](#12-local-setup)
 13. [Deployment](#13-deployment)
-14. [Important Notes](#14-important-notes)
-15. [Troubleshooting](#15-troubleshooting)
+14. [Feature Testing Sample (End-to-End QA)](#14-feature-testing-sample-end-to-end-qa)
+15. [Important Notes](#15-important-notes)
+16. [Troubleshooting](#16-troubleshooting)
 
 ---
 
@@ -35,53 +36,36 @@ Production-ready Firebase salon platform for **Royal Braids** with:
 This project is built to:
 
 1. Showcase salon services, styles, and content dynamically.
-2. Accept online bookings with strict anti-double-booking logic.
-3. Let clients authenticate and track their own data (dashboard + favorites).
-4. Give admins one panel to manage all operational content and customer pipelines.
-5. Enforce security through Firebase Auth + strict Firestore rules.
+2. Accept online bookings with anti-double-booking slot locking.
+3. Support authenticated client self-service (dashboard, favorites, reschedule/cancel actions).
+4. Give admins one panel for operations (bookings, calendar schedule, content, and messages).
+5. Enforce security via Firebase Auth + strict Firestore Rules.
 
 ---
 
 ## 2. Latest Project Changes (Current State)
 
-The README now reflects **current implementation**, including:
-
-- Added **Blogs module** end-to-end:
-  - Public blog rendering with realtime Firestore sync and fallback content
-  - Admin blog CRUD (create/edit/delete), image uploads, date/read-time metadata
-- Added **Client Auth + Dashboard** module:
-  - Email/password register/login, forgot-password
-  - Continue-as-guest flow
-  - Dashboard with recent bookings, reviews, profile info, and favorite styles
-- Added **Favorites system**:
-  - Save/unsave styles from gallery/lightbox
-  - Stored under `users/{uid}/favorites`
-  - Dashboard management actions (book/remove)
-- Upgraded **Gallery management**:
-  - Filter chips, sorting, featured strips (Trending + Most Booked)
-  - Before/after lightbox comparison
-  - Admin live preview + publish checklist/progress meter
-- Upgraded **Review workflow**:
-  - Public display pulls approved reviews only
-  - Review submission creates pending docs
-  - Local pending draft edit UX
-  - Abuse report increments `reportsCount`
-  - Admin moderation (approve/reject/pending, feature, edit text, reply, delete)
-- Upgraded **Contact workflow**:
-  - Firestore message pipeline with statuses (`new`, `read`, `resolved`)
-  - Admin message sorting/status lifecycle/delete
-  - Contact success popup/toast
-- Upgraded **Booking workflow**:
-  - Realtime slot availability via `bookingSlots`
-  - Transactional slot locking + booking write
-  - Cancel + release slot action in admin (transaction)
-- Added/updated **Cloud Function email automation**:
-  - On booking create, sends confirmation email through Resend
-  - Writes send status fields (`emailStatus`, timestamps, errors)
-- Added **Manage Account + Delete Account confirmation modal UI** on the public app:
-  - New account settings sections in `index.html`/`style.css` for profile, security, preferences, and account deletion
-  - Includes UI elements for avatar upload, password strength checks, accessibility/notification preferences, and a dedicated delete-confirm dialog
-  - Current state: markup + styling are present; JS wiring for full runtime behavior is still pending
+- Added/expanded **Client Dashboard self-service**:
+  - Client-side booking reschedule flow with slot re-locking
+  - Client-side booking cancellation flow
+  - Realtime dashboard sections for appointments/reviews/favorites
+- Added full **Manage Account runtime implementation**:
+  - Profile updates (name/email/phone/avatar)
+  - Password change + password reset actions
+  - Theme/accessibility/notification preferences persistence
+  - Account delete confirmation flow in UI
+- Added **Waitlist workflow** for lost booking slots:
+  - Public app prompts client to join waitlist when slot was just taken
+  - Waitlist entries stored in Firestore (`waitlist` collection)
+  - Backend notifies next waitlisted client when a slot lock is deleted
+- Expanded **Cloud Functions automation**:
+  - Email booking confirmation via Resend
+  - WhatsApp booking confirmation on create
+  - Scheduled WhatsApp reminders (24h window)
+  - Booking system field initialization + per-user review/contact rate-limit updates
+- Expanded **Admin operations**:
+  - Schedule tab with day/week calendar view and quick booking actions
+  - Existing CRUD/moderation modules maintained for gallery, blogs, reviews, and messages
 
 ---
 
@@ -95,17 +79,18 @@ The README now reflects **current implementation**, including:
 
 ### Firebase
 
-- Firebase Hosting (serves `public/`)
-- Firebase Authentication (email/password + anonymous)
+- Firebase Hosting (`public/`)
+- Firebase Authentication (Email/Password + Anonymous)
 - Cloud Firestore
 - Firestore Security Rules (`firestore.rules`)
-- App Check support (configured in public/admin pages)
+- Firebase App Check (configured in public/admin apps)
 
 ### Media + Automation
 
 - Cloudinary unsigned uploads (booking/gallery/review/blog images)
 - Firebase Cloud Functions (`functions/index.js`)
 - Resend transactional email API
+- WhatsApp Cloud API for confirmations/reminders
 
 ---
 
@@ -136,38 +121,31 @@ The README now reflects **current implementation**, including:
 ### Public App (`index.html` + `script.js`)
 
 1. Initializes Firebase/Auth/Firestore/App Check.
-2. Renders fallback content first.
-3. Starts realtime listeners for:
-   - `galleryStyles`
-   - `blogs`
-   - approved `reviews`
-   - `bookingSlots` availability by selected date/stylist
-4. Handles booking, review submit, favorites, and contact flows.
+2. Renders fallback datasets first.
+3. Starts realtime listeners for gallery/blog/reviews and slot availability.
+4. Handles booking, waitlist fallback, reviews, favorites, contact, and account workflows.
 
 ### Client Dashboard Runtime
 
-- Authenticated clients get dashboard data from:
+- Reads authenticated user data from:
   - `bookings`
   - `reviews`
   - `users/{uid}/favorites`
-- User profile is upserted in `users/{uid}`.
+- Supports booking reschedule/cancel actions.
+- Upserts user profile data in `users/{uid}`.
 
 ### Admin App (`admin.html` + `admin.js`)
 
-1. Admin email/password login.
-2. Allowed-email gate via `APP_CONFIG.admin.allowedEmails`.
-3. Realtime listeners across:
-   - `bookings`
-   - `galleryStyles`
-   - `blogs`
-   - `reviews`
-   - `contactMessages`
+1. Email/password admin login with allowed-email gating.
+2. Realtime listeners for bookings, gallery, blogs, reviews, and contact messages.
+3. Calendar-like schedule board (day/week) for operational booking management.
 
 ### Backend Automation
 
-- Cloud Function triggers on new booking doc.
-- Sends confirmation email via Resend.
-- Writes delivery status metadata back to same booking doc.
+- Functions trigger on booking creation and slot release events.
+- Email + WhatsApp booking notifications.
+- Scheduled WhatsApp reminders.
+- Waitlist notification dispatch for newly opened slots.
 
 ---
 
@@ -175,76 +153,60 @@ The README now reflects **current implementation**, including:
 
 ### Services
 
-- JS-driven services catalog + category tabs
+- JS-driven service catalog + category tabs
 - “Book This Service” quick-fill action
 
 ### Gallery
 
-- Firestore realtime gallery with fallback dataset
-- Filters: length, size, style type
-- Sorting: recommended/name/date variants
-- Featured rails: Trending Braids + Most Booked Styles
-- View All/View Less controls
-- Lightbox with prev/next/keyboard/escape and before-after view
-- Save-style button (favorites)
+- Realtime Firestore gallery with fallback dataset
+- Filters (length/size/style type), sorting, featured rails
+- Before/after lightbox support
+- Save-style to favorites
 
 ### Booking
 
 - Required validation + optional inspiration image upload
-- Date minimum restriction (no past bookings)
 - Realtime slot availability from `bookingSlots`
-- Transactional booking write:
-  - checks slot
-  - locks slot (`taken: true`)
-  - creates booking doc with `status: "confirmed"`
+- Transactional slot lock + booking write
+- If race condition occurs (slot taken), optional waitlist enrollment
 
 ### Reviews
 
-- Public reviews list shows approved reviews only
-- Sorting: Featured/Newest/Highest Rated
-- View All/View Less controls
-- Submission requires **non-anonymous logged-in user** in UI
-- New/updated review saved as `status: "pending"`
-- Verified booking check attempted (uid + service + completed booking)
+- Public feed shows approved reviews only
+- Auth-gated submission for non-anonymous signed-in users
+- Pending moderation on create/update
 - Abuse report increments `reportsCount`
-- Local pending draft edit UX
 
 ### Blog
 
-- Public blog cards with image/date/read-time/CTA
-- Horizontal scroll controls
-- View More/View Less with animation
-- Realtime Firestore sync + fallback blog dataset
+- Realtime blog rendering with fallback content
+- Public card rendering with controls for browsing
 
 ### Contact
 
-- Contact form intercepted in JS and persisted to Firestore
-- Creates `contactMessages` with `status: "new"`
-- Success inline message + success popup
+- Firestore-backed contact pipeline (`status: new` on create)
+- Success messaging in UI
 
 ---
 
 ## 7. Client Auth + Dashboard Features
 
-- Auth modal with:
-  - Email/password login/register
+- Auth modal:
+  - Email/password sign-in/register
   - Forgot password
   - Continue as guest
-  - Phone auth placeholder (coming soon UI)
-- Guest sessions via anonymous auth for booking/contact operations
-- Profile dropdown + logout
-- Client dashboard:
-  - Recent appointments
-  - Recent reviews
-  - Favorite styles list + count
-  - Favorite actions (book/remove)
-  - Profile summary (name/email/phone)
-- Manage Account modal UI includes:
-  - **Profile Info:** avatar picker, name/email/phone fields with input hints
-  - **Login & Security:** current/new password fields, password strength + rule checklist, change/reset actions
-  - **Preferences:** theme/font size selectors, accessibility toggles, notification toggles
-  - **Danger Zone:** delete account trigger + dedicated confirmation modal
-  - **Implementation status:** current update is UI structure/styling in HTML/CSS
+- Dashboard:
+  - Recent appointments and reviews
+  - Favorites list + quick actions
+  - Profile summary fields
+- Manage Account runtime:
+  - Profile updates + optional avatar upload
+  - Password security tools (change/reset + strength checks)
+  - Preferences (theme, font size, accessibility, notifications)
+  - Account deletion confirmation flow
+- Booking self-service:
+  - Reschedule booking
+  - Cancel booking
 
 ---
 
@@ -252,108 +214,70 @@ The README now reflects **current implementation**, including:
 
 ### Access + UX
 
-- Firebase email/password admin login
-- Allowed-email guard
+- Firebase admin login + allowed email guard
 - Password visibility toggle
-- Section tabs: Bookings, Gallery, Blogs, Reviews, Messages
+- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages**
 - Confirmation modal for destructive actions
 
-### Bookings
+### Bookings + Schedule
 
-- Realtime bookings list + status stats
-- Actions: pending / confirmed / completed
-- Cancel + release slot (transaction)
+- Realtime bookings list + status cards
+- Status actions (pending / confirmed / completed)
+- Cancel + release slot action
+- Day/week schedule board with quick-detail action panel
 
 ### Gallery
 
-- Create/edit/delete gallery style
-- Cloudinary upload (main + optional before image)
-- Featured flags (Trending, Most Booked)
-- Live preview + checklist + completion progress meter
+- Create/edit/delete styles
+- Cloudinary upload (after + optional before image)
+- Featured flags + live preview + checklist/progress meter
 
 ### Blogs
 
 - Create/edit/delete blog posts
-- Fields: title, excerpt, read time, publish date, read-more URL, image
-- Blog list vertical scroll controls
+- Fields: title, excerpt, read time, publish date, URL, image
 
 ### Reviews
 
-- Realtime moderation queue + stats
-- Sort reviews (featured/newest/highest-rated)
-- Actions:
-  - approve/reject/set pending
-  - edit text (resets to pending)
-  - save admin reply
-  - toggle featured
-  - delete
-- Local profanity/content list management for moderation assistance
+- Realtime moderation queue + sorting
+- Actions: approve/reject/pending, edit, reply, feature, delete
+- Local blocked-word list helper for moderation
 
 ### Messages
 
-- Realtime contact inbox + stats
+- Realtime inbox + status stats
 - Sort modes (newest/oldest/status/name)
-- Status transitions (`new`, `read`, `resolved`)
-- Delete message
+- Status transitions: `new`, `read`, `resolved`
 
 ---
 
 ## 9. Firestore Data Model
 
-### `bookings/{bookingId}`
+Main collections used:
 
-- Customer fields: `firstName`, `lastName`, `email`, `phone`
-- Booking fields: `service`, `stylist`, `stylistKey`, `date`, `time`, `slotId`, `notes`
-- Media/status: `inspirationImageUrl`, `status`, `uid`
-- Timestamps: `createdAt`, `updatedAt`
-- Function metadata: `emailStatus`, `emailSentAt`, `emailError`, `emailTriedAt`
-
-### `bookingSlots/{slotId}`
-
-- `taken`, `date`, `time`, `stylistKey`, `bookingId`, `uid`, timestamps
-
-### `galleryStyles/{styleId}`
-
-- Style metadata + image fields + featured flags + timestamps
-
-### `blogs/{blogId}`
-
-- `title`, `excerpt`, `readTime`, `publishDate`, `readMoreUrl`, `imageUrl`, timestamps
-
-### `reviews/{reviewId}`
-
-- Review content, rating, optional service/photo, moderation + report fields, status, featured, uid, timestamps
-
-### `users/{userId}`
-
-- Profile fields: `displayName`, `email`, `provider`, `phone`, timestamps
-
-### `users/{userId}/favorites/{favoriteId}`
-
-- Favorite style snapshot: `id`, `styleName`, `styleType`, `stylistName`, `imageUrl`, `savedAt`
-
-### `contactMessages/{messageId}`
-
-- `name`, `email`, `subject`, `message`, `status`, `uid`, timestamps
+- `bookings/{bookingId}`
+- `bookingSlots/{slotId}`
+- `waitlist/{waitlistId}`
+- `galleryStyles/{styleId}`
+- `blogs/{blogId}`
+- `reviews/{reviewId}`
+- `users/{userId}`
+- `users/{userId}/favorites/{favoriteId}`
+- `contactMessages/{messageId}`
+- `rateLimits/{uid}` (function-managed internal cooldown docs)
 
 ---
 
 ## 10. Security Model (`firestore.rules`)
 
-Core rule behavior:
+Core behavior:
 
-- Helper guards:
-  - `isSignedIn()`
-  - `isAdmin()`
-- Strict payload key/type checks on writes
-- Collection-level access:
-  - `bookings`: signed-in create, owner/admin read, admin status updates
-  - `bookingSlots`: signed-in create, public read, admin delete
-  - `galleryStyles`: public read, admin write
-  - `blogs`: public read, admin write
-  - `reviews`: approved public read, owner/admin constraints, report increment path
-  - `users`: self read/write, no delete; favorites scoped to owner
-  - `contactMessages`: signed-in create, admin read/update/delete
+- Helper guards: `isSignedIn()`, `isAdmin()`, owner/admin checks
+- Strict payload and changed-key validation for create/update operations
+- Booking owner update logic supports constrained reschedule/cancel paths
+- Public reads only where intended (`galleryStyles`, `blogs`, approved reviews, slot availability)
+- Waitlist create/read/update constraints added
+- Internal `rateLimits` collection is not client-readable/writeable
 
 ---
 
@@ -361,16 +285,20 @@ Core rule behavior:
 
 File: `functions/index.js`
 
-### `sendBookingConfirmationEmail`
+- `sendBookingConfirmationEmail` (on booking create)
+- `sendBookingConfirmationWhatsApp` (on booking create)
+- `sendUpcomingBookingWhatsAppReminders` (scheduled every 15 minutes)
+- `initializeBookingSystemFields` (booking defaults patch)
+- `updateReviewRateLimit` (on review create)
+- `updateContactRateLimit` (on contact create)
+- `notifyWaitlistOnSlotOpen` (on booking slot deletion)
 
-- Trigger: `onDocumentCreated("bookings/{bookingId}")`
-- Uses secrets:
-  - `RESEND_API_KEY`
-  - `RESEND_FROM_EMAIL`
-- Sends booking confirmation email (HTML + text)
-- Writes send outcome back to booking doc:
-  - success: `emailStatus: "sent"`, `emailSentAt`
-  - failure: `emailStatus: "failed"`, `emailError`, `emailTriedAt`
+Required function secrets include:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `WHATSAPP_CLOUD_ACCESS_TOKEN`
+- `WHATSAPP_CLOUD_PHONE_NUMBER_ID`
 
 ---
 
@@ -380,7 +308,7 @@ File: `functions/index.js`
 
 - Node.js + npm
 - Firebase CLI
-- Access to Firebase project
+- Firebase project access
 
 ### Install Functions Dependencies
 
@@ -392,11 +320,11 @@ cd ..
 
 ### Firebase Checklist
 
-1. Enable Firestore
+1. Enable Firestore.
 2. Enable Authentication providers:
    - Email/Password
    - Anonymous
-3. Deploy rules:
+3. Deploy Firestore rules:
 
 ```bash
 firebase deploy --only firestore:rules
@@ -407,6 +335,8 @@ firebase deploy --only firestore:rules
 ```bash
 firebase functions:secrets:set RESEND_API_KEY
 firebase functions:secrets:set RESEND_FROM_EMAIL
+firebase functions:secrets:set WHATSAPP_CLOUD_ACCESS_TOKEN
+firebase functions:secrets:set WHATSAPP_CLOUD_PHONE_NUMBER_ID
 ```
 
 5. Deploy functions:
@@ -439,19 +369,116 @@ Deploy specific components:
 
 ---
 
-## 14. Important Notes
+## 14. Feature Testing Sample (End-to-End QA)
 
-1. Frontend Firebase config is expected in web apps; security is enforced by rules + auth.
-2. Anonymous auth is required for guest booking/contact flow.
-3. Review form UI currently requires non-anonymous login to submit.
-4. Cloudinary uploads are unsigned; keep upload preset tightly restricted.
-5. Booking UI mentions SMS reminders, but implemented automation is email confirmation function.
-6. Contact form has `formsubmit.co` attributes in HTML, but active flow is JS + Firestore (`preventDefault`).
-7. Manage Account/Delete Account modal UI is included in `index.html` + `CSS/style.css`; runtime JS handlers are not yet implemented in `JS/script.js`.
+Use this as a practical checklist to confirm all major features are working.
+
+### A) Public website smoke test
+
+1. Open `index.html` (or deployed site) and verify:
+   - Hero, Services, Gallery, Reviews, Blog, and Contact sections render.
+   - Dark mode toggle works.
+2. In **Gallery**:
+   - Change filters/sort options.
+   - Open a style in lightbox; test next/prev and close.
+   - Expected: list updates correctly and lightbox navigation works.
+
+### B) Auth + dashboard test
+
+1. Click **Log In** and create a test account (email/password).
+2. Open **My Dashboard** and confirm:
+   - Profile info appears.
+   - Favorites count/list updates after saving a style.
+3. In **Manage Account**:
+   - Update name/phone and save.
+   - Trigger password reset email.
+   - Change theme/accessibility/preferences and save.
+   - Expected: success messages appear and profile/preferences persist.
+
+### C) Booking + slot locking test
+
+1. Submit booking form with valid data.
+2. Confirm success UI appears.
+3. In Firestore, verify:
+   - New doc in `bookings`.
+   - Corresponding doc in `bookingSlots` with `taken: true`.
+4. In dashboard:
+   - Use **Reschedule** to pick a new slot.
+   - Use **Cancel** on another active booking.
+   - Expected: slot changes/cancellation reflected in Firestore and UI.
+
+### D) Waitlist test (race condition path)
+
+1. Attempt to book an already-taken slot (or simulate by taking slot in another session first).
+2. Accept the waitlist prompt.
+3. Verify new document in `waitlist` with `status: "waiting"`.
+4. Delete the related `bookingSlots/{slotId}` lock (admin cancellation path is easiest).
+5. Expected: top waitlisted client gets notified (email/WhatsApp based on available contact data) and waitlist status updates.
+
+### E) Reviews + moderation test
+
+1. Submit a review while signed in.
+2. Confirm review saved as `pending`.
+3. Open admin panel → **Reviews**:
+   - Approve/reject/pending transitions.
+   - Edit text and save reply.
+   - Toggle featured and test delete.
+4. Expected: public site only shows approved reviews.
+
+### F) Contact + admin messages test
+
+1. Submit contact form.
+2. Verify document created in `contactMessages` with `status: "new"`.
+3. In admin panel → **Messages**:
+   - Sort list.
+   - Move status new → read → resolved.
+   - Delete one message.
+4. Expected: counts and status badges update in realtime.
+
+### G) Admin content management test
+
+1. Admin login using allowed email.
+2. **Gallery**: create/edit/delete a style (with image).
+3. **Blogs**: create/edit/delete a blog post.
+4. **Schedule**:
+   - Switch Day/Week.
+   - Open an event and run quick actions.
+5. Expected: public site reflects gallery/blog changes in realtime.
+
+### H) Backend automation verification
+
+After creating test bookings, verify on booking docs:
+
+- `emailStatus` updates (`sent`/`failed`)
+- `whatsappStatus` updates (`confirmation_sent`, `reminder_sent`, etc.)
+- reminder timestamps (`reminderSentAt`, `reminderTriedAt` when applicable)
+
+Also check logs:
+
+```bash
+firebase functions:log
+```
+
+Expected: successful execution logs for:
+
+- `sendBookingConfirmationEmail`
+- `sendBookingConfirmationWhatsApp`
+- `sendUpcomingBookingWhatsAppReminders`
+- `notifyWaitlistOnSlotOpen`
 
 ---
 
-## 15. Troubleshooting
+## 15. Important Notes
+
+1. Frontend Firebase config in web clients is expected; rules + auth enforce security.
+2. Anonymous auth is required for guest booking/contact entry points.
+3. Cloudinary uploads are unsigned; keep upload presets tightly restricted.
+4. Booking/notification automation currently covers email and WhatsApp.
+5. Contact HTML may include legacy attributes, but active pipeline is JS + Firestore.
+
+---
+
+## 16. Troubleshooting
 
 ### "Anonymous sign-in is disabled"
 
@@ -459,21 +486,19 @@ Deploy specific components:
 
 ### Permission denied errors
 
-- Verify auth state and payload schema against rules.
-- Ensure latest rules are deployed.
+- Validate auth state and payload schema against deployed `firestore.rules`.
 
 ### Realtime listeners not updating
 
-- Check browser console for listener/query errors.
-- Verify `window.APP_CONFIG` project values.
-- Confirm required collections/documents exist.
+- Check browser console for query/listener errors.
+- Verify `window.APP_CONFIG` values.
 
-### Email confirmation not sent
+### Notifications not sent
 
-- Confirm function deployment.
-- Confirm secrets are set.
-- Check Cloud Functions logs.
+- Confirm functions are deployed.
+- Confirm all required secrets are set.
+- Check Cloud Functions logs for failed status writes.
 
 ---
 
-**Status:** This README reflects the current implementation in `public/`, `functions/`, `firebase.json`, and `firestore.rules`.
+**Status:** This README reflects current implementation in `public/`, `functions/`, `firebase.json`, and `firestore.rules`.
