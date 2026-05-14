@@ -262,6 +262,25 @@ const galleryFiltersState = {
 	size: "all",
 	styleType: "all",
 }
+const preloadedBeforeImageUrls = new Set()
+
+function preloadGalleryBeforeImages(items = []) {
+	items.forEach((item) => {
+		const beforeUrl = String(item?.beforeImageUrl || "").trim()
+		if (!item?.hasBeforeAfter || !beforeUrl) return
+		if (preloadedBeforeImageUrls.has(beforeUrl)) return
+
+		const img = new Image()
+		img.decoding = "async"
+		img.onload = () => {
+			preloadedBeforeImageUrls.add(beforeUrl)
+		}
+		img.onerror = () => {
+			preloadedBeforeImageUrls.delete(beforeUrl)
+		}
+		img.src = beforeUrl
+	})
+}
 
 const fallbackBlogsData = [
 	{
@@ -3834,6 +3853,9 @@ function renderGallery() {
 	const dataToShow = showAllGallery
 		? filteredGalleryData
 		: filteredGalleryData.slice(0, 8)
+
+	// Preload before-images for currently visible cards so lightbox opens instantly.
+	preloadGalleryBeforeImages(dataToShow)
 
 	if (emptyState) {
 		emptyState.style.display = filteredGalleryData.length ? "none" : "block"
