@@ -3506,6 +3506,67 @@ function getSlotId(date, stylist, time) {
 	return `${date}__${stylistKey}__${normalizedTime}`
 }
 
+const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
+const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
+
+function getRateLimitDocId(kind = "", uid = "") {
+	const safeKind = String(kind || "")
+		.trim()
+		.toLowerCase()
+	const safeUid = String(uid || "").trim()
+	if (!safeKind || !safeUid) return ""
+	return `${safeKind}_${safeUid}`
+}
+
+function buildRateLimitPayload(kind = "", uid = "", cooldownMs = 0) {
+	const nowMs = Date.now()
+	const safeCooldown = Math.max(0, Number(cooldownMs || 0))
+	return {
+		kind: String(kind || "")
+			.trim()
+			.toLowerCase(),
+		uid: String(uid || "").trim(),
+		lastSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+		cooldownUntil: firebase.firestore.Timestamp.fromMillis(nowMs + safeCooldown),
+		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+	}
+}
+
+async function joinWaitlistForUnavailableSlot({
+	bookingData = {},
+	stylistKey = "any",
+	activeUid = "",
+	slotId = "",
+	inspirationImageUrl = "",
+} = {}) {
+	if (!firebaseReady || !db || !activeUid || !slotId) return false
+
+	const waitlistPayload = {
+		firstName: String(bookingData.firstName || "").trim(),
+		lastName: String(bookingData.lastName || "").trim(),
+		email: String(bookingData.email || "")
+			.trim()
+			.toLowerCase(),
+		phone: String(bookingData.phone || "").trim(),
+		service: String(bookingData.service || "").trim(),
+		stylist: String(bookingData.stylist || "").trim(),
+		stylistKey: normalizeStylistKey(stylistKey || bookingData.stylist || "any"),
+		preferredDate: String(bookingData.date || "").trim(),
+		preferredTime: String(bookingData.time || "").trim(),
+		preferredSlotId: String(slotId || "").trim(),
+		notes: String(bookingData.notes || "").trim(),
+		inspirationImageUrl: String(inspirationImageUrl || "").trim(),
+		status: "waiting",
+		notifiedAt: null,
+		uid: String(activeUid || "").trim(),
+		createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+	}
+
+	await db.collection("waitlist").add(waitlistPayload)
+	return true
+}
+
 async function uploadImageToCloudinary(file) {
 	if (!file) return ""
 	if (!cloudinaryConfig.cloudName || !cloudinaryConfig.uploadPreset) {
@@ -5292,8 +5353,6 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 					notes: data.notes || "",
 					inspirationImageUrl,
 					status: "confirmed",
-					whatsappStatus: "pending",
-					reminderSentAt: null,
 					uid: activeUid,
 					createdAt: firebase.firestore.FieldValue.serverTimestamp(),
 					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -5324,6 +5383,45 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 			handleAvailabilityWatch()
 		} catch (error) {
 			console.error("Booking failed:", error)
+
+			const shouldOfferWaitlist =
+				/time slot was just taken|slot is no longer available/i.test(
+					String(error?.message || ""),
+				)
+
+			if (shouldOfferWaitlist && activeUid) {
+				const wantsWaitlist = window.confirm(
+					"That slot is no longer available. Would you like to join the waitlist for this same date, time, and stylist?",
+				)
+
+				if (wantsWaitlist) {
+					try {
+						await joinWaitlistForUnavailableSlot({
+							bookingData: data,
+							stylistKey,
+							activeUid,
+							slotId,
+							inspirationImageUrl,
+						})
+
+						showTimedFormMessage(
+							msg,
+							"success",
+							"✅ You have been added to the waitlist. We’ll notify you if this slot opens up.",
+						)
+						return
+					} catch (waitlistError) {
+						console.error("Waitlist join failed:", waitlistError)
+						showTimedFormMessage(
+							msg,
+							"error",
+							`❌ Could not join waitlist: ${waitlistError?.message || "Please try again."}`,
+						)
+						return
+					}
+				}
+			}
+
 			showTimedFormMessage(
 				msg,
 				"error",

@@ -1,4 +1,7 @@
-const { onDocumentCreated } = require("firebase-functions/v2/firestore")
+const {
+	onDocumentCreated,
+	onDocumentDeleted,
+} = require("firebase-functions/v2/firestore")
 const { onSchedule } = require("firebase-functions/v2/scheduler")
 const { defineSecret } = require("firebase-functions/params")
 const logger = require("firebase-functions/logger")
@@ -14,6 +17,43 @@ const TWILIO_AUTH_TOKEN = defineSecret("TWILIO_AUTH_TOKEN")
 const TWILIO_WHATSAPP_FROM = defineSecret("TWILIO_WHATSAPP_FROM")
 const NAIROBI_TIMEZONE = "Africa/Nairobi"
 const NAIROBI_UTC_OFFSET_HOURS = 3
+const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
+const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
+
+function buildRateLimitDocId(kind = "", uid = "") {
+	const safeKind = String(kind || "")
+		.trim()
+		.toLowerCase()
+	const safeUid = String(uid || "").trim()
+	if (!safeKind || !safeUid) return ""
+	return `${safeKind}_${safeUid}`
+}
+
+async function upsertRateLimit({ kind = "", uid = "", cooldownMs = 0 } = {}) {
+	const docId = buildRateLimitDocId(kind, uid)
+	if (!docId) return
+
+	const cooldownUntil = admin.firestore.Timestamp.fromMillis(
+		Date.now() + Math.max(0, Number(cooldownMs || 0)),
+	)
+
+	await admin
+		.firestore()
+		.collection("rateLimits")
+		.doc(docId)
+		.set(
+			{
+				kind: String(kind || "")
+					.trim()
+					.toLowerCase(),
+				uid: String(uid || "").trim(),
+				cooldownUntil,
+				lastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
+				updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		)
+}
 
 function buildCustomerName(booking = {}) {
 	const fullName = `${booking.firstName || ""} ${booking.lastName || ""}`.trim()
@@ -105,6 +145,15 @@ function formatBookingDateTimeForMessage(booking = {}) {
 			timeZone: NAIROBI_TIMEZONE,
 		}),
 	}
+}
+
+function toMillis(value) {
+	if (!value) return 0
+	if (typeof value?.toMillis === "function") return value.toMillis()
+	if (typeof value === "number" && Number.isFinite(value)) return value
+	if (value?.seconds && Number.isFinite(value.seconds)) return value.seconds * 1000
+	const parsed = Date.parse(String(value))
+	return Number.isNaN(parsed) ? 0 : parsed
 }
 
 async function sendWhatsAppMessage({ toPhoneNumber, messageBody }) {
@@ -416,6 +465,203 @@ exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 			sentCount,
 			failedCount,
 			skippedCount,
+		})
+	},
+)
+
+exports.initializeBookingSystemFields = onDocumentCreated(
+	{
+		document: "bookings/{bookingId}",
+		region: "us-central1",
+	},
+	async (event) => {
+		const snapshot = event.data
+		if (!snapshot) return
+
+		const data = snapshot.data() || {}
+		const patch = {}
+		if (typeof data.whatsappStatus !== "string") patch.whatsappStatus = "pending"
+		if (!("reminderSentAt" in data)) patch.reminderSentAt = null
+
+		if (!Object.keys(patch).length) return
+		patch.updatedAt = admin.firestore.FieldValue.serverTimestamp()
+		await snapshot.ref.set(patch, { merge: true })
+	},
+)
+
+exports.updateReviewRateLimit = onDocumentCreated(
+	{
+		document: "reviews/{reviewId}",
+		region: "us-central1",
+	},
+	async (event) => {
+		const snapshot = event.data
+		if (!snapshot) return
+		const review = snapshot.data() || {}
+		if (!review.uid) return
+		await upsertRateLimit({
+			kind: "review",
+			uid: review.uid,
+			cooldownMs: REVIEW_RATE_LIMIT_COOLDOWN_MS,
+		})
+	},
+)
+
+exports.updateContactRateLimit = onDocumentCreated(
+	{
+		document: "contactMessages/{messageId}",
+		region: "us-central1",
+	},
+	async (event) => {
+		const snapshot = event.data
+		if (!snapshot) return
+		const message = snapshot.data() || {}
+		if (!message.uid) return
+		await upsertRateLimit({
+			kind: "contact",
+			uid: message.uid,
+			cooldownMs: CONTACT_RATE_LIMIT_COOLDOWN_MS,
+		})
+	},
+)
+
+exports.notifyWaitlistOnSlotOpen = onDocumentDeleted(
+	{
+		document: "bookingSlots/{slotId}",
+		region: "us-central1",
+		secrets: [
+			RESEND_API_KEY,
+			RESEND_FROM_EMAIL,
+			TWILIO_ACCOUNT_SID,
+			TWILIO_AUTH_TOKEN,
+			TWILIO_WHATSAPP_FROM,
+		],
+	},
+	async (event) => {
+		const snapshot = event.data
+		if (!snapshot) return
+
+		const slotId = String(event.params.slotId || "").trim()
+		if (!slotId) return
+
+		const slotData = snapshot.data() || {}
+		const db = admin.firestore()
+		let waitlistDocs = []
+
+		try {
+			const indexed = await db
+				.collection("waitlist")
+				.where("preferredSlotId", "==", slotId)
+				.where("status", "==", "waiting")
+				.orderBy("createdAt", "asc")
+				.limit(20)
+				.get()
+			waitlistDocs = indexed.docs
+		} catch (queryError) {
+			logger.warn("Waitlist indexed query failed. Using fallback query.", {
+				slotId,
+				errorMessage: queryError?.message || "Unknown error",
+			})
+			const fallback = await db
+				.collection("waitlist")
+				.where("preferredSlotId", "==", slotId)
+				.where("status", "==", "waiting")
+				.limit(50)
+				.get()
+			waitlistDocs = fallback.docs.sort(
+				(a, b) => toMillis(a.data()?.createdAt) - toMillis(b.data()?.createdAt),
+			)
+		}
+
+		if (!waitlistDocs.length) {
+			logger.info("No waitlist entries for released slot", { slotId })
+			return
+		}
+
+		const nextEntryDoc = waitlistDocs[0]
+		const entry = nextEntryDoc.data() || {}
+		const fullName = `${entry.firstName || ""} ${entry.lastName || ""}`.trim() ||
+			"Client"
+		const dateLabel = String(slotData.date || entry.preferredDate || "N/A")
+		const timeLabel = String(slotData.time || entry.preferredTime || "N/A")
+		const stylistLabel = String(entry.stylist || slotData.stylistKey || "Any Available")
+		const serviceLabel = String(entry.service || "your selected service")
+
+		const textBody = [
+			`Hi ${fullName},`,
+			"",
+			"Good news — your waitlisted appointment slot is now available! 🎉",
+			`Service: ${serviceLabel}`,
+			`Date: ${dateLabel}`,
+			`Time: ${timeLabel}`,
+			`Stylist: ${stylistLabel}`,
+			"",
+			"Please return to Royal Braids booking page to secure it.",
+		].join("\n")
+
+		let emailSent = false
+		let whatsappSent = false
+
+		if (entry.email) {
+			try {
+				const resend = new Resend(RESEND_API_KEY.value())
+				await resend.emails.send({
+					to: entry.email,
+					from: RESEND_FROM_EMAIL.value(),
+					subject: "Slot Available: Your Royal Braids Waitlist Alert",
+					text: textBody,
+				})
+				emailSent = true
+			} catch (emailError) {
+				logger.error("Failed sending waitlist email notification", {
+					slotId,
+					waitlistId: nextEntryDoc.id,
+					errorMessage: emailError?.message || "Unknown error",
+				})
+			}
+		}
+
+		const normalizedPhone = normalizePhoneForWhatsApp(entry.phone)
+		if (normalizedPhone) {
+			try {
+				await sendWhatsAppMessage({
+					toPhoneNumber: normalizedPhone,
+					messageBody: textBody,
+				})
+				whatsappSent = true
+			} catch (whatsError) {
+				logger.error("Failed sending waitlist WhatsApp notification", {
+					slotId,
+					waitlistId: nextEntryDoc.id,
+					errorMessage: whatsError?.message || "Unknown error",
+				})
+			}
+		}
+
+		const anySent = emailSent || whatsappSent
+		await nextEntryDoc.ref.set(
+			{
+				status: anySent ? "notified" : "notification_failed",
+				notifiedAt: anySent
+					? admin.firestore.FieldValue.serverTimestamp()
+					: null,
+				notificationChannel: anySent
+					? emailSent && whatsappSent
+						? "email_whatsapp"
+						: emailSent
+							? "email"
+							: "whatsapp"
+					: "none",
+				updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		)
+
+		logger.info("Processed waitlist notification for released slot", {
+			slotId,
+			waitlistId: nextEntryDoc.id,
+			emailSent,
+			whatsappSent,
 		})
 	},
 )
