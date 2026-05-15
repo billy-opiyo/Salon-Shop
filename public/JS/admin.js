@@ -17,6 +17,7 @@ let adminContactUnsubscribe = null
 let adminSecurityUnsubscribe = null
 let adminSecurityAlertsUnsubscribe = null
 let adminAccountHistoryUnsubscribe = null
+let adminSessionsUnsubscribe = null
 let adminGalleryDocs = []
 let adminBlogDocs = []
 let adminReviewDocs = []
@@ -26,9 +27,11 @@ let adminBookingDocs = []
 let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
 let adminSecuritySortMode = "newest"
+let adminSessionsSortMode = "online-first"
 let adminSecurityAlertsSortMode = "newest"
 let adminAccountHistorySortMode = "newest"
 let adminSecurityDocs = []
+let adminSessionsDocs = []
 let adminSecurityAlertsDocs = []
 let adminAccountHistoryDocs = []
 let adminGalleryPreviewObjectUrl = ""
@@ -45,6 +48,7 @@ const adminMessageTimers = new Map()
 const adminMessageHideTimers = new Map()
 const defaultAdminSection = "bookings"
 const ADMIN_APP_NAME = "royalBraidsAdminApp"
+const ADMIN_SESSION_STALE_AFTER_MS = 2 * 60 * 1000
 const ADMIN_REVIEW_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 }
@@ -743,6 +747,13 @@ function stopAdminAccountHistoryListener() {
 	}
 }
 
+function stopAdminSessionsListener() {
+	if (typeof adminSessionsUnsubscribe === "function") {
+		adminSessionsUnsubscribe()
+		adminSessionsUnsubscribe = null
+	}
+}
+
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
@@ -833,6 +844,7 @@ function setAdminUnlockedState(value) {
 		stopAdminSecurityListener()
 		stopAdminSecurityAlertsListener()
 		stopAdminAccountHistoryListener()
+		stopAdminSessionsListener()
 		setAdminMessage("", "")
 		setAdminMessage("", "", "adminGalleryMessage")
 		setAdminMessage("", "", "adminBlogsMessage")
@@ -843,6 +855,7 @@ function setAdminUnlockedState(value) {
 		setAdminMessage("", "", "adminScheduleMessage")
 		adminBookingDocs = []
 		adminSecurityDocs = []
+		adminSessionsDocs = []
 		adminSecurityAlertsDocs = []
 		adminAccountHistoryDocs = []
 		adminScheduleSelectedBookingId = ""
@@ -856,6 +869,7 @@ function setAdminUnlockedState(value) {
 		startAdminSecurityListener()
 		startAdminSecurityAlertsListener()
 		startAdminAccountHistoryListener()
+		startAdminSessionsListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
 }
@@ -1050,6 +1064,181 @@ function renderAdminSecurityActivities(docs = []) {
 								<td><span class="admin-status ${statusClass}">${escapeHtml(item.status)}</span></td>
 								<td>${escapeHtml(suspiciousText)}</td>
 								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
+							</tr>
+						`
+					})
+					.join("")}
+			</tbody>
+		</table>
+	`
+}
+
+function normalizeSessionDoc(doc = {}) {
+	const userPath = String(doc.__name__?.path || "")
+	const pathMatch = userPath.match(/userSessions\/([^/]+)\/sessions\//i)
+	const uidFromPath = pathMatch?.[1] || ""
+	const uid = String(doc.uid || uidFromPath || "").trim()
+	const sessionId = String(doc.sessionId || doc.id || "").trim()
+	const online = doc.online === true
+	const lastActiveMs =
+		Number(doc.lastActiveAtMs || 0) || toTimestampMs(doc.lastActiveAt) || 0
+	const startedAtMs =
+		Number(doc.startedAtMs || 0) || toTimestampMs(doc.startedAt) || lastActiveMs || 0
+
+	return {
+		id: String(doc.id || ""),
+		uid,
+		sessionId,
+		email: String(doc.email || "").trim(),
+		displayName: String(doc.displayName || "").trim(),
+		deviceType: normalizeSecurityDeviceType(doc.deviceType),
+		browser: String(doc.browser || "Unknown").trim() || "Unknown",
+		method: normalizeSecurityMethod(doc.methodHint || doc.method || "unknown"),
+		timezone: String(doc.timezone || "").trim(),
+		locale: String(doc.locale || "").trim(),
+		online,
+		lastActiveMs,
+		startedAtMs,
+		lastActiveAt: doc.lastActiveAt || null,
+		startedAt: doc.startedAt || null,
+	}
+}
+
+function sortAdminSessions(items = [], mode = adminSessionsSortMode) {
+	const data = [...items]
+
+	if (mode === "last-active-newest") {
+		return data.sort((a, b) => (b.lastActiveMs || 0) - (a.lastActiveMs || 0))
+	}
+
+	if (mode === "longest-session") {
+		const nowMs = Date.now()
+		return data.sort((a, b) => {
+			const aDuration = Math.max(0, nowMs - (a.startedAtMs || nowMs))
+			const bDuration = Math.max(0, nowMs - (b.startedAtMs || nowMs))
+			if (aDuration !== bDuration) return bDuration - aDuration
+			return (b.lastActiveMs || 0) - (a.lastActiveMs || 0)
+		})
+	}
+
+	if (mode === "multi-device-first") {
+		const onlineCountByUid = new Map()
+		data.forEach((item) => {
+			if (!item.uid || !item.online) return
+			onlineCountByUid.set(item.uid, (onlineCountByUid.get(item.uid) || 0) + 1)
+		})
+
+		return data.sort((a, b) => {
+			const aMulti = (onlineCountByUid.get(a.uid) || 0) >= 2
+			const bMulti = (onlineCountByUid.get(b.uid) || 0) >= 2
+			if (aMulti !== bMulti) return aMulti ? -1 : 1
+			if (a.online !== b.online) return a.online ? -1 : 1
+			return (b.lastActiveMs || 0) - (a.lastActiveMs || 0)
+		})
+	}
+
+	return data.sort((a, b) => {
+		if (a.online !== b.online) return a.online ? -1 : 1
+		return (b.lastActiveMs || 0) - (a.lastActiveMs || 0)
+	})
+}
+
+function formatSessionDuration(startedAtMs = 0, endMs = Date.now()) {
+	const durationMs = Math.max(0, Number(endMs || 0) - Number(startedAtMs || 0))
+	const totalMinutes = Math.floor(durationMs / (60 * 1000))
+	const hours = Math.floor(totalMinutes / 60)
+	const minutes = totalMinutes % 60
+	if (hours <= 0) return `${minutes}m`
+	return `${hours}h ${minutes}m`
+}
+
+function renderAdminSessions(docs = []) {
+	const mount = document.getElementById("adminSessionsList")
+	if (!mount) return
+
+	const nowMs = Date.now()
+	const normalized = docs
+		.map(normalizeSessionDoc)
+		.filter((item) => item.uid && item.sessionId)
+		.map((item) => {
+			const isOnlineByHeartbeat =
+				item.online && nowMs - (item.lastActiveMs || 0) <= ADMIN_SESSION_STALE_AFTER_MS
+			return {
+				...item,
+				online: isOnlineByHeartbeat,
+			}
+		})
+
+	const dedupMap = new Map()
+	normalized.forEach((item) => {
+		const key = `${item.uid}::${item.sessionId}`
+		const existing = dedupMap.get(key)
+		if (!existing || (item.lastActiveMs || 0) > (existing.lastActiveMs || 0)) {
+			dedupMap.set(key, item)
+		}
+	})
+
+	const deduped = Array.from(dedupMap.values())
+	const sorted = sortAdminSessions(deduped, adminSessionsSortMode)
+	adminSessionsDocs = sorted
+
+	const onlineSessions = sorted.filter((item) => item.online)
+	const onlineUsers = new Set(onlineSessions.map((item) => item.uid).filter(Boolean))
+	const onlineCountByUid = new Map()
+	onlineSessions.forEach((item) => {
+		onlineCountByUid.set(item.uid, (onlineCountByUid.get(item.uid) || 0) + 1)
+	})
+	const multiDeviceUsers = Array.from(onlineCountByUid.values()).filter(
+		(count) => count >= 2,
+	).length
+
+	const totalEl = document.getElementById("adminSessionsTotalCount")
+	const onlineUsersEl = document.getElementById("adminSessionsOnlineUsersCount")
+	const onlineSessionsEl = document.getElementById("adminSessionsOnlineCount")
+	const multiDeviceEl = document.getElementById("adminSessionsMultiDeviceCount")
+
+	if (totalEl) totalEl.textContent = String(sorted.length)
+	if (onlineUsersEl) onlineUsersEl.textContent = String(onlineUsers.size)
+	if (onlineSessionsEl) onlineSessionsEl.textContent = String(onlineSessions.length)
+	if (multiDeviceEl) multiDeviceEl.textContent = String(multiDeviceUsers)
+
+	if (!sorted.length) {
+		mount.innerHTML =
+			'<div class="admin-empty-state">No active session data yet. User sessions will appear here in realtime.</div>'
+		return
+	}
+
+	mount.innerHTML = `
+		<table class="admin-security-table">
+			<thead>
+				<tr>
+					<th>User</th>
+					<th>Device/Browser</th>
+					<th>Status</th>
+					<th>Last Active</th>
+					<th>Duration</th>
+					<th>Devices</th>
+				</tr>
+			</thead>
+			<tbody>
+				${sorted
+					.map((item) => {
+						const userLabel =
+							item.displayName || item.email || item.uid || "Unknown user"
+						const userOnlineDeviceCount = onlineCountByUid.get(item.uid) || 0
+						const multiDeviceText =
+							userOnlineDeviceCount >= 2
+								? `User logged in from ${userOnlineDeviceCount} devices`
+								: `${userOnlineDeviceCount || 0} active device`
+						const durationText = formatSessionDuration(item.startedAtMs, nowMs)
+						return `
+							<tr>
+								<td>${escapeHtml(userLabel)}</td>
+								<td>${escapeHtml(`${item.deviceType} ${item.browser}`)}</td>
+								<td><span class="admin-status ${item.online ? "admin-status-confirmed" : "admin-status-pending"}">${item.online ? "online" : "offline"}</span></td>
+								<td>${escapeHtml(item.lastActiveMs ? formatAdminDate(item.lastActiveAt || item.lastActiveMs) : "N/A")}</td>
+								<td>${escapeHtml(durationText)}</td>
+								<td>${escapeHtml(multiDeviceText)}</td>
 							</tr>
 						`
 					})
@@ -2911,6 +3100,31 @@ function startAdminAccountHistoryListener() {
 		)
 }
 
+function startAdminSessionsListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminSessionsListener()
+
+	adminSessionsUnsubscribe = db.collectionGroup("sessions").limit(800).onSnapshot(
+		(snapshot) => {
+			const docs = snapshot.docs.map((doc) => ({
+				id: doc.id,
+				...doc.data(),
+				__name__: doc.ref,
+			}))
+			renderAdminSessions(docs)
+		},
+		(error) => {
+			console.error("Admin session tracking listener failed:", error)
+			setAdminMessage(
+				"error",
+				`❌ Failed to watch session tracking in realtime: ${error.message || "unknown error"}`,
+				"adminSecurityEventsMessage",
+			)
+		},
+	)
+}
+
 function initializeAdminPanel() {
 	const loginForm = document.getElementById("adminLoginForm")
 	const logoutBtn = document.getElementById("adminLogoutBtn")
@@ -2939,6 +3153,7 @@ function initializeAdminPanel() {
 	const securityAlertsSortSelect = document.getElementById(
 		"adminSecurityAlertsSortSelect",
 	)
+	const sessionsSortSelect = document.getElementById("adminSessionsSortSelect")
 	const accountHistorySortSelect = document.getElementById(
 		"adminAccountHistorySortSelect",
 	)
@@ -3352,6 +3567,14 @@ function initializeAdminPanel() {
 		securityAlertsSortSelect.addEventListener("change", (event) => {
 			adminSecurityAlertsSortMode = event.target.value || "newest"
 			renderAdminSecurityAlerts(adminSecurityAlertsDocs)
+		})
+	}
+
+	if (sessionsSortSelect) {
+		sessionsSortSelect.value = adminSessionsSortMode
+		sessionsSortSelect.addEventListener("change", (event) => {
+			adminSessionsSortMode = event.target.value || "online-first"
+			renderAdminSessions(adminSessionsDocs)
 		})
 	}
 

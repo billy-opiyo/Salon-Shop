@@ -448,6 +448,23 @@ service cloud.firestore {
       }
     }
 
+    match /userSessions/{userId} {
+      // Session container docs are private to owner/admin.
+      allow read: if isOwnerOrAdmin(userId);
+      allow create, update, delete: if false;
+
+      match /sessions/{sessionId} {
+        // Owner can maintain their own presence; admin can audit for security.
+        allow read: if isOwnerOrAdmin(userId);
+
+        allow create, update: if isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.uid == userId;
+
+        allow delete: if isOwnerOrAdmin(userId);
+      }
+    }
+
     match /contactMessages/{messageId} {
       // Anyone signed in (anonymous auth included) can submit contact messages.
       allow create: if isSignedIn()

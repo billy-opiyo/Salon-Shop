@@ -826,9 +826,24 @@
 
 						<div class="admin-stats">
 							<div class="admin-stat-card">
+								<div class="label">Online Users</div>
+								<strong id="adminSessionsOnlineUsersCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Online Sessions</div>
+								<strong id="adminSessionsOnlineCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Multi-Device Users</div>
+								<strong id="adminSessionsMultiDeviceCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
 								<div class="label">Security Alerts</div>
 								<strong id="adminSecurityAlertsTotalCount">0</strong>
 							</div>
+						</div>
+
+						<div class="admin-stats">
 							<div class="admin-stat-card">
 								<div class="label">Open Alerts</div>
 								<strong id="adminSecurityAlertsOpenCount">0</strong>
@@ -840,6 +855,10 @@
 							<div class="admin-stat-card">
 								<div class="label">Account Changes</div>
 								<strong id="adminAccountHistoryTotalCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Tracked Sessions</div>
+								<strong id="adminSessionsTotalCount">0</strong>
 							</div>
 						</div>
 
@@ -882,6 +901,29 @@
 							<div class="admin-empty-state">
 								No login activity yet. Activity appears here once users attempt
 								sign-in.
+							</div>
+						</div>
+
+						<div class="admin-review-list-head" style="margin-top: 18px">
+							<label for="adminSessionsSortSelect">Sort Sessions:</label>
+							<select
+								id="adminSessionsSortSelect"
+								class="admin-review-sort-select"
+							>
+								<option value="online-first">Online First</option>
+								<option value="last-active-newest">Last Active (Newest)</option>
+								<option value="longest-session">Longest Session</option>
+								<option value="multi-device-first">Multi-Device First</option>
+							</select>
+						</div>
+
+						<div
+							class="admin-security-table-wrap"
+							id="adminSessionsList"
+						>
+							<div class="admin-empty-state">
+								No active session data yet. User sessions will appear here in
+								realtime.
 							</div>
 						</div>
 
@@ -957,5 +999,6 @@
 		</div>
 	</body>
 </html>
+
 
 
