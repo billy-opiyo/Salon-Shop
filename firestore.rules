@@ -495,5 +495,21 @@ service cloud.firestore {
       // Only admins can read login activity for security/fraud monitoring.
       allow read: if isAdmin();
     }
+
+    match /securityAlerts/{alertId} {
+      // Alerts are server-generated only.
+      allow create, update, delete: if false;
+
+      // Admin security dashboard can read alerts.
+      allow read: if isAdmin();
+    }
+
+    match /accountChangeHistory/{changeId} {
+      // History entries are server-generated only.
+      allow create, update, delete: if false;
+
+      // Admin security dashboard can read account history events.
+      allow read: if isAdmin();
+    }
   }
 }

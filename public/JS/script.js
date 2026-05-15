@@ -925,7 +925,10 @@ function getSessionFirestoreRef(uid = "", sessionId = "") {
 		.doc(safeSessionId)
 }
 
-async function writeSessionPresence({ online = true, markSessionStart = false } = {}) {
+async function writeSessionPresence({
+	online = true,
+	markSessionStart = false,
+} = {}) {
 	if (
 		!firebaseReady ||
 		!db ||
@@ -1073,6 +1076,45 @@ async function trackLoginActivity({
 		})
 	} catch (trackError) {
 		console.warn("Login activity tracking failed:", trackError)
+	}
+}
+
+async function trackAccountSecurityChange({
+	changeType = "",
+	details = "",
+	context = {},
+} = {}) {
+	if (
+		!firebaseReady ||
+		!auth?.currentUser ||
+		auth.currentUser.isAnonymous ||
+		!functionsService ||
+		typeof functionsService.httpsCallable !== "function"
+	) {
+		return
+	}
+
+	const logAccountSecurityChange = functionsService.httpsCallable(
+		"logAccountSecurityChange",
+	)
+	const client = buildLoginClientContext()
+
+	try {
+		await logAccountSecurityChange({
+			changeType: String(changeType || "")
+				.trim()
+				.toLowerCase(),
+			details: String(details || "").trim(),
+			source: String(context?.source || "").trim(),
+			metadata: {
+				deviceType: client.deviceType,
+				browser: client.browser,
+				locale: client.locale,
+				timezone: client.timezone,
+			},
+		})
+	} catch (trackError) {
+		console.warn("Account security change tracking failed:", trackError)
 	}
 }
 
@@ -1604,8 +1646,24 @@ async function handleManageAccountSaveProfile() {
 	const user = auth.currentUser
 	const name = authUi.manageAccountName?.value?.trim() || ""
 	const email = authUi.manageAccountEmail?.value?.trim() || ""
+	const nextEmailLower = email.toLowerCase()
 	const phone = authUi.manageAccountPhone?.value?.trim() || ""
 	const avatarFile = authUi.manageAccountAvatarInput?.files?.[0] || null
+	const previousDisplayName = String(user.displayName || "").trim()
+	const previousEmail = String(user.email || "")
+		.trim()
+		.toLowerCase()
+	const previousPhoneLabel = String(
+		authUi.dashboardProfilePhone?.textContent || "",
+	).trim()
+	const previousPhone =
+		previousPhoneLabel === "Add phone during booking" ? "" : previousPhoneLabel
+	const didChangeDisplayName = Boolean(name && name !== previousDisplayName)
+	const didChangeEmail = Boolean(
+		nextEmailLower && nextEmailLower !== previousEmail,
+	)
+	const didChangePhone = phone !== previousPhone
+	const didChangeAvatar = Boolean(avatarFile)
 	if (!isValidEmailFormat(email)) {
 		showTimedFormMessage(
 			authUi.manageAccountMessage,
@@ -1643,7 +1701,7 @@ async function handleManageAccountSaveProfile() {
 		if (Object.keys(profileUpdate).length) {
 			await user.updateProfile(profileUpdate)
 		}
-		if (email && email !== (user.email || "")) {
+		if (email && nextEmailLower !== previousEmail) {
 			await user.updateEmail(email)
 		}
 		await upsertUserProfile(user, {
@@ -1659,6 +1717,45 @@ async function handleManageAccountSaveProfile() {
 		if (authUi.manageAccountAvatarInput) {
 			authUi.manageAccountAvatarInput.value = ""
 		}
+
+		const changeTrackPromises = []
+		if (didChangeEmail) {
+			changeTrackPromises.push(
+				trackAccountSecurityChange({
+					changeType: "email_changed",
+					details: `Email changed to ${email}`,
+					context: { source: "manage-account-profile" },
+				}),
+			)
+		}
+		if (didChangePhone) {
+			changeTrackPromises.push(
+				trackAccountSecurityChange({
+					changeType: "phone_changed",
+					details: "Phone number updated",
+					context: { source: "manage-account-profile" },
+				}),
+			)
+		}
+		if (didChangeDisplayName || didChangeAvatar) {
+			const profileChangeDetails = [
+				didChangeDisplayName ? "display name" : "",
+				didChangeAvatar ? "avatar" : "",
+			]
+				.filter(Boolean)
+				.join(" + ")
+			changeTrackPromises.push(
+				trackAccountSecurityChange({
+					changeType: "profile_updated",
+					details: `Profile updated (${profileChangeDetails || "general"})`,
+					context: { source: "manage-account-profile" },
+				}),
+			)
+		}
+		if (changeTrackPromises.length) {
+			await Promise.allSettled(changeTrackPromises)
+		}
+
 		showTimedFormMessage(
 			authUi.manageAccountMessage,
 			"success",
@@ -1719,6 +1816,11 @@ async function handleManageAccountChangePassword() {
 			"success",
 			"✅ Password changed securely.",
 		)
+		await trackAccountSecurityChange({
+			changeType: "password_changed",
+			details: "Account password changed",
+			context: { source: "manage-account-password" },
+		})
 	} catch (error) {
 		showTimedFormMessage(
 			authUi.manageAccountMessage,
@@ -3339,6 +3441,11 @@ async function handleDeleteAccount() {
 	}
 
 	try {
+		await trackAccountSecurityChange({
+			changeType: "account_deleted",
+			details: "User requested account deletion",
+			context: { source: "delete-account" },
+		})
 		await user.delete()
 
 		if (!auth.currentUser) {

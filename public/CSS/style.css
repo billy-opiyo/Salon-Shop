@@ -2112,6 +2112,102 @@ h6 {
     color: var(--text-primary);
 }
 
+.admin-security-privacy-note {
+    margin: 0 0 12px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(200, 150, 62, 0.3);
+    background: linear-gradient(180deg, rgba(200, 150, 62, 0.1), rgba(200, 150, 62, 0.04));
+}
+
+.admin-security-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-secondary);
+}
+
+#adminSecurityActivityList.is-vertical-scroll-active {
+    --admin-security-visible-rows: 4;
+    --admin-security-header-height: 44px;
+    --admin-security-row-height: 52px;
+    max-height: calc(var(--admin-security-header-height) + (var(--admin-security-row-height) * var(--admin-security-visible-rows)));
+    overflow-y: scroll;
+    overflow-x: auto;
+    padding-right: 4px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #e0ac4f #1b1712;
+}
+
+#adminSecurityActivityList.is-vertical-scroll-active::-webkit-scrollbar {
+    width: 10px;
+}
+
+#adminSecurityActivityList.is-vertical-scroll-active::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #17120d, #20180f);
+    border-radius: 999px;
+}
+
+#adminSecurityActivityList.is-vertical-scroll-active::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #ffe1a3, #e0ac4f, #b6802d);
+    border-radius: 999px;
+}
+
+#adminSecurityActivityList.is-vertical-scroll-active::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #ffedbf, #efbf62, #c9923a);
+}
+
+.admin-security-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 860px;
+}
+
+.admin-security-table th,
+.admin-security-table td {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 0.86rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+.admin-security-table th {
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.02);
+    white-space: nowrap;
+}
+
+.admin-security-table tbody tr:hover {
+    background: rgba(200, 150, 62, 0.07);
+}
+
+.admin-security-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.admin-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
 .admin-bookings-list {
     display: grid;
     gap: 12px;

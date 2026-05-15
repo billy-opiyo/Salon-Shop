@@ -52,8 +52,8 @@
 					<h1 class="section-title">Content & Booking Management</h1>
 					<p class="section-desc">
 						Log in with your admin account to manage Bookings, Schedules,
-						Gallery, Blogs, Reviews and Messages from one categorized control
-						panel.
+						Gallery, Blogs, Reviews, Messages and Security Alerts from one
+						categorized control panel.
 					</p>
 					<br />
 					<p style="margin-top: 12px">
@@ -826,16 +826,20 @@
 
 						<div class="admin-stats">
 							<div class="admin-stat-card">
-								<div class="label">Online Users</div>
-								<strong id="adminSessionOnlineUsersCount">0</strong>
+								<div class="label">Security Alerts</div>
+								<strong id="adminSecurityAlertsTotalCount">0</strong>
 							</div>
 							<div class="admin-stat-card">
-								<div class="label">Active Sessions</div>
-								<strong id="adminSessionActiveSessionsCount">0</strong>
+								<div class="label">Open Alerts</div>
+								<strong id="adminSecurityAlertsOpenCount">0</strong>
 							</div>
 							<div class="admin-stat-card">
-								<div class="label">Multi-Device Users</div>
-								<strong id="adminSessionMultiDeviceUsersCount">0</strong>
+								<div class="label">High Severity Alerts</div>
+								<strong id="adminSecurityAlertsHighCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Account Changes</div>
+								<strong id="adminAccountHistoryTotalCount">0</strong>
 							</div>
 						</div>
 
@@ -847,15 +851,16 @@
 
 						<div
 							class="form-message"
-							id="adminSessionMessage"
+							id="adminSecurityEventsMessage"
 							style="display: none"
 						></div>
 
 						<p class="admin-security-privacy-note">
-							Privacy note: this view shows only security-relevant metadata (masked
-							IP, city/country, device/browser, status). No passwords, exact IPs,
-							or exact GPS are stored.
-						</p><br>
+							Privacy note: this view shows only security-relevant metadata
+							(masked IP, city/country, device/browser, status). No passwords,
+							exact IPs, or exact GPS are stored.
+						</p>
+						<br />
 
 						<div class="admin-review-list-head">
 							<label for="adminSecuritySortSelect">Sort Activity:</label>
@@ -870,22 +875,62 @@
 							</select>
 						</div>
 
-						<div class="admin-security-table-wrap" id="adminSecurityActivityList"></div>
+						<div
+							class="admin-security-table-wrap"
+							id="adminSecurityActivityList"
+						>
+							<div class="admin-empty-state">
+								No login activity yet. Activity appears here once users attempt
+								sign-in.
+							</div>
+						</div>
 
 						<div class="admin-review-list-head" style="margin-top: 18px">
-							<label for="adminSessionSortSelect">Sort Sessions:</label>
+							<label for="adminSecurityAlertsSortSelect">Sort Alerts:</label>
 							<select
-								id="adminSessionSortSelect"
+								id="adminSecurityAlertsSortSelect"
 								class="admin-review-sort-select"
 							>
-								<option value="online-first">Online First</option>
-								<option value="last-active-newest">Last Active (Newest)</option>
-								<option value="duration-longest">Longest Duration</option>
-								<option value="multi-device-first">Multi-Device First</option>
+								<option value="newest">Newest</option>
+								<option value="oldest">Oldest</option>
+								<option value="high-first">High Severity First</option>
+								<option value="open-first">Open First</option>
 							</select>
 						</div>
 
-						<div class="admin-security-table-wrap" id="adminSessionActivityList"></div>
+						<div
+							class="admin-security-table-wrap"
+							id="adminSecurityAlertsList"
+						>
+							<div class="admin-empty-state">
+								No security alerts yet. Alerts will appear here in realtime.
+							</div>
+						</div>
+
+						<div class="admin-review-list-head" style="margin-top: 18px">
+							<label for="adminAccountHistorySortSelect"
+								>Sort Account Changes:</label
+							>
+							<select
+								id="adminAccountHistorySortSelect"
+								class="admin-review-sort-select"
+							>
+								<option value="newest">Newest</option>
+								<option value="oldest">Oldest</option>
+								<option value="critical-first">Critical First</option>
+								<option value="type">Change Type</option>
+							</select>
+						</div>
+
+						<div
+							class="admin-security-table-wrap"
+							id="adminAccountHistoryList"
+						>
+							<div class="admin-empty-state">
+								No account change history yet. Entries will appear here in
+								realtime.
+							</div>
+						</div>
 					</section>
 				</div>
 			</div>
@@ -912,3 +957,5 @@
 		</div>
 	</body>
 </html>
+
+

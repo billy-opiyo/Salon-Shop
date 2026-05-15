@@ -15,6 +15,8 @@ let adminBlogsUnsubscribe = null
 let adminReviewsUnsubscribe = null
 let adminContactUnsubscribe = null
 let adminSecurityUnsubscribe = null
+let adminSecurityAlertsUnsubscribe = null
+let adminAccountHistoryUnsubscribe = null
 let adminGalleryDocs = []
 let adminBlogDocs = []
 let adminReviewDocs = []
@@ -24,7 +26,11 @@ let adminBookingDocs = []
 let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
 let adminSecuritySortMode = "newest"
+let adminSecurityAlertsSortMode = "newest"
+let adminAccountHistorySortMode = "newest"
 let adminSecurityDocs = []
+let adminSecurityAlertsDocs = []
+let adminAccountHistoryDocs = []
 let adminGalleryPreviewObjectUrl = ""
 const ADMIN_SCHEDULE_VIEWS = {
 	day: "day",
@@ -351,7 +357,9 @@ function getAdminVisibleScheduleDates() {
 	const anchor = parseAdminBookingDate(adminScheduleAnchorDate) || new Date()
 	anchor.setHours(0, 0, 0, 0)
 
-	if (normalizeAdminScheduleView(adminScheduleView) === ADMIN_SCHEDULE_VIEWS.day) {
+	if (
+		normalizeAdminScheduleView(adminScheduleView) === ADMIN_SCHEDULE_VIEWS.day
+	) {
 		return [anchor]
 	}
 
@@ -461,7 +469,9 @@ function renderAdminScheduleDetails(booking = null) {
 
 	const status = normalizeStatus(extractRawStatus(booking))
 	const customerName = getAdminBookingCustomerName(booking)
-	const specialRequest = String(booking.notes || booking.specialRequest || "").trim()
+	const specialRequest = String(
+		booking.notes || booking.specialRequest || "",
+	).trim()
 	const inspirationImageUrl = String(
 		booking.inspirationImageUrl ||
 			booking.inspirationImage ||
@@ -529,12 +539,12 @@ function renderAdminSchedule() {
 		rangeLabel.textContent = formatAdminScheduleRangeLabel(visibleDates)
 	}
 
-	const normalizedDocs = (Array.isArray(adminBookingDocs) ? adminBookingDocs : []).map(
-		(booking) => ({
-			...booking,
-			status: normalizeStatus(extractRawStatus(booking)),
-		}),
-	)
+	const normalizedDocs = (
+		Array.isArray(adminBookingDocs) ? adminBookingDocs : []
+	).map((booking) => ({
+		...booking,
+		status: normalizeStatus(extractRawStatus(booking)),
+	}))
 
 	const grouped = new Map()
 	visibleDates.forEach((date) => {
@@ -561,7 +571,9 @@ function renderAdminSchedule() {
 	})
 
 	grouped.forEach((items) => {
-		items.sort((a, b) => a.__scheduleStart.getTime() - b.__scheduleStart.getTime())
+		items.sort(
+			(a, b) => a.__scheduleStart.getTime() - b.__scheduleStart.getTime(),
+		)
 	})
 
 	if (adminScheduleSelectedBookingId && !selectedBooking) {
@@ -657,7 +669,7 @@ function renderAdminSchedule() {
 								`
 							})
 							.join("")
-				  })()
+					})()
 				: '<div class="admin-schedule-empty-day">No bookings</div>'
 
 			return `
@@ -714,6 +726,20 @@ function stopAdminSecurityListener() {
 	if (typeof adminSecurityUnsubscribe === "function") {
 		adminSecurityUnsubscribe()
 		adminSecurityUnsubscribe = null
+	}
+}
+
+function stopAdminSecurityAlertsListener() {
+	if (typeof adminSecurityAlertsUnsubscribe === "function") {
+		adminSecurityAlertsUnsubscribe()
+		adminSecurityAlertsUnsubscribe = null
+	}
+}
+
+function stopAdminAccountHistoryListener() {
+	if (typeof adminAccountHistoryUnsubscribe === "function") {
+		adminAccountHistoryUnsubscribe()
+		adminAccountHistoryUnsubscribe = null
 	}
 }
 
@@ -805,15 +831,20 @@ function setAdminUnlockedState(value) {
 		stopAdminReviewsListener()
 		stopAdminContactListener()
 		stopAdminSecurityListener()
+		stopAdminSecurityAlertsListener()
+		stopAdminAccountHistoryListener()
 		setAdminMessage("", "")
 		setAdminMessage("", "", "adminGalleryMessage")
 		setAdminMessage("", "", "adminBlogsMessage")
 		setAdminMessage("", "", "adminReviewsMessage")
 		setAdminMessage("", "", "adminContactMessage")
 		setAdminMessage("", "", "adminSecurityMessage")
+		setAdminMessage("", "", "adminSecurityEventsMessage")
 		setAdminMessage("", "", "adminScheduleMessage")
 		adminBookingDocs = []
 		adminSecurityDocs = []
+		adminSecurityAlertsDocs = []
+		adminAccountHistoryDocs = []
 		adminScheduleSelectedBookingId = ""
 		renderAdminSchedule()
 	} else {
@@ -823,6 +854,8 @@ function setAdminUnlockedState(value) {
 		startAdminReviewsListener()
 		startAdminContactListener()
 		startAdminSecurityListener()
+		startAdminSecurityAlertsListener()
+		startAdminAccountHistoryListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
 }
@@ -878,7 +911,9 @@ function normalizeSecurityDeviceType(deviceType = "") {
 function normalizeSecurityDoc(doc = {}) {
 	const status = normalizeSecurityStatus(doc.status)
 	const suspiciousFlags = Array.isArray(doc.suspiciousFlags)
-		? doc.suspiciousFlags.map((flag) => String(flag || "").trim()).filter(Boolean)
+		? doc.suspiciousFlags
+				.map((flag) => String(flag || "").trim())
+				.filter(Boolean)
 		: []
 	const isSuspicious = doc.suspicious === true || suspiciousFlags.length > 0
 
@@ -911,7 +946,9 @@ function normalizeSecurityDoc(doc = {}) {
 function sortAdminSecurityActivities(items = [], mode = adminSecuritySortMode) {
 	const data = [...items]
 	if (mode === "oldest") {
-		return data.sort((a, b) => toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt))
+		return data.sort(
+			(a, b) => toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt),
+		)
 	}
 
 	if (mode === "failed-first") {
@@ -932,7 +969,9 @@ function sortAdminSecurityActivities(items = [], mode = adminSecuritySortMode) {
 		})
 	}
 
-	return data.sort((a, b) => toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt))
+	return data.sort(
+		(a, b) => toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt),
+	)
 }
 
 function renderAdminSecurityActivities(docs = []) {
@@ -957,6 +996,16 @@ function renderAdminSecurityActivities(docs = []) {
 	if (successEl) successEl.textContent = String(successCount)
 	if (failedEl) failedEl.textContent = String(failedCount)
 	if (suspiciousEl) suspiciousEl.textContent = String(suspiciousCount)
+
+	const shouldEnableVerticalScroll = sorted.length > 4
+	mount.classList.toggle(
+		"is-vertical-scroll-active",
+		shouldEnableVerticalScroll,
+	)
+	mount.setAttribute(
+		"data-scroll-active",
+		shouldEnableVerticalScroll ? "true" : "false",
+	)
 
 	if (!sorted.length) {
 		mount.innerHTML =
@@ -1000,6 +1049,259 @@ function renderAdminSecurityActivities(docs = []) {
 								<td>${escapeHtml(item.ipMasked)}</td>
 								<td><span class="admin-status ${statusClass}">${escapeHtml(item.status)}</span></td>
 								<td>${escapeHtml(suspiciousText)}</td>
+								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
+							</tr>
+						`
+					})
+					.join("")}
+			</tbody>
+		</table>
+	`
+}
+
+function normalizeAlertSeverity(severity = "") {
+	const raw = String(severity || "")
+		.trim()
+		.toLowerCase()
+	if (["low", "medium", "high"].includes(raw)) return raw
+	return "medium"
+}
+
+function normalizeAlertStatus(status = "") {
+	const raw = String(status || "")
+		.trim()
+		.toLowerCase()
+	if (["open", "investigating", "resolved"].includes(raw)) return raw
+	return "open"
+}
+
+function normalizeSecurityAlertDoc(doc = {}) {
+	const type = String(doc.type || "")
+		.trim()
+		.toLowerCase()
+	const severity = normalizeAlertSeverity(doc.severity)
+	const status = normalizeAlertStatus(doc.status)
+	const message =
+		String(doc.message || "").trim() ||
+		String(type || "security alert").replace(/_/g, " ")
+
+	return {
+		id: String(doc.id || ""),
+		type,
+		severity,
+		status,
+		message,
+		email: String(doc.email || "").trim(),
+		displayName: String(doc.displayName || "").trim(),
+		uid: String(doc.uid || "").trim(),
+		createdAt: doc.createdAt || null,
+	}
+}
+
+function sortAdminSecurityAlerts(
+	items = [],
+	mode = adminSecurityAlertsSortMode,
+) {
+	const data = [...items]
+	if (mode === "oldest") {
+		return data.sort(
+			(a, b) => toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt),
+		)
+	}
+
+	if (mode === "high-first") {
+		const priority = { high: 0, medium: 1, low: 2 }
+		return data.sort((a, b) => {
+			const pDiff = (priority[a.severity] ?? 9) - (priority[b.severity] ?? 9)
+			if (pDiff !== 0) return pDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	if (mode === "open-first") {
+		return data.sort((a, b) => {
+			const aOpen = a.status !== "resolved"
+			const bOpen = b.status !== "resolved"
+			if (aOpen !== bOpen) return aOpen ? -1 : 1
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	return data.sort(
+		(a, b) => toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt),
+	)
+}
+
+function getAdminSeverityClass(severity = "medium") {
+	if (severity === "high") return "admin-status-cancelled"
+	if (severity === "low") return "admin-status-completed"
+	return "admin-status-pending"
+}
+
+function renderAdminSecurityAlerts(docs = []) {
+	const mount = document.getElementById("adminSecurityAlertsList")
+	if (!mount) return
+
+	const normalized = docs.map(normalizeSecurityAlertDoc)
+	const sorted = sortAdminSecurityAlerts(
+		normalized,
+		adminSecurityAlertsSortMode,
+	)
+	adminSecurityAlertsDocs = sorted
+
+	const totalEl = document.getElementById("adminSecurityAlertsTotalCount")
+	const openEl = document.getElementById("adminSecurityAlertsOpenCount")
+	const highEl = document.getElementById("adminSecurityAlertsHighCount")
+
+	const total = sorted.length
+	const openCount = sorted.filter((item) => item.status !== "resolved").length
+	const highCount = sorted.filter((item) => item.severity === "high").length
+
+	if (totalEl) totalEl.textContent = String(total)
+	if (openEl) openEl.textContent = String(openCount)
+	if (highEl) highEl.textContent = String(highCount)
+
+	if (!sorted.length) {
+		mount.innerHTML =
+			'<div class="admin-empty-state">No security alerts yet. Alerts will appear here in realtime.</div>'
+		return
+	}
+
+	mount.innerHTML = `
+		<table class="admin-security-table">
+			<thead>
+				<tr>
+					<th>Alert</th>
+					<th>User</th>
+					<th>Severity</th>
+					<th>Status</th>
+					<th>Time</th>
+				</tr>
+			</thead>
+			<tbody>
+				${sorted
+					.map((item) => {
+						const userLabel =
+							item.displayName || item.email || item.uid || "Unknown user"
+						return `
+							<tr>
+								<td>${escapeHtml(item.message)}</td>
+								<td>${escapeHtml(userLabel)}</td>
+								<td><span class="admin-status ${getAdminSeverityClass(item.severity)}">${escapeHtml(item.severity)}</span></td>
+								<td>${escapeHtml(item.status)}</td>
+								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
+							</tr>
+						`
+					})
+					.join("")}
+			</tbody>
+		</table>
+	`
+}
+
+function normalizeAccountHistoryDoc(doc = {}) {
+	const changeType = String(doc.changeType || "")
+		.trim()
+		.toLowerCase()
+	const changeLabel =
+		String(doc.changeLabel || "").trim() ||
+		String(changeType || "account updated").replace(/_/g, " ")
+
+	return {
+		id: String(doc.id || ""),
+		changeType,
+		changeLabel,
+		details: String(doc.details || "").trim(),
+		email: String(doc.email || "").trim(),
+		displayName: String(doc.displayName || "").trim(),
+		uid: String(doc.uid || "").trim(),
+		createdAt: doc.createdAt || null,
+	}
+}
+
+function sortAdminAccountHistory(
+	items = [],
+	mode = adminAccountHistorySortMode,
+) {
+	const data = [...items]
+	if (mode === "oldest") {
+		return data.sort(
+			(a, b) => toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt),
+		)
+	}
+
+	if (mode === "critical-first") {
+		const critical = new Set([
+			"password_changed",
+			"email_changed",
+			"account_deleted",
+			"account_deactivated",
+		])
+		return data.sort((a, b) => {
+			const aCritical = critical.has(a.changeType)
+			const bCritical = critical.has(b.changeType)
+			if (aCritical !== bCritical) return aCritical ? -1 : 1
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	if (mode === "type") {
+		return data.sort((a, b) => {
+			const typeDiff = String(a.changeLabel || "").localeCompare(
+				String(b.changeLabel || ""),
+				undefined,
+				{ sensitivity: "base" },
+			)
+			if (typeDiff !== 0) return typeDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	return data.sort(
+		(a, b) => toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt),
+	)
+}
+
+function renderAdminAccountHistory(docs = []) {
+	const mount = document.getElementById("adminAccountHistoryList")
+	if (!mount) return
+
+	const normalized = docs.map(normalizeAccountHistoryDoc)
+	const sorted = sortAdminAccountHistory(
+		normalized,
+		adminAccountHistorySortMode,
+	)
+	adminAccountHistoryDocs = sorted
+
+	const totalEl = document.getElementById("adminAccountHistoryTotalCount")
+	if (totalEl) totalEl.textContent = String(sorted.length)
+
+	if (!sorted.length) {
+		mount.innerHTML =
+			'<div class="admin-empty-state">No account change history yet. Entries will appear here in realtime.</div>'
+		return
+	}
+
+	mount.innerHTML = `
+		<table class="admin-security-table">
+			<thead>
+				<tr>
+					<th>Change</th>
+					<th>User</th>
+					<th>Details</th>
+					<th>Time</th>
+				</tr>
+			</thead>
+			<tbody>
+				${sorted
+					.map((item) => {
+						const userLabel =
+							item.displayName || item.email || item.uid || "Unknown user"
+						return `
+							<tr>
+								<td>${escapeHtml(item.changeLabel)}</td>
+								<td>${escapeHtml(userLabel)}</td>
+								<td>${escapeHtml(item.details || "-")}</td>
 								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
 							</tr>
 						`
@@ -2559,6 +2861,56 @@ function startAdminSecurityListener() {
 		)
 }
 
+function startAdminSecurityAlertsListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminSecurityAlertsListener()
+
+	adminSecurityAlertsUnsubscribe = db
+		.collection("securityAlerts")
+		.orderBy("createdAt", "desc")
+		.limit(400)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminSecurityAlerts(docs)
+			},
+			(error) => {
+				console.error("Admin security alerts listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch security alerts in realtime: ${error.message || "unknown error"}`,
+					"adminSecurityEventsMessage",
+				)
+			},
+		)
+}
+
+function startAdminAccountHistoryListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminAccountHistoryListener()
+
+	adminAccountHistoryUnsubscribe = db
+		.collection("accountChangeHistory")
+		.orderBy("createdAt", "desc")
+		.limit(400)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminAccountHistory(docs)
+			},
+			(error) => {
+				console.error("Admin account history listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch account history in realtime: ${error.message || "unknown error"}`,
+					"adminSecurityEventsMessage",
+				)
+			},
+		)
+}
+
 function initializeAdminPanel() {
 	const loginForm = document.getElementById("adminLoginForm")
 	const logoutBtn = document.getElementById("adminLogoutBtn")
@@ -2584,6 +2936,12 @@ function initializeAdminPanel() {
 	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
 	const messagesSortSelect = document.getElementById("adminMessagesSortSelect")
 	const securitySortSelect = document.getElementById("adminSecuritySortSelect")
+	const securityAlertsSortSelect = document.getElementById(
+		"adminSecurityAlertsSortSelect",
+	)
+	const accountHistorySortSelect = document.getElementById(
+		"adminAccountHistorySortSelect",
+	)
 	const profanityWordsInput = document.getElementById("adminProfanityWords")
 	const saveProfanityBtn = document.getElementById("adminSaveProfanityList")
 	const cancelEditBtn = document.getElementById("adminGalleryCancelEdit")
@@ -2986,6 +3344,22 @@ function initializeAdminPanel() {
 		securitySortSelect.addEventListener("change", (event) => {
 			adminSecuritySortMode = event.target.value || "newest"
 			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityAlertsSortSelect) {
+		securityAlertsSortSelect.value = adminSecurityAlertsSortMode
+		securityAlertsSortSelect.addEventListener("change", (event) => {
+			adminSecurityAlertsSortMode = event.target.value || "newest"
+			renderAdminSecurityAlerts(adminSecurityAlertsDocs)
+		})
+	}
+
+	if (accountHistorySortSelect) {
+		accountHistorySortSelect.value = adminAccountHistorySortMode
+		accountHistorySortSelect.addEventListener("change", (event) => {
+			adminAccountHistorySortMode = event.target.value || "newest"
+			renderAdminAccountHistory(adminAccountHistoryDocs)
 		})
 	}
 

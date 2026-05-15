@@ -21,6 +21,29 @@ const NAIROBI_TIMEZONE = "Africa/Nairobi"
 const NAIROBI_UTC_OFFSET_HOURS = 3
 const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
 const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
+const SECURITY_ALERT_SEVERITY = {
+	multiple_failed_login_attempts: "high",
+	new_device_detected: "medium",
+	login_unusual_country: "high",
+	rapid_repeated_logins: "high",
+	account_deleted: "high",
+	account_deactivated: "high",
+	password_changed: "medium",
+	email_changed: "medium",
+	phone_changed: "low",
+	profile_updated: "low",
+}
+
+const ACCOUNT_CHANGE_LABELS = {
+	password_changed: "Password changed",
+	email_changed: "Email changed",
+	phone_changed: "Phone changed",
+	profile_updated: "Profile updated",
+	account_deleted: "Account deleted",
+	account_deactivated: "Account deactivated",
+}
+
+const ACCOUNT_CHANGE_TYPES = Object.keys(ACCOUNT_CHANGE_LABELS)
 let ResendClient = null
 
 function getResendClient() {
@@ -59,7 +82,21 @@ function normalizeDeviceType(deviceType = "") {
 }
 
 function normalizeShortText(value = "", maxLen = 80) {
-	return String(value || "").trim().slice(0, maxLen)
+	return String(value || "")
+		.trim()
+		.slice(0, maxLen)
+}
+
+function normalizeAccountChangeType(value = "") {
+	const raw = String(value || "")
+		.trim()
+		.toLowerCase()
+	if (ACCOUNT_CHANGE_TYPES.includes(raw)) return raw
+	return ""
+}
+
+function getAccountChangeLabel(changeType = "") {
+	return ACCOUNT_CHANGE_LABELS[changeType] || "Account updated"
 }
 
 function extractRequestIp(request) {
@@ -92,7 +129,10 @@ function maskIpAddress(ipAddress = "") {
 }
 
 function extractApproxLocation(request) {
-	const city = normalizeShortText(request?.headers?.["x-appengine-city"] || "", 80)
+	const city = normalizeShortText(
+		request?.headers?.["x-appengine-city"] || "",
+		80,
+	)
 	const countryRaw = normalizeShortText(
 		request?.headers?.["x-appengine-country"] || "",
 		80,
@@ -293,6 +333,57 @@ async function sendWhatsAppMessage({ toPhoneNumber, messageBody }) {
 	}
 }
 
+async function createSecurityAlert({
+	type = "",
+	uid = "",
+	email = "",
+	displayName = "",
+	severity = "medium",
+	message = "",
+	metadata = {},
+} = {}) {
+	const alertType = String(type || "")
+		.trim()
+		.toLowerCase()
+	if (!alertType) return
+
+	const safeSeverity = ["low", "medium", "high"].includes(
+		String(severity || "")
+			.trim()
+			.toLowerCase(),
+	)
+		? String(severity || "")
+				.trim()
+				.toLowerCase()
+		: "medium"
+
+	const safeUid = String(uid || "").trim()
+	const safeEmail = String(email || "")
+		.trim()
+		.toLowerCase()
+	const safeDisplayName = normalizeShortText(displayName || "", 120)
+	const safeMessage = normalizeShortText(message || "", 220)
+
+	await admin
+		.firestore()
+		.collection("securityAlerts")
+		.add({
+			type: alertType,
+			severity: safeSeverity,
+			status: "open",
+			message: safeMessage,
+			uid: safeUid,
+			email: safeEmail,
+			displayName: safeDisplayName,
+			metadata:
+				typeof metadata === "object" && metadata && !Array.isArray(metadata)
+					? metadata
+					: {},
+			createdAt: admin.firestore.FieldValue.serverTimestamp(),
+			updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+		})
+}
+
 exports.logLoginActivity = onCall(
 	{
 		region: "us-central1",
@@ -314,7 +405,8 @@ exports.logLoginActivity = onCall(
 		}
 
 		const deviceType = normalizeDeviceType(data.deviceType)
-		const browser = normalizeShortText(data.browser || "Unknown", 80) || "Unknown"
+		const browser =
+			normalizeShortText(data.browser || "Unknown", 80) || "Unknown"
 		const locale = normalizeShortText(data.locale || "", 40)
 		const timezone = normalizeShortText(data.timezone || "", 80)
 		const source = normalizeShortText(data.source || "", 60)
@@ -326,7 +418,9 @@ exports.logLoginActivity = onCall(
 		const authToken = request.auth?.token || {}
 		const displayName = normalizeShortText(authToken.name || "", 120)
 		const authEmail = normalizeShortText(authToken.email || "", 160)
-		const email = (authEmail || (isFailure ? attemptedEmail : "")).toLowerCase().trim()
+		const email = (authEmail || (isFailure ? attemptedEmail : ""))
+			.toLowerCase()
+			.trim()
 
 		const rawIp = extractRequestIp(request.rawRequest)
 		const ipMasked = maskIpAddress(rawIp)
@@ -354,6 +448,13 @@ exports.logLoginActivity = onCall(
 
 			const recent = recentSnapshot.docs.map((doc) => doc.data() || {})
 			const nowMs = Date.now()
+			const repeatedAttemptsInShortWindow = recent.filter((entry) => {
+				const age = nowMs - toMillis(entry.createdAt)
+				return age >= 0 && age <= 2 * 60 * 1000
+			}).length
+			if (repeatedAttemptsInShortWindow >= 4) {
+				suspiciousFlags.push("rapid_repeated_logins")
+			}
 
 			if (isFailure) {
 				const failuresInWindow = recent.filter((entry) => {
@@ -407,29 +508,147 @@ exports.logLoginActivity = onCall(
 		suspiciousFlags = [...new Set(suspiciousFlags)]
 		const suspicious = suspiciousFlags.length > 0
 
-		await admin.firestore().collection("loginActivities").add({
-			uid,
-			displayName,
-			email,
-			attemptedEmail,
-			identityType,
-			identityValue,
-			method,
-			status,
-			deviceType,
-			browser,
-			locationCity: location.city,
-			locationCountry: location.country,
-			locationLabel: location.locationLabel,
-			ipMasked,
-			failureCode,
-			suspicious,
-			suspiciousFlags,
-			source,
-			locale,
-			timezone,
-			createdAt: admin.firestore.FieldValue.serverTimestamp(),
-		})
+		const activityRef = await admin
+			.firestore()
+			.collection("loginActivities")
+			.add({
+				uid,
+				displayName,
+				email,
+				attemptedEmail,
+				identityType,
+				identityValue,
+				method,
+				status,
+				deviceType,
+				browser,
+				locationCity: location.city,
+				locationCountry: location.country,
+				locationLabel: location.locationLabel,
+				ipMasked,
+				failureCode,
+				suspicious,
+				suspiciousFlags,
+				source,
+				locale,
+				timezone,
+				createdAt: admin.firestore.FieldValue.serverTimestamp(),
+			})
+
+		const alertSpecs = []
+		if (suspiciousFlags.includes("repeated_failures")) {
+			alertSpecs.push({
+				type: "multiple_failed_login_attempts",
+				message: "Multiple failed login attempts detected",
+			})
+		}
+		if (suspiciousFlags.includes("new_device_or_browser")) {
+			alertSpecs.push({
+				type: "new_device_detected",
+				message: "Login from a new device or browser detected",
+			})
+		}
+		if (suspiciousFlags.includes("country_changed_quickly")) {
+			alertSpecs.push({
+				type: "login_unusual_country",
+				message: "Login from unusual country detected",
+			})
+		}
+		if (suspiciousFlags.includes("rapid_repeated_logins")) {
+			alertSpecs.push({
+				type: "rapid_repeated_logins",
+				message: "Rapid repeated login attempts detected",
+			})
+		}
+
+		if (alertSpecs.length) {
+			await Promise.allSettled(
+				alertSpecs.map((spec) =>
+					createSecurityAlert({
+						type: spec.type,
+						uid,
+						email,
+						displayName,
+						severity: SECURITY_ALERT_SEVERITY[spec.type] || "medium",
+						message: spec.message,
+						metadata: {
+							loginActivityId: activityRef.id,
+							method,
+							status,
+							deviceType,
+							browser,
+							locationLabel: location.locationLabel,
+							ipMasked,
+							suspiciousFlags,
+						},
+					}),
+				),
+			)
+		}
+
+		return { ok: true }
+	},
+)
+
+exports.logAccountSecurityChange = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		if (!request.auth?.uid) {
+			throw new HttpsError("unauthenticated", "Sign in required")
+		}
+
+		const data = request.data || {}
+		const changeType = normalizeAccountChangeType(data.changeType)
+		if (!changeType) {
+			throw new HttpsError("invalid-argument", "Invalid account change type")
+		}
+
+		const uid = String(request.auth.uid || "").trim()
+		const authToken = request.auth.token || {}
+		const email = normalizeShortText(authToken.email || "", 160)
+			.toLowerCase()
+			.trim()
+		const displayName = normalizeShortText(authToken.name || "", 120)
+		const details = normalizeShortText(data.details || "", 280)
+		const source = normalizeShortText(data.source || "", 80)
+
+		await admin
+			.firestore()
+			.collection("accountChangeHistory")
+			.add({
+				uid,
+				email,
+				displayName,
+				changeType,
+				changeLabel: getAccountChangeLabel(changeType),
+				details,
+				source,
+				createdAt: admin.firestore.FieldValue.serverTimestamp(),
+			})
+
+		const shouldAlert = [
+			"password_changed",
+			"email_changed",
+			"account_deleted",
+			"account_deactivated",
+		].includes(changeType)
+
+		if (shouldAlert) {
+			await createSecurityAlert({
+				type: changeType,
+				uid,
+				email,
+				displayName,
+				severity: SECURITY_ALERT_SEVERITY[changeType] || "medium",
+				message: `${getAccountChangeLabel(changeType)} event recorded`,
+				metadata: {
+					source,
+					details,
+				},
+			})
+		}
 
 		return { ok: true }
 	},
