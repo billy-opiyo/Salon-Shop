@@ -2,11 +2,11 @@ const {
 	onDocumentCreated,
 	onDocumentDeleted,
 } = require("firebase-functions/v2/firestore")
+const { onCall, HttpsError } = require("firebase-functions/v2/https")
 const { onSchedule } = require("firebase-functions/v2/scheduler")
 const { defineSecret } = require("firebase-functions/params")
 const logger = require("firebase-functions/logger")
 const admin = require("firebase-admin")
-const { Resend } = require("resend")
 
 admin.initializeApp()
 
@@ -21,6 +21,102 @@ const NAIROBI_TIMEZONE = "Africa/Nairobi"
 const NAIROBI_UTC_OFFSET_HOURS = 3
 const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
 const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
+let ResendClient = null
+
+function getResendClient() {
+	if (!ResendClient) {
+		const { Resend } = require("resend")
+		ResendClient = Resend
+	}
+	return new ResendClient(RESEND_API_KEY.value())
+}
+
+function normalizeLoginMethod(method = "") {
+	const raw = String(method || "")
+		.trim()
+		.toLowerCase()
+	if (raw === "google") return "google"
+	if (raw === "email/password" || raw === "email" || raw === "password") {
+		return "email/password"
+	}
+	if (raw === "anonymous") return "anonymous"
+	return "unknown"
+}
+
+function normalizeLoginStatus(status = "") {
+	const raw = String(status || "")
+		.trim()
+		.toLowerCase()
+	return raw === "failure" ? "failure" : "success"
+}
+
+function normalizeDeviceType(deviceType = "") {
+	const raw = String(deviceType || "")
+		.trim()
+		.toLowerCase()
+	if (["mobile", "desktop", "tablet"].includes(raw)) return raw
+	return "unknown"
+}
+
+function normalizeShortText(value = "", maxLen = 80) {
+	return String(value || "").trim().slice(0, maxLen)
+}
+
+function extractRequestIp(request) {
+	const forwarded = request?.headers?.["x-forwarded-for"]
+	if (typeof forwarded === "string" && forwarded.trim()) {
+		return forwarded.split(",")[0].trim()
+	}
+	return String(request?.ip || "").trim()
+}
+
+function maskIpAddress(ipAddress = "") {
+	const ip = String(ipAddress || "").trim()
+	if (!ip) return "masked"
+
+	if (ip.includes(".")) {
+		const parts = ip.split(".")
+		if (parts.length === 4) {
+			return `${parts[0]}.${parts[1]}.xxx.xxx`
+		}
+	}
+
+	if (ip.includes(":")) {
+		const parts = ip.split(":")
+		if (parts.length >= 2) {
+			return `${parts[0]}:${parts[1]}:xxxx:xxxx:xxxx:xxxx`
+		}
+	}
+
+	return "masked"
+}
+
+function extractApproxLocation(request) {
+	const city = normalizeShortText(request?.headers?.["x-appengine-city"] || "", 80)
+	const countryRaw = normalizeShortText(
+		request?.headers?.["x-appengine-country"] || "",
+		80,
+	)
+	const country = countryRaw && countryRaw !== "ZZ" ? countryRaw : "Unknown"
+	const locationLabel = [city, country].filter(Boolean).join(", ") || "Unknown"
+
+	return {
+		city: city || "Unknown",
+		country,
+		locationLabel,
+	}
+}
+
+function toMillis(value) {
+	if (!value) return 0
+	if (typeof value?.toMillis === "function") return value.toMillis()
+	if (typeof value === "number" && Number.isFinite(value)) return value
+	if (value?.seconds && Number.isFinite(value.seconds)) {
+		return value.seconds * 1000
+	}
+	const parsed = Date.parse(String(value))
+	return Number.isNaN(parsed) ? 0 : parsed
+}
 
 function buildRateLimitDocId(uid = "") {
 	const safeUid = String(uid || "").trim()
@@ -151,16 +247,6 @@ function formatBookingDateTimeForMessage(booking = {}) {
 	}
 }
 
-function toMillis(value) {
-	if (!value) return 0
-	if (typeof value?.toMillis === "function") return value.toMillis()
-	if (typeof value === "number" && Number.isFinite(value)) return value
-	if (value?.seconds && Number.isFinite(value.seconds))
-		return value.seconds * 1000
-	const parsed = Date.parse(String(value))
-	return Number.isNaN(parsed) ? 0 : parsed
-}
-
 async function sendWhatsAppMessage({ toPhoneNumber, messageBody }) {
 	const accessToken = WHATSAPP_CLOUD_ACCESS_TOKEN.value()
 	const phoneNumberId = WHATSAPP_CLOUD_PHONE_NUMBER_ID.value()
@@ -207,6 +293,148 @@ async function sendWhatsAppMessage({ toPhoneNumber, messageBody }) {
 	}
 }
 
+exports.logLoginActivity = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const data = request.data || {}
+		const method = normalizeLoginMethod(data.method)
+		const status = normalizeLoginStatus(data.status)
+		const isFailure = status === "failure"
+		const isAuthenticated = Boolean(request.auth?.uid)
+
+		if (!isAuthenticated && !isFailure) {
+			throw new HttpsError("unauthenticated", "Sign in required")
+		}
+
+		const uid = isAuthenticated ? String(request.auth.uid || "").trim() : ""
+		if (isAuthenticated && !uid) {
+			throw new HttpsError("unauthenticated", "Invalid auth session")
+		}
+
+		const deviceType = normalizeDeviceType(data.deviceType)
+		const browser = normalizeShortText(data.browser || "Unknown", 80) || "Unknown"
+		const locale = normalizeShortText(data.locale || "", 40)
+		const timezone = normalizeShortText(data.timezone || "", 80)
+		const source = normalizeShortText(data.source || "", 60)
+		const failureCode = normalizeShortText(data.failureCode || "", 80)
+		const attemptedEmail = normalizeShortText(data.attemptedEmail || "", 160)
+			.toLowerCase()
+			.trim()
+
+		const authToken = request.auth?.token || {}
+		const displayName = normalizeShortText(authToken.name || "", 120)
+		const authEmail = normalizeShortText(authToken.email || "", 160)
+		const email = (authEmail || (isFailure ? attemptedEmail : "")).toLowerCase().trim()
+
+		const rawIp = extractRequestIp(request.rawRequest)
+		const ipMasked = maskIpAddress(rawIp)
+		const location = extractApproxLocation(request.rawRequest)
+		const identityType = uid ? "uid" : email ? "email" : "masked_ip"
+		const identityValue = uid || email || ipMasked
+
+		let suspiciousFlags = []
+		try {
+			let recentQuery = admin
+				.firestore()
+				.collection("loginActivities")
+				.orderBy("createdAt", "desc")
+				.limit(25)
+
+			if (uid) {
+				recentQuery = recentQuery.where("uid", "==", uid)
+			} else if (email) {
+				recentQuery = recentQuery.where("email", "==", email)
+			} else {
+				recentQuery = recentQuery.where("ipMasked", "==", ipMasked)
+			}
+
+			const recentSnapshot = await recentQuery.get()
+
+			const recent = recentSnapshot.docs.map((doc) => doc.data() || {})
+			const nowMs = Date.now()
+
+			if (isFailure) {
+				const failuresInWindow = recent.filter((entry) => {
+					if (String(entry.status || "") !== "failure") return false
+					const age = nowMs - toMillis(entry.createdAt)
+					return age >= 0 && age <= 5 * 60 * 1000
+				}).length
+				if (failuresInWindow >= 2) {
+					suspiciousFlags.push("repeated_failures")
+				}
+			}
+
+			if (status === "success") {
+				const priorSuccess = recent.filter(
+					(entry) => String(entry.status || "") === "success",
+				)
+
+				if (priorSuccess.length) {
+					const hasSeenDeviceBrowser = priorSuccess.some(
+						(entry) =>
+							String(entry.deviceType || "") === deviceType &&
+							String(entry.browser || "") === browser,
+					)
+					if (!hasSeenDeviceBrowser) {
+						suspiciousFlags.push("new_device_or_browser")
+					}
+
+					const lastSuccess = priorSuccess[0]
+					const lastCountry = String(lastSuccess.locationCountry || "")
+					const lastSuccessAge = nowMs - toMillis(lastSuccess.createdAt)
+					if (
+						location.country !== "Unknown" &&
+						lastCountry &&
+						lastCountry !== "Unknown" &&
+						lastCountry !== location.country &&
+						lastSuccessAge >= 0 &&
+						lastSuccessAge <= 24 * 60 * 60 * 1000
+					) {
+						suspiciousFlags.push("country_changed_quickly")
+					}
+				}
+			}
+		} catch (analysisError) {
+			logger.warn("Login activity risk analysis skipped", {
+				uid,
+				email,
+				errorMessage: analysisError?.message || "Unknown error",
+			})
+		}
+
+		suspiciousFlags = [...new Set(suspiciousFlags)]
+		const suspicious = suspiciousFlags.length > 0
+
+		await admin.firestore().collection("loginActivities").add({
+			uid,
+			displayName,
+			email,
+			attemptedEmail,
+			identityType,
+			identityValue,
+			method,
+			status,
+			deviceType,
+			browser,
+			locationCity: location.city,
+			locationCountry: location.country,
+			locationLabel: location.locationLabel,
+			ipMasked,
+			failureCode,
+			suspicious,
+			suspiciousFlags,
+			source,
+			locale,
+			timezone,
+			createdAt: admin.firestore.FieldValue.serverTimestamp(),
+		})
+
+		return { ok: true }
+	},
+)
+
 exports.sendBookingConfirmationEmail = onDocumentCreated(
 	{
 		document: "bookings/{bookingId}",
@@ -225,7 +453,7 @@ exports.sendBookingConfirmationEmail = onDocumentCreated(
 			return
 		}
 
-		const resend = new Resend(RESEND_API_KEY.value())
+		const resend = getResendClient()
 
 		const customerName = buildCustomerName(booking)
 
@@ -616,7 +844,7 @@ exports.notifyWaitlistOnSlotOpen = onDocumentDeleted(
 
 		if (entry.email) {
 			try {
-				const resend = new Resend(RESEND_API_KEY.value())
+				const resend = getResendClient()
 				await resend.emails.send({
 					to: entry.email,
 					from: RESEND_FROM_EMAIL.value(),

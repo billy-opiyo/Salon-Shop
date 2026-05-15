@@ -14,6 +14,7 @@ let adminGalleryUnsubscribe = null
 let adminBlogsUnsubscribe = null
 let adminReviewsUnsubscribe = null
 let adminContactUnsubscribe = null
+let adminSecurityUnsubscribe = null
 let adminGalleryDocs = []
 let adminBlogDocs = []
 let adminReviewDocs = []
@@ -22,6 +23,8 @@ let adminContactDocs = []
 let adminBookingDocs = []
 let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
+let adminSecuritySortMode = "newest"
+let adminSecurityDocs = []
 let adminGalleryPreviewObjectUrl = ""
 const ADMIN_SCHEDULE_VIEWS = {
 	day: "day",
@@ -707,6 +710,13 @@ function stopAdminContactListener() {
 	}
 }
 
+function stopAdminSecurityListener() {
+	if (typeof adminSecurityUnsubscribe === "function") {
+		adminSecurityUnsubscribe()
+		adminSecurityUnsubscribe = null
+	}
+}
+
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
@@ -794,13 +804,16 @@ function setAdminUnlockedState(value) {
 		stopAdminBlogsListener()
 		stopAdminReviewsListener()
 		stopAdminContactListener()
+		stopAdminSecurityListener()
 		setAdminMessage("", "")
 		setAdminMessage("", "", "adminGalleryMessage")
 		setAdminMessage("", "", "adminBlogsMessage")
 		setAdminMessage("", "", "adminReviewsMessage")
 		setAdminMessage("", "", "adminContactMessage")
+		setAdminMessage("", "", "adminSecurityMessage")
 		setAdminMessage("", "", "adminScheduleMessage")
 		adminBookingDocs = []
+		adminSecurityDocs = []
 		adminScheduleSelectedBookingId = ""
 		renderAdminSchedule()
 	} else {
@@ -809,6 +822,7 @@ function setAdminUnlockedState(value) {
 		startAdminBlogsListener()
 		startAdminReviewsListener()
 		startAdminContactListener()
+		startAdminSecurityListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
 }
@@ -830,6 +844,170 @@ function getContactStatusClass(status) {
 		default:
 			return "admin-status-pending"
 	}
+}
+
+function normalizeSecurityStatus(status = "") {
+	const raw = String(status || "success")
+		.trim()
+		.toLowerCase()
+	return raw === "failure" ? "failure" : "success"
+}
+
+function normalizeSecurityMethod(method = "") {
+	const raw = String(method || "unknown")
+		.trim()
+		.toLowerCase()
+	if (raw === "google") return "Google"
+	if (raw === "email/password" || raw === "password" || raw === "email") {
+		return "Email/Password"
+	}
+	if (raw === "anonymous") return "Anonymous"
+	return "Unknown"
+}
+
+function normalizeSecurityDeviceType(deviceType = "") {
+	const raw = String(deviceType || "unknown")
+		.trim()
+		.toLowerCase()
+	if (["mobile", "desktop", "tablet"].includes(raw)) {
+		return raw.charAt(0).toUpperCase() + raw.slice(1)
+	}
+	return "Unknown"
+}
+
+function normalizeSecurityDoc(doc = {}) {
+	const status = normalizeSecurityStatus(doc.status)
+	const suspiciousFlags = Array.isArray(doc.suspiciousFlags)
+		? doc.suspiciousFlags.map((flag) => String(flag || "").trim()).filter(Boolean)
+		: []
+	const isSuspicious = doc.suspicious === true || suspiciousFlags.length > 0
+
+	return {
+		id: String(doc.id || ""),
+		uid: String(doc.uid || ""),
+		displayName: String(doc.displayName || "").trim(),
+		email: String(doc.email || "").trim(),
+		method: normalizeSecurityMethod(doc.method),
+		deviceType: normalizeSecurityDeviceType(doc.deviceType),
+		browser: String(doc.browser || "Unknown").trim() || "Unknown",
+		locationLabel:
+			String(doc.locationLabel || "").trim() ||
+			[
+				String(doc.locationCity || "").trim(),
+				String(doc.locationCountry || "").trim(),
+			]
+				.filter(Boolean)
+				.join(", ") ||
+			"Unknown",
+		ipMasked: String(doc.ipMasked || "").trim() || "Masked",
+		status,
+		failureCode: String(doc.failureCode || "").trim(),
+		isSuspicious,
+		suspiciousFlags,
+		createdAt: doc.createdAt || null,
+	}
+}
+
+function sortAdminSecurityActivities(items = [], mode = adminSecuritySortMode) {
+	const data = [...items]
+	if (mode === "oldest") {
+		return data.sort((a, b) => toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt))
+	}
+
+	if (mode === "failed-first") {
+		return data.sort((a, b) => {
+			if (a.status !== b.status) {
+				return a.status === "failure" ? -1 : 1
+			}
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	if (mode === "suspicious-first") {
+		return data.sort((a, b) => {
+			if (a.isSuspicious !== b.isSuspicious) {
+				return a.isSuspicious ? -1 : 1
+			}
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	return data.sort((a, b) => toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt))
+}
+
+function renderAdminSecurityActivities(docs = []) {
+	const mount = document.getElementById("adminSecurityActivityList")
+	if (!mount) return
+
+	const normalized = docs.map(normalizeSecurityDoc)
+	const sorted = sortAdminSecurityActivities(normalized, adminSecuritySortMode)
+	adminSecurityDocs = sorted
+
+	const total = sorted.length
+	const successCount = sorted.filter((item) => item.status === "success").length
+	const failedCount = sorted.filter((item) => item.status === "failure").length
+	const suspiciousCount = sorted.filter((item) => item.isSuspicious).length
+
+	const totalEl = document.getElementById("adminSecurityTotalCount")
+	const successEl = document.getElementById("adminSecuritySuccessCount")
+	const failedEl = document.getElementById("adminSecurityFailedCount")
+	const suspiciousEl = document.getElementById("adminSecuritySuspiciousCount")
+
+	if (totalEl) totalEl.textContent = String(total)
+	if (successEl) successEl.textContent = String(successCount)
+	if (failedEl) failedEl.textContent = String(failedCount)
+	if (suspiciousEl) suspiciousEl.textContent = String(suspiciousCount)
+
+	if (!sorted.length) {
+		mount.innerHTML =
+			'<div class="admin-empty-state">No login activity yet. Activity appears here once users attempt sign-in.</div>'
+		return
+	}
+
+	mount.innerHTML = `
+		<table class="admin-security-table">
+			<thead>
+				<tr>
+					<th>User</th>
+					<th>Method</th>
+					<th>Device/Browser</th>
+					<th>Location</th>
+					<th>IP (Masked)</th>
+					<th>Status</th>
+					<th>Suspicious</th>
+					<th>Time</th>
+				</tr>
+			</thead>
+			<tbody>
+				${sorted
+					.map((item) => {
+						const userLabel =
+							item.displayName || item.email || item.uid || "Unknown user"
+						const statusClass =
+							item.status === "success"
+								? "admin-status-completed"
+								: "admin-status-cancelled"
+						const suspiciousText = item.isSuspicious
+							? item.suspiciousFlags.join(", ") || "Flagged"
+							: "No"
+
+						return `
+							<tr>
+								<td>${escapeHtml(userLabel)}</td>
+								<td>${escapeHtml(item.method)}</td>
+								<td>${escapeHtml(`${item.deviceType} ${item.browser}`)}</td>
+								<td>${escapeHtml(item.locationLabel)}</td>
+								<td>${escapeHtml(item.ipMasked)}</td>
+								<td><span class="admin-status ${statusClass}">${escapeHtml(item.status)}</span></td>
+								<td>${escapeHtml(suspiciousText)}</td>
+								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
+							</tr>
+						`
+					})
+					.join("")}
+			</tbody>
+		</table>
+	`
 }
 
 function normalizeContactDoc(doc = {}) {
@@ -2356,6 +2534,31 @@ function startAdminContactListener() {
 		)
 }
 
+function startAdminSecurityListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminSecurityListener()
+
+	adminSecurityUnsubscribe = db
+		.collection("loginActivities")
+		.orderBy("createdAt", "desc")
+		.limit(400)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminSecurityActivities(docs)
+			},
+			(error) => {
+				console.error("Admin security activity listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch login activities in realtime: ${error.message || "unknown error"}`,
+					"adminSecurityMessage",
+				)
+			},
+		)
+}
+
 function initializeAdminPanel() {
 	const loginForm = document.getElementById("adminLoginForm")
 	const logoutBtn = document.getElementById("adminLogoutBtn")
@@ -2377,8 +2580,10 @@ function initializeAdminPanel() {
 	const galleryList = document.getElementById("adminGalleryList")
 	const reviewsList = document.getElementById("adminReviewsList")
 	const contactList = document.getElementById("adminContactList")
+	const securityList = document.getElementById("adminSecurityActivityList")
 	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
 	const messagesSortSelect = document.getElementById("adminMessagesSortSelect")
+	const securitySortSelect = document.getElementById("adminSecuritySortSelect")
 	const profanityWordsInput = document.getElementById("adminProfanityWords")
 	const saveProfanityBtn = document.getElementById("adminSaveProfanityList")
 	const cancelEditBtn = document.getElementById("adminGalleryCancelEdit")
@@ -2386,7 +2591,7 @@ function initializeAdminPanel() {
 	const confirmCancelBtn = document.getElementById("adminConfirmCancel")
 	const confirmOkBtn = document.getElementById("adminConfirmOk")
 
-	if (!loginForm || !logoutBtn || !bookingList) return
+	if (!loginForm || !logoutBtn || !bookingList || !securityList) return
 
 	initializeAdminSectionTabs()
 	bindGalleryPreviewEvents()
@@ -2773,6 +2978,14 @@ function initializeAdminPanel() {
 		messagesSortSelect.addEventListener("change", (event) => {
 			adminMessagesSortMode = event.target.value || "newest"
 			renderAdminContactMessages(adminContactDocs)
+		})
+	}
+
+	if (securitySortSelect) {
+		securitySortSelect.value = adminSecuritySortMode
+		securitySortSelect.addEventListener("change", (event) => {
+			adminSecuritySortMode = event.target.value || "newest"
+			renderAdminSecurityActivities(adminSecurityDocs)
 		})
 	}
 

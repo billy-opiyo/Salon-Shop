@@ -487,5 +487,13 @@ service cloud.firestore {
         ])
         && request.resource.data.status in ['new', 'read', 'resolved'];
     }
+
+    match /loginActivities/{activityId} {
+      // Security logs are server-written only (Cloud Functions using Admin SDK bypass rules).
+      allow create, update, delete: if false;
+
+      // Only admins can read login activity for security/fraud monitoring.
+      allow read: if isAdmin();
+    }
   }
 }

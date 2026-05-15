@@ -657,11 +657,18 @@ const appCheckConfig = appConfig.appCheck || {}
 let firebaseReady = false
 let db = null
 let auth = null
+let functionsService = null
 let activeAvailabilityUnsubscribe = null
 let authMode = "signin"
 let authObserverAttached = false
 let shouldAutoFocusDashboardAfterAuth = false
 let googleAuthInProgress = false
+let sessionHeartbeatTimer = null
+let currentSessionId = ""
+let sessionPresenceBound = false
+
+const SESSION_HEARTBEAT_INTERVAL_MS = 60 * 1000
+const SESSION_STALE_AFTER_MS = 2 * 60 * 1000
 
 function isNonGuestSignedIn() {
 	return Boolean(auth?.currentUser && !auth.currentUser.isAnonymous)
@@ -844,6 +851,231 @@ function shouldPreferRedirectGoogleAuth() {
 	return isMobileDevice || isEmbeddedBrowser
 }
 
+function normalizeLoginMethod(method = "") {
+	const raw = String(method || "")
+		.trim()
+		.toLowerCase()
+	if (raw === "google" || raw === "google.com") return "google"
+	if (raw === "password" || raw === "email" || raw === "email/password") {
+		return "email/password"
+	}
+	if (raw === "anonymous" || raw === "guest") return "anonymous"
+	return "unknown"
+}
+
+function normalizeLoginStatus(status = "") {
+	const raw = String(status || "")
+		.trim()
+		.toLowerCase()
+	return raw === "failure" ? "failure" : "success"
+}
+
+function getLoginDeviceTypeFromUserAgent(ua = "") {
+	const userAgent = String(ua || "")
+	if (/iPad|Tablet|Kindle|PlayBook|Silk/i.test(userAgent)) return "tablet"
+	if (/Mobi|Android|iPhone|iPod|Windows Phone/i.test(userAgent)) return "mobile"
+	return "desktop"
+}
+
+function getLoginBrowserFromUserAgent(ua = "") {
+	const userAgent = String(ua || "")
+	if (/Edg\//i.test(userAgent)) return "Edge"
+	if (/OPR\//i.test(userAgent) || /Opera/i.test(userAgent)) return "Opera"
+	if (/Firefox\//i.test(userAgent)) return "Firefox"
+	if (/Chrome\//i.test(userAgent) && !/Edg\//i.test(userAgent)) {
+		return "Chrome"
+	}
+	if (/Safari\//i.test(userAgent) && !/Chrome\//i.test(userAgent)) {
+		return "Safari"
+	}
+	return "Unknown"
+}
+
+function buildLoginClientContext() {
+	const ua = navigator.userAgent || ""
+	return {
+		deviceType: getLoginDeviceTypeFromUserAgent(ua),
+		browser: getLoginBrowserFromUserAgent(ua),
+		locale: navigator.language || "",
+		timezone:
+			typeof Intl !== "undefined"
+				? Intl.DateTimeFormat().resolvedOptions().timeZone || ""
+				: "",
+	}
+}
+
+function generateSessionId() {
+	if (
+		typeof crypto !== "undefined" &&
+		typeof crypto.randomUUID === "function"
+	) {
+		return crypto.randomUUID()
+	}
+	return `sess_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function getSessionFirestoreRef(uid = "", sessionId = "") {
+	const safeUid = String(uid || "").trim()
+	const safeSessionId = String(sessionId || "").trim()
+	if (!firebaseReady || !db || !safeUid || !safeSessionId) return null
+	return db
+		.collection("userSessions")
+		.doc(safeUid)
+		.collection("sessions")
+		.doc(safeSessionId)
+}
+
+async function writeSessionPresence({ online = true, markSessionStart = false } = {}) {
+	if (
+		!firebaseReady ||
+		!db ||
+		!auth?.currentUser ||
+		auth.currentUser.isAnonymous
+	)
+		return
+
+	const uid = String(auth.currentUser.uid || "").trim()
+	if (!uid) return
+
+	if (!currentSessionId) {
+		currentSessionId = generateSessionId()
+	}
+
+	const ref = getSessionFirestoreRef(uid, currentSessionId)
+	if (!ref) return
+
+	const nowMs = Date.now()
+	const client = buildLoginClientContext()
+	const payload = {
+		uid,
+		sessionId: currentSessionId,
+		online: online === true,
+		lastActiveAt: firebase.firestore.FieldValue.serverTimestamp(),
+		lastActiveAtMs: nowMs,
+		deviceType: client.deviceType,
+		browser: client.browser,
+		methodHint: normalizeLoginMethod(
+			auth.currentUser.providerData?.[0]?.providerId ||
+				(auth.currentUser.isAnonymous ? "anonymous" : "email/password"),
+		),
+		timezone: client.timezone,
+		locale: client.locale,
+		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+	}
+
+	if (online === true && markSessionStart === true) {
+		payload.startedAt = firebase.firestore.FieldValue.serverTimestamp()
+		payload.startedAtMs = nowMs
+	}
+
+	try {
+		await ref.set(payload, { merge: true })
+	} catch (error) {
+		console.warn("Session presence update failed:", error)
+	}
+}
+
+function stopSessionHeartbeat() {
+	if (sessionHeartbeatTimer) {
+		clearInterval(sessionHeartbeatTimer)
+		sessionHeartbeatTimer = null
+	}
+}
+
+function startSessionHeartbeat() {
+	stopSessionHeartbeat()
+	if (
+		!firebaseReady ||
+		!db ||
+		!auth?.currentUser ||
+		auth.currentUser.isAnonymous
+	)
+		return
+
+	void writeSessionPresence({ online: true, markSessionStart: true })
+	sessionHeartbeatTimer = setInterval(() => {
+		void writeSessionPresence({ online: true, markSessionStart: false })
+	}, SESSION_HEARTBEAT_INTERVAL_MS)
+}
+
+async function markCurrentSessionOffline() {
+	if (!firebaseReady || !db || !auth?.currentUser || !currentSessionId) return
+	const uid = String(auth.currentUser.uid || "").trim()
+	if (!uid) return
+
+	const ref = getSessionFirestoreRef(uid, currentSessionId)
+	if (!ref) return
+
+	try {
+		await ref.set(
+			{
+				online: false,
+				lastActiveAt: firebase.firestore.FieldValue.serverTimestamp(),
+				lastActiveAtMs: Date.now(),
+				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		)
+	} catch (error) {
+		console.warn("Session offline update failed:", error)
+	}
+}
+
+function bindSessionPresenceLifecycle() {
+	if (sessionPresenceBound) return
+	sessionPresenceBound = true
+
+	window.addEventListener("beforeunload", () => {
+		void markCurrentSessionOffline()
+	})
+
+	document.addEventListener("visibilitychange", () => {
+		if (document.hidden) {
+			void markCurrentSessionOffline()
+			stopSessionHeartbeat()
+		} else if (auth?.currentUser && !auth.currentUser.isAnonymous) {
+			startSessionHeartbeat()
+		}
+	})
+}
+
+async function trackLoginActivity({
+	method = "unknown",
+	status = "success",
+	error = null,
+	context = {},
+} = {}) {
+	if (
+		!firebaseReady ||
+		!functionsService ||
+		typeof functionsService.httpsCallable !== "function"
+	) {
+		return
+	}
+
+	const logLoginActivity = functionsService.httpsCallable("logLoginActivity")
+	const client = buildLoginClientContext()
+	const attemptedEmail = String(context?.attemptedEmail || "")
+		.trim()
+		.toLowerCase()
+
+	try {
+		await logLoginActivity({
+			method: normalizeLoginMethod(method),
+			status: normalizeLoginStatus(status),
+			deviceType: client.deviceType,
+			browser: client.browser,
+			locale: client.locale,
+			timezone: client.timezone,
+			source: String(context?.source || "").trim(),
+			failureCode: String(error?.code || "").trim(),
+			attemptedEmail,
+		})
+	} catch (trackError) {
+		console.warn("Login activity tracking failed:", trackError)
+	}
+}
+
 async function finalizeGoogleSignInResult(user, context = {}) {
 	if (!user || user.isAnonymous) {
 		throw new Error("Google sign-in did not complete. Please try again.")
@@ -859,6 +1091,12 @@ async function finalizeGoogleSignInResult(user, context = {}) {
 		upsertUserProfile(user, { provider: "google.com" }),
 		loadUserDashboardData(user),
 	])
+
+	void trackLoginActivity({
+		method: "google",
+		status: "success",
+		context,
+	})
 
 	if (context.source === "redirect" && authUi.message) {
 		showTimedAuthMessage("success", "✅ Signed in with Google successfully.")
@@ -921,6 +1159,9 @@ async function initializeFirebaseServices() {
 		console.warn("Auth persistence setup failed:", persistenceError)
 	}
 	db = firebase.firestore()
+	if (typeof firebase.functions === "function") {
+		functionsService = firebase.functions()
+	}
 
 	firebaseReady = true
 
@@ -2754,6 +2995,12 @@ async function handleGoogleAuth() {
 	} catch (error) {
 		console.error("Google auth failed:", error)
 		shouldAutoFocusDashboardAfterAuth = false
+		void trackLoginActivity({
+			method: "google",
+			status: "failure",
+			error,
+			context: { source: "google-auth" },
+		})
 		const code = error?.code || ""
 
 		const useRedirectFallback =
@@ -2877,9 +3124,23 @@ async function handleEmailAuthSubmit(event) {
 			await loadUserDashboardData(signedInUser)
 		}
 
+		void trackLoginActivity({
+			method: "email/password",
+			status: "success",
+			context: { source: authMode },
+		})
+
 		if (authUi.emailForm) authUi.emailForm.reset()
 	} catch (error) {
 		console.error("Email auth failed:", error)
+		if (authMode === "signin") {
+			void trackLoginActivity({
+				method: "email/password",
+				status: "failure",
+				error,
+				context: { source: "signin", attemptedEmail: email },
+			})
+		}
 		const code = error?.code || ""
 
 		if (authMode === "signin" && code === "auth/wrong-password") {
@@ -2990,6 +3251,9 @@ async function handleForgotPassword() {
 async function handleLogout() {
 	if (!firebaseReady || !auth) return
 	try {
+		await markCurrentSessionOffline()
+		stopSessionHeartbeat()
+		currentSessionId = ""
 		await auth.signOut()
 		closeAuthModal()
 		setDashboardPromptState()
@@ -3021,12 +3285,23 @@ async function handleContinueAsGuest() {
 		setDashboardPromptState()
 		closeAuthModal()
 		showFavoritesToast("You're now continuing as guest")
+		void trackLoginActivity({
+			method: "anonymous",
+			status: "success",
+			context: { source: "continue-as-guest" },
+		})
 		document.getElementById("booking")?.scrollIntoView({
 			behavior: "smooth",
 			block: "start",
 		})
 	} catch (error) {
 		console.error("Continue as guest failed:", error)
+		void trackLoginActivity({
+			method: "anonymous",
+			status: "failure",
+			error,
+			context: { source: "continue-as-guest" },
+		})
 		if (authUi.message) {
 			showTimedAuthMessage("error", `❌ ${getFriendlyAuthError(error)}`)
 		}
@@ -3481,11 +3756,16 @@ function attachAuthStateObserver() {
 	auth.onAuthStateChanged(async (user) => {
 		if (user && !user.isAnonymous) {
 			setDashboardSignedInState(user)
+			if (!currentSessionId) currentSessionId = generateSessionId()
+			startSessionHeartbeat()
 			await upsertUserProfile(user)
 			await loadUserDashboardData(user)
 			renderTestimonials(testimonialsData)
 			focusDashboardAfterAuthIfRequested()
 		} else {
+			await markCurrentSessionOffline()
+			stopSessionHeartbeat()
+			currentSessionId = ""
 			setDashboardPromptState()
 			renderDashboardList(
 				authUi.dashboardBookingsList,
@@ -3529,7 +3809,9 @@ function buildRateLimitPayload(kind = "", uid = "", cooldownMs = 0) {
 			.toLowerCase(),
 		uid: String(uid || "").trim(),
 		lastSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
-		cooldownUntil: firebase.firestore.Timestamp.fromMillis(nowMs + safeCooldown),
+		cooldownUntil: firebase.firestore.Timestamp.fromMillis(
+			nowMs + safeCooldown,
+		),
 		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
 	}
 }
@@ -3930,21 +4212,20 @@ function renderGallery() {
 	}
 
 	grid.innerHTML = dataToShow
-		.map(
-			(item, i) => {
-				const hasBeforeAfterPair = Boolean(item.beforeImageUrl && item.imageUrl)
-				return `
+		.map((item, i) => {
+			const hasBeforeAfterPair = Boolean(item.beforeImageUrl && item.imageUrl)
+			return `
     <div class="gallery-item" onclick="openLightbox(${i})" style="animation-delay: ${i * 0.1}s">
       ${
-					hasBeforeAfterPair
-						? `
+				hasBeforeAfterPair
+					? `
       <div class="gallery-slideshow" aria-label="${item.styleName} before and after slideshow">
 		<img class="gallery-slideshow-image gallery-slideshow-before" src="${item.beforeImageUrl}" alt="${item.styleName} before" loading="lazy" decoding="async" fetchpriority="low">
 		<img class="gallery-slideshow-image gallery-slideshow-after" src="${item.imageUrl}" alt="${item.styleName} after" loading="lazy" decoding="async" fetchpriority="low">
       </div>
       `
-						: `<img src="${item.imageUrl}" alt="${item.styleName}" loading="lazy" decoding="async" fetchpriority="low">`
-				}
+					: `<img src="${item.imageUrl}" alt="${item.styleName}" loading="lazy" decoding="async" fetchpriority="low">`
+			}
       <div class="gallery-overlay">
         <h4>${item.styleName}</h4>
         <p>${item.styleType} • by ${item.stylistName}</p>
@@ -3953,8 +4234,7 @@ function renderGallery() {
       </div>
     </div>
   `
-			},
-		)
+		})
 		.join("")
 
 	initializeGallerySlideshows()
@@ -3962,7 +4242,8 @@ function renderGallery() {
 }
 
 function clearGallerySlideshows() {
-	if (!Array.isArray(gallerySlideshowTimers) || !gallerySlideshowTimers.length) return
+	if (!Array.isArray(gallerySlideshowTimers) || !gallerySlideshowTimers.length)
+		return
 	gallerySlideshowTimers.forEach((timerId) => clearInterval(timerId))
 	gallerySlideshowTimers = []
 }
@@ -5914,6 +6195,7 @@ initAuthUiRefs()
 setAuthMode("signin")
 setDashboardPromptState()
 bindAuthUiEvents()
+bindSessionPresenceLifecycle()
 renderServices()
 galleryData = fallbackGalleryData.map((item, i) =>
 	normalizeGalleryItem({ id: `fallback-${i}`, ...item }),

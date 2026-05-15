@@ -180,6 +180,15 @@
 						>
 							Messages
 						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
+							data-admin-section-tab="security"
+							role="tab"
+							aria-selected="false"
+						>
+							Security
+						</button>
 					</div>
 
 					<section
@@ -789,6 +798,94 @@
 						</div>
 
 						<div class="admin-review-list" id="adminContactList"></div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="security"
+						role="tabpanel"
+					>
+						<div class="admin-stats">
+							<div class="admin-stat-card">
+								<div class="label">Total Logins</div>
+								<strong id="adminSecurityTotalCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Success</div>
+								<strong id="adminSecuritySuccessCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Failed</div>
+								<strong id="adminSecurityFailedCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Suspicious</div>
+								<strong id="adminSecuritySuspiciousCount">0</strong>
+							</div>
+						</div>
+
+						<div class="admin-stats">
+							<div class="admin-stat-card">
+								<div class="label">Online Users</div>
+								<strong id="adminSessionOnlineUsersCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Active Sessions</div>
+								<strong id="adminSessionActiveSessionsCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Multi-Device Users</div>
+								<strong id="adminSessionMultiDeviceUsersCount">0</strong>
+							</div>
+						</div>
+
+						<div
+							class="form-message"
+							id="adminSecurityMessage"
+							style="display: none"
+						></div>
+
+						<div
+							class="form-message"
+							id="adminSessionMessage"
+							style="display: none"
+						></div>
+
+						<p class="admin-security-privacy-note">
+							Privacy note: this view shows only security-relevant metadata (masked
+							IP, city/country, device/browser, status). No passwords, exact IPs,
+							or exact GPS are stored.
+						</p><br>
+
+						<div class="admin-review-list-head">
+							<label for="adminSecuritySortSelect">Sort Activity:</label>
+							<select
+								id="adminSecuritySortSelect"
+								class="admin-review-sort-select"
+							>
+								<option value="newest">Newest</option>
+								<option value="oldest">Oldest</option>
+								<option value="failed-first">Failed First</option>
+								<option value="suspicious-first">Suspicious First</option>
+							</select>
+						</div>
+
+						<div class="admin-security-table-wrap" id="adminSecurityActivityList"></div>
+
+						<div class="admin-review-list-head" style="margin-top: 18px">
+							<label for="adminSessionSortSelect">Sort Sessions:</label>
+							<select
+								id="adminSessionSortSelect"
+								class="admin-review-sort-select"
+							>
+								<option value="online-first">Online First</option>
+								<option value="last-active-newest">Last Active (Newest)</option>
+								<option value="duration-longest">Longest Duration</option>
+								<option value="multi-device-first">Multi-Device First</option>
+							</select>
+						</div>
+
+						<div class="admin-security-table-wrap" id="adminSessionActivityList"></div>
 					</section>
 				</div>
 			</div>
