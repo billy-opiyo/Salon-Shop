@@ -528,5 +528,13 @@ service cloud.firestore {
       // Admin security dashboard can read account history events.
       allow read: if isAdmin();
     }
+
+    match /activityTimeline/{timelineId} {
+      // Timeline entries are server-generated only.
+      allow create, update, delete: if false;
+
+      // Admin security dashboard can read timeline events.
+      allow read: if isAdmin();
+    }
   }
 }

@@ -860,6 +860,10 @@
 								<div class="label">Tracked Sessions</div>
 								<strong id="adminSessionsTotalCount">0</strong>
 							</div>
+							<div class="admin-stat-card">
+								<div class="label">Timeline Events</div>
+								<strong id="adminTimelineTotalCount">0</strong>
+							</div>
 						</div>
 
 						<div
@@ -917,10 +921,7 @@
 							</select>
 						</div>
 
-						<div
-							class="admin-security-table-wrap"
-							id="adminSessionsList"
-						>
+						<div class="admin-security-table-wrap" id="adminSessionsList">
 							<div class="admin-empty-state">
 								No active session data yet. User sessions will appear here in
 								realtime.
@@ -940,10 +941,7 @@
 							</select>
 						</div>
 
-						<div
-							class="admin-security-table-wrap"
-							id="adminSecurityAlertsList"
-						>
+						<div class="admin-security-table-wrap" id="adminSecurityAlertsList">
 							<div class="admin-empty-state">
 								No security alerts yet. Alerts will appear here in realtime.
 							</div>
@@ -964,13 +962,31 @@
 							</select>
 						</div>
 
-						<div
-							class="admin-security-table-wrap"
-							id="adminAccountHistoryList"
-						>
+						<div class="admin-security-table-wrap" id="adminAccountHistoryList">
 							<div class="admin-empty-state">
 								No account change history yet. Entries will appear here in
 								realtime.
+							</div>
+						</div>
+
+						<div class="admin-review-list-head" style="margin-top: 18px">
+							<label for="adminTimelineSortSelect">Sort Timeline:</label>
+							<select
+								id="adminTimelineSortSelect"
+								class="admin-review-sort-select"
+							>
+								<option value="newest">Newest</option>
+								<option value="oldest">Oldest</option>
+								<option value="bookings-first">Bookings First</option>
+								<option value="reviews-first">Reviews First</option>
+								<option value="contact-first">Contact First</option>
+							</select>
+						</div>
+
+						<div class="admin-security-table-wrap" id="adminTimelineList">
+							<div class="admin-empty-state">
+								No booking/action timeline events yet. User behavior events will
+								appear here in realtime.
 							</div>
 						</div>
 					</section>
@@ -999,6 +1015,3 @@
 		</div>
 	</body>
 </html>
-
-
-

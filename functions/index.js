@@ -1,6 +1,7 @@
 const {
 	onDocumentCreated,
 	onDocumentDeleted,
+	onDocumentUpdated,
 } = require("firebase-functions/v2/firestore")
 const { onCall, HttpsError } = require("firebase-functions/v2/https")
 const { onSchedule } = require("firebase-functions/v2/scheduler")
@@ -20,7 +21,7 @@ const WHATSAPP_CLOUD_API_VERSION = "v20.0"
 const NAIROBI_TIMEZONE = "Africa/Nairobi"
 const NAIROBI_UTC_OFFSET_HOURS = 3
 const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
-const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
+const CONTACT_RATE_LIMI5T_COOLDOWN_MS = 60 * 1000
 const SECURITY_ALERT_SEVERITY = {
 	multiple_failed_login_attempts: "high",
 	new_device_detected: "medium",
@@ -44,6 +45,13 @@ const ACCOUNT_CHANGE_LABELS = {
 }
 
 const ACCOUNT_CHANGE_TYPES = Object.keys(ACCOUNT_CHANGE_LABELS)
+const ACTIVITY_TIMELINE_TYPES = {
+	booking_created: "booking_created",
+	booking_canceled: "booking_canceled",
+	review_posted: "review_posted",
+	review_edited: "review_edited",
+	contact_submitted: "contact_submitted",
+}
 let ResendClient = null
 
 function getResendClient() {
@@ -384,6 +392,88 @@ async function createSecurityAlert({
 		})
 }
 
+function sanitizeTimelineType(type = "") {
+	const normalized = String(type || "")
+		.trim()
+		.toLowerCase()
+	return Object.values(ACTIVITY_TIMELINE_TYPES).includes(normalized)
+		? normalized
+		: "activity"
+}
+
+function buildTimelineSummary({
+	type = "",
+	actorName = "",
+	context = {},
+} = {}) {
+	const safeName = String(actorName || "").trim() || "User"
+	const safeContext =
+		typeof context === "object" && context && !Array.isArray(context)
+			? context
+			: {}
+
+	if (type === ACTIVITY_TIMELINE_TYPES.booking_created) {
+		return `${safeName} booked ${safeContext.service || "a service"}`
+	}
+
+	if (type === ACTIVITY_TIMELINE_TYPES.booking_canceled) {
+		return `${safeName} canceled ${safeContext.service || "a booking"}`
+	}
+
+	if (type === ACTIVITY_TIMELINE_TYPES.review_posted) {
+		return `${safeName} posted a review`
+	}
+
+	if (type === ACTIVITY_TIMELINE_TYPES.review_edited) {
+		return `${safeName} edited a review`
+	}
+
+	if (type === ACTIVITY_TIMELINE_TYPES.contact_submitted) {
+		return `${safeName} submitted contact form`
+	}
+
+	return `${safeName} performed an account action`
+}
+
+async function createActivityTimelineEvent({
+	type = "",
+	uid = "",
+	email = "",
+	displayName = "",
+	context = {},
+	source = "",
+} = {}) {
+	const safeType = sanitizeTimelineType(type)
+	const safeUid = String(uid || "").trim()
+	const safeEmail = normalizeShortText(email || "", 160)
+		.toLowerCase()
+		.trim()
+	const safeDisplayName = normalizeShortText(displayName || "", 120)
+	const safeSource = normalizeShortText(source || "", 80)
+	const safeContext =
+		typeof context === "object" && context && !Array.isArray(context)
+			? context
+			: {}
+
+	await admin
+		.firestore()
+		.collection("activityTimeline")
+		.add({
+			type: safeType,
+			uid: safeUid,
+			email: safeEmail,
+			displayName: safeDisplayName,
+			source: safeSource,
+			summary: buildTimelineSummary({
+				type: safeType,
+				actorName: safeDisplayName || safeEmail || safeUid,
+				context: safeContext,
+			}),
+			context: safeContext,
+			createdAt: admin.firestore.FieldValue.serverTimestamp(),
+		})
+}
+
 exports.logLoginActivity = onCall(
 	{
 		region: "us-central1",
@@ -658,7 +748,7 @@ exports.sendBookingConfirmationEmail = onDocumentCreated(
 	{
 		document: "bookings/{bookingId}",
 		secrets: [RESEND_API_KEY, RESEND_FROM_EMAIL],
-		region: "us-central1",
+		region: "europe-west1",
 	},
 	async (event) => {
 		const snapshot = event.data
@@ -746,7 +836,7 @@ exports.sendBookingConfirmationWhatsApp = onDocumentCreated(
 	{
 		document: "bookings/{bookingId}",
 		secrets: [WHATSAPP_CLOUD_ACCESS_TOKEN, WHATSAPP_CLOUD_PHONE_NUMBER_ID],
-		region: "us-central1",
+		region: "europe-west1",
 	},
 	async (event) => {
 		const snapshot = event.data
@@ -929,7 +1019,7 @@ exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 exports.initializeBookingSystemFields = onDocumentCreated(
 	{
 		document: "bookings/{bookingId}",
-		region: "us-central1",
+		region: "europe-west1",
 	},
 	async (event) => {
 		const snapshot = event.data
@@ -950,13 +1040,27 @@ exports.initializeBookingSystemFields = onDocumentCreated(
 exports.updateReviewRateLimit = onDocumentCreated(
 	{
 		document: "reviews/{reviewId}",
-		region: "us-central1",
+		region: "europe-west1",
 	},
 	async (event) => {
 		const snapshot = event.data
 		if (!snapshot) return
 		const review = snapshot.data() || {}
 		if (!review.uid) return
+
+		await createActivityTimelineEvent({
+			type: ACTIVITY_TIMELINE_TYPES.review_posted,
+			uid: String(review.uid || "").trim(),
+			email: String(review.email || "").trim(),
+			displayName: String(review.name || "").trim(),
+			source: "reviews",
+			context: {
+				reviewId: String(event.params.reviewId || "").trim(),
+				rating: Number(review.rating || 0) || 0,
+				service: normalizeShortText(review.service || "", 80),
+			},
+		})
+
 		await upsertRateLimit({
 			kind: "review",
 			uid: review.uid,
@@ -965,16 +1069,69 @@ exports.updateReviewRateLimit = onDocumentCreated(
 	},
 )
 
+exports.trackReviewEdited = onDocumentUpdated(
+	{
+		document: "reviews/{reviewId}",
+		region: "europe-west1",
+	},
+	async (event) => {
+		const before = event.data?.before?.data() || {}
+		const after = event.data?.after?.data() || {}
+		if (!after.uid) return
+
+		const beforeText = String(before.text || "").trim()
+		const afterText = String(after.text || "").trim()
+		const beforeRating = Number(before.rating || 0) || 0
+		const afterRating = Number(after.rating || 0) || 0
+		const beforeService = String(before.service || "").trim()
+		const afterService = String(after.service || "").trim()
+
+		const wasEdited =
+			beforeText !== afterText ||
+			beforeRating !== afterRating ||
+			beforeService !== afterService
+
+		if (!wasEdited) return
+
+		await createActivityTimelineEvent({
+			type: ACTIVITY_TIMELINE_TYPES.review_edited,
+			uid: String(after.uid || "").trim(),
+			email: String(after.email || "").trim(),
+			displayName: String(after.name || "").trim(),
+			source: "reviews",
+			context: {
+				reviewId: String(event.params.reviewId || "").trim(),
+				rating: afterRating,
+				service: normalizeShortText(after.service || "", 80),
+				updatedBy: String(after.uid || "").trim(),
+			},
+		})
+	},
+)
+
 exports.updateContactRateLimit = onDocumentCreated(
 	{
 		document: "contactMessages/{messageId}",
-		region: "us-central1",
+		region: "europe-west1",
 	},
 	async (event) => {
 		const snapshot = event.data
 		if (!snapshot) return
 		const message = snapshot.data() || {}
 		if (!message.uid) return
+
+		await createActivityTimelineEvent({
+			type: ACTIVITY_TIMELINE_TYPES.contact_submitted,
+			uid: String(message.uid || "").trim(),
+			email: String(message.email || "").trim(),
+			displayName: String(message.name || "").trim(),
+			source: "contact",
+			context: {
+				messageId: String(event.params.messageId || "").trim(),
+				subject: normalizeShortText(message.subject || "", 120),
+			},
+		})
+
 		await upsertRateLimit({
 			kind: "contact",
 			uid: message.uid,
@@ -983,10 +1140,73 @@ exports.updateContactRateLimit = onDocumentCreated(
 	},
 )
 
+exports.trackBookingCreated = onDocumentCreated(
+	{
+		document: "bookings/{bookingId}",
+		region: "europe-west1",
+	},
+	async (event) => {
+		const booking = event.data?.data() || {}
+		if (!booking.uid) return
+
+		await createActivityTimelineEvent({
+			type: ACTIVITY_TIMELINE_TYPES.booking_created,
+			uid: String(booking.uid || "").trim(),
+			email: String(booking.email || "").trim(),
+			displayName: buildCustomerName(booking),
+			source: "bookings",
+			context: {
+				bookingId: String(event.params.bookingId || "").trim(),
+				service: normalizeShortText(booking.service || "", 80),
+				stylist: normalizeShortText(booking.stylist || "", 80),
+				date: normalizeShortText(booking.date || "", 20),
+				time: normalizeShortText(booking.time || "", 20),
+			},
+		})
+	},
+)
+
+exports.trackBookingCanceled = onDocumentUpdated(
+	{
+		document: "bookings/{bookingId}",
+		region: "europe-west1",
+	},
+	async (event) => {
+		const before = event.data?.before?.data() || {}
+		const after = event.data?.after?.data() || {}
+		if (!after.uid) return
+
+		const prevStatus = String(before.status || "")
+			.trim()
+			.toLowerCase()
+		const nextStatus = String(after.status || "")
+			.trim()
+			.toLowerCase()
+		if (prevStatus === "cancelled" || nextStatus !== "cancelled") return
+
+		await createActivityTimelineEvent({
+			type: ACTIVITY_TIMELINE_TYPES.booking_canceled,
+			uid: String(after.uid || "").trim(),
+			email: String(after.email || "").trim(),
+			displayName: buildCustomerName(after),
+			source: "bookings",
+			context: {
+				bookingId: String(event.params.bookingId || "").trim(),
+				service: normalizeShortText(after.service || "", 80),
+				stylist: normalizeShortText(after.stylist || "", 80),
+				date: normalizeShortText(after.date || "", 20),
+				time: normalizeShortText(after.time || "", 20),
+				fromStatus: prevStatus,
+				toStatus: nextStatus,
+			},
+		})
+	},
+)
+
 exports.notifyWaitlistOnSlotOpen = onDocumentDeleted(
 	{
 		document: "bookingSlots/{slotId}",
-		region: "us-central1",
+		region: "europe-west1",
 		secrets: [
 			RESEND_API_KEY,
 			RESEND_FROM_EMAIL,

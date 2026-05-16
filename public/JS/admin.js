@@ -18,6 +18,7 @@ let adminSecurityUnsubscribe = null
 let adminSecurityAlertsUnsubscribe = null
 let adminAccountHistoryUnsubscribe = null
 let adminSessionsUnsubscribe = null
+let adminTimelineUnsubscribe = null
 let adminGalleryDocs = []
 let adminBlogDocs = []
 let adminReviewDocs = []
@@ -30,10 +31,12 @@ let adminSecuritySortMode = "newest"
 let adminSessionsSortMode = "online-first"
 let adminSecurityAlertsSortMode = "newest"
 let adminAccountHistorySortMode = "newest"
+let adminTimelineSortMode = "newest"
 let adminSecurityDocs = []
 let adminSessionsDocs = []
 let adminSecurityAlertsDocs = []
 let adminAccountHistoryDocs = []
+let adminTimelineDocs = []
 let adminGalleryPreviewObjectUrl = ""
 const ADMIN_SCHEDULE_VIEWS = {
 	day: "day",
@@ -754,6 +757,13 @@ function stopAdminSessionsListener() {
 	}
 }
 
+function stopAdminTimelineListener() {
+	if (typeof adminTimelineUnsubscribe === "function") {
+		adminTimelineUnsubscribe()
+		adminTimelineUnsubscribe = null
+	}
+}
+
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
@@ -845,6 +855,7 @@ function setAdminUnlockedState(value) {
 		stopAdminSecurityAlertsListener()
 		stopAdminAccountHistoryListener()
 		stopAdminSessionsListener()
+		stopAdminTimelineListener()
 		setAdminMessage("", "")
 		setAdminMessage("", "", "adminGalleryMessage")
 		setAdminMessage("", "", "adminBlogsMessage")
@@ -858,6 +869,7 @@ function setAdminUnlockedState(value) {
 		adminSessionsDocs = []
 		adminSecurityAlertsDocs = []
 		adminAccountHistoryDocs = []
+		adminTimelineDocs = []
 		adminScheduleSelectedBookingId = ""
 		renderAdminSchedule()
 	} else {
@@ -870,6 +882,7 @@ function setAdminUnlockedState(value) {
 		startAdminSecurityAlertsListener()
 		startAdminAccountHistoryListener()
 		startAdminSessionsListener()
+		startAdminTimelineListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
 }
@@ -1492,6 +1505,155 @@ function renderAdminAccountHistory(docs = []) {
 								<td>${escapeHtml(userLabel)}</td>
 								<td>${escapeHtml(item.details || "-")}</td>
 								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
+							</tr>
+						`
+					})
+					.join("")}
+			</tbody>
+		</table>
+	`
+}
+
+function normalizeTimelineType(type = "") {
+	const raw = String(type || "")
+		.trim()
+		.toLowerCase()
+	if (
+		[
+			"booking_created",
+			"booking_canceled",
+			"review_posted",
+			"review_edited",
+			"contact_submitted",
+		].includes(raw)
+	) {
+		return raw
+	}
+	return "activity"
+}
+
+function getTimelineTypeLabel(type = "") {
+	if (type === "booking_created") return "Booking Created"
+	if (type === "booking_canceled") return "Booking Canceled"
+	if (type === "review_posted") return "Review Posted"
+	if (type === "review_edited") return "Review Edited"
+	if (type === "contact_submitted") return "Contact Submitted"
+	return "Activity"
+}
+
+function getTimelineTypeClass(type = "") {
+	if (type === "booking_created") return "admin-status-completed"
+	if (type === "booking_canceled") return "admin-status-cancelled"
+	if (type === "review_posted" || type === "review_edited") {
+		return "admin-status-confirmed"
+	}
+	if (type === "contact_submitted") return "admin-status-pending"
+	return "admin-status-pending"
+}
+
+function normalizeTimelineDoc(doc = {}) {
+	const type = normalizeTimelineType(doc.type)
+	const context =
+		typeof doc.context === "object" && doc.context && !Array.isArray(doc.context)
+			? doc.context
+			: {}
+	const summary =
+		String(doc.summary || "").trim() ||
+		`${String(doc.displayName || doc.email || doc.uid || "User").trim() || "User"} ${getTimelineTypeLabel(type).toLowerCase()}`
+
+	return {
+		id: String(doc.id || "").trim(),
+		type,
+		typeLabel: getTimelineTypeLabel(type),
+		summary,
+		uid: String(doc.uid || "").trim(),
+		email: String(doc.email || "").trim(),
+		displayName: String(doc.displayName || "").trim(),
+		source: String(doc.source || "").trim(),
+		context,
+		createdAt: doc.createdAt || null,
+	}
+}
+
+function sortAdminTimeline(items = [], mode = adminTimelineSortMode) {
+	const data = [...items]
+
+	if (mode === "oldest") {
+		return data.sort(
+			(a, b) => toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt),
+		)
+	}
+
+	if (mode === "bookings-first") {
+		const priority = { booking_created: 0, booking_canceled: 0 }
+		return data.sort((a, b) => {
+			const pDiff = (priority[a.type] ?? 9) - (priority[b.type] ?? 9)
+			if (pDiff !== 0) return pDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	if (mode === "reviews-first") {
+		const priority = { review_posted: 0, review_edited: 0 }
+		return data.sort((a, b) => {
+			const pDiff = (priority[a.type] ?? 9) - (priority[b.type] ?? 9)
+			if (pDiff !== 0) return pDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	if (mode === "contact-first") {
+		const priority = { contact_submitted: 0 }
+		return data.sort((a, b) => {
+			const pDiff = (priority[a.type] ?? 9) - (priority[b.type] ?? 9)
+			if (pDiff !== 0) return pDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	return data.sort(
+		(a, b) => toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt),
+	)
+}
+
+function renderAdminTimeline(docs = []) {
+	const mount = document.getElementById("adminTimelineList")
+	if (!mount) return
+
+	const normalized = docs.map(normalizeTimelineDoc)
+	const sorted = sortAdminTimeline(normalized, adminTimelineSortMode)
+	adminTimelineDocs = sorted
+
+	const totalEl = document.getElementById("adminTimelineTotalCount")
+	if (totalEl) totalEl.textContent = String(sorted.length)
+
+	if (!sorted.length) {
+		mount.innerHTML =
+			'<div class="admin-empty-state">No booking/action timeline events yet. User behavior events will appear here in realtime.</div>'
+		return
+	}
+
+	mount.innerHTML = `
+		<table class="admin-security-table">
+			<thead>
+				<tr>
+					<th>Time</th>
+					<th>Event</th>
+					<th>User</th>
+					<th>Summary</th>
+				</tr>
+			</thead>
+			<tbody>
+				${sorted
+					.map((item) => {
+						const userLabel =
+							item.displayName || item.email || item.uid || "Unknown user"
+						return `
+							<tr>
+								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
+								<td><span class="admin-status ${getTimelineTypeClass(item.type)}">${escapeHtml(item.typeLabel)}</span></td>
+								<td>${escapeHtml(userLabel)}</td>
+								<td>${escapeHtml(item.summary)}</td>
 							</tr>
 						`
 					})
@@ -3125,6 +3287,31 @@ function startAdminSessionsListener() {
 	)
 }
 
+function startAdminTimelineListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminTimelineListener()
+
+	adminTimelineUnsubscribe = db
+		.collection("activityTimeline")
+		.orderBy("createdAt", "desc")
+		.limit(500)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminTimeline(docs)
+			},
+			(error) => {
+				console.error("Admin timeline listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch activity timeline in realtime: ${error.message || "unknown error"}`,
+					"adminSecurityEventsMessage",
+				)
+			},
+		)
+}
+
 function initializeAdminPanel() {
 	const loginForm = document.getElementById("adminLoginForm")
 	const logoutBtn = document.getElementById("adminLogoutBtn")
@@ -3157,6 +3344,7 @@ function initializeAdminPanel() {
 	const accountHistorySortSelect = document.getElementById(
 		"adminAccountHistorySortSelect",
 	)
+	const timelineSortSelect = document.getElementById("adminTimelineSortSelect")
 	const profanityWordsInput = document.getElementById("adminProfanityWords")
 	const saveProfanityBtn = document.getElementById("adminSaveProfanityList")
 	const cancelEditBtn = document.getElementById("adminGalleryCancelEdit")
@@ -3583,6 +3771,14 @@ function initializeAdminPanel() {
 		accountHistorySortSelect.addEventListener("change", (event) => {
 			adminAccountHistorySortMode = event.target.value || "newest"
 			renderAdminAccountHistory(adminAccountHistoryDocs)
+		})
+	}
+
+	if (timelineSortSelect) {
+		timelineSortSelect.value = adminTimelineSortMode
+		timelineSortSelect.addEventListener("change", (event) => {
+			adminTimelineSortMode = event.target.value || "newest"
+			renderAdminTimeline(adminTimelineDocs)
 		})
 	}
 
