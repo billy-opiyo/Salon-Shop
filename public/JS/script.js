@@ -3121,13 +3121,17 @@ async function loadUserDashboardData(userOrUid) {
 		const hasBookingsAccessIssue = !bookingsByUidSnap
 		const hasReviewsAccessIssue = !reviewsSnap
 		const hasLoginHistoryAccessIssue = !loginHistorySnap
+		const hasCoreDashboardSectionIssue =
+			hasBookingsAccessIssue || hasReviewsAccessIssue
+
+		if (hasLoginHistoryAccessIssue) {
+			console.warn(
+				"Dashboard login history could not be loaded. Keeping appointments/reviews visible.",
+			)
+		}
 
 		if (authUi.dashboardMessage) {
-			if (
-				hasBookingsAccessIssue ||
-				hasReviewsAccessIssue ||
-				hasLoginHistoryAccessIssue
-			) {
+			if (hasCoreDashboardSectionIssue) {
 				showFormMessage(
 					authUi.dashboardMessage,
 					"error",
