@@ -2120,6 +2120,36 @@ h6 {
     color: var(--text-primary);
 }
 
+.admin-management-section[data-admin-section="security"] .admin-stat-card[data-security-widget] {
+    transition:
+        border-color 0.25s ease,
+        box-shadow 0.25s ease,
+        background-color 0.25s ease,
+        transform 0.25s ease;
+}
+
+.admin-management-section[data-admin-section="security"] .admin-stat-card[data-security-widget].security-widget-normal {
+    border-color: rgba(72, 187, 120, 0.36);
+    box-shadow: 0 0 0 1px rgba(72, 187, 120, 0.1) inset;
+}
+
+.admin-management-section[data-admin-section="security"] .admin-stat-card[data-security-widget].security-widget-warn {
+    border-color: rgba(236, 201, 75, 0.72);
+    background: linear-gradient(180deg, rgba(236, 201, 75, 0.15), rgba(236, 201, 75, 0.06));
+    box-shadow: 0 8px 18px rgba(236, 201, 75, 0.12);
+}
+
+.admin-management-section[data-admin-section="security"] .admin-stat-card[data-security-widget].security-widget-danger {
+    border-color: rgba(245, 101, 101, 0.78);
+    background: linear-gradient(180deg, rgba(245, 101, 101, 0.18), rgba(245, 101, 101, 0.08));
+    box-shadow: 0 10px 22px rgba(245, 101, 101, 0.16);
+    transform: translateY(-1px);
+}
+
+.admin-management-section[data-admin-section="security"] .admin-stat-card[data-security-widget].security-widget-danger strong {
+    color: #ffb3b3;
+}
+
 .admin-security-privacy-note {
     margin: 0 0 12px;
     color: var(--text-secondary);

@@ -19,6 +19,7 @@ let adminSecurityAlertsUnsubscribe = null
 let adminAccountHistoryUnsubscribe = null
 let adminSessionsUnsubscribe = null
 let adminTimelineUnsubscribe = null
+let adminUsersUnsubscribe = null
 let adminGalleryDocs = []
 let adminBlogDocs = []
 let adminReviewDocs = []
@@ -38,6 +39,8 @@ let adminSessionsDocs = []
 let adminSecurityAlertsDocs = []
 let adminAccountHistoryDocs = []
 let adminTimelineDocs = []
+let adminSecurityRawDocs = []
+let adminUserDocs = []
 let adminGalleryPreviewObjectUrl = ""
 const ADMIN_SCHEDULE_VIEWS = {
 	day: "day",
@@ -765,6 +768,13 @@ function stopAdminTimelineListener() {
 	}
 }
 
+function stopAdminUsersListener() {
+	if (typeof adminUsersUnsubscribe === "function") {
+		adminUsersUnsubscribe()
+		adminUsersUnsubscribe = null
+	}
+}
+
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
@@ -857,6 +867,7 @@ function setAdminUnlockedState(value) {
 		stopAdminAccountHistoryListener()
 		stopAdminSessionsListener()
 		stopAdminTimelineListener()
+		stopAdminUsersListener()
 		setAdminMessage("", "")
 		setAdminMessage("", "", "adminGalleryMessage")
 		setAdminMessage("", "", "adminBlogsMessage")
@@ -871,7 +882,10 @@ function setAdminUnlockedState(value) {
 		adminSecurityAlertsDocs = []
 		adminAccountHistoryDocs = []
 		adminTimelineDocs = []
+		adminSecurityRawDocs = []
+		adminUserDocs = []
 		adminScheduleSelectedBookingId = ""
+		updateAdminSecurityWidgets()
 		renderAdminSchedule()
 	} else {
 		startAdminBookingsListener()
@@ -884,6 +898,7 @@ function setAdminUnlockedState(value) {
 		startAdminAccountHistoryListener()
 		startAdminSessionsListener()
 		startAdminTimelineListener()
+		startAdminUsersListener()
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
 }
@@ -938,6 +953,20 @@ function normalizeSecurityDeviceType(deviceType = "") {
 
 function normalizeSecurityDoc(doc = {}) {
 	const status = normalizeSecurityStatus(doc.status)
+	const methodRaw = String(doc.method || "")
+		.trim()
+		.toLowerCase()
+	let methodKey = "unknown"
+	if (methodRaw === "google") methodKey = "google"
+	else if (
+		methodRaw === "email/password" ||
+		methodRaw === "password" ||
+		methodRaw === "email"
+	) {
+		methodKey = "email/password"
+	} else if (methodRaw === "anonymous") {
+		methodKey = "anonymous"
+	}
 	const suspiciousFlags = Array.isArray(doc.suspiciousFlags)
 		? doc.suspiciousFlags
 				.map((flag) => String(flag || "").trim())
@@ -965,6 +994,8 @@ function normalizeSecurityDoc(doc = {}) {
 		uid: String(doc.uid || ""),
 		displayName: String(doc.displayName || "").trim(),
 		email: String(doc.email || "").trim(),
+		attemptedEmail: String(doc.attemptedEmail || "").trim(),
+		methodKey,
 		method: normalizeSecurityMethod(doc.method),
 		deviceType: normalizeSecurityDeviceType(doc.deviceType),
 		browser: String(doc.browser || "Unknown").trim() || "Unknown",
@@ -994,6 +1025,176 @@ function normalizeSecurityDoc(doc = {}) {
 		suspiciousFlags,
 		createdAt: doc.createdAt || null,
 	}
+}
+
+function getAdminSecurityDayStartMs() {
+	const now = new Date()
+	now.setHours(0, 0, 0, 0)
+	return now.getTime()
+}
+
+function setAdminSecurityWidgetState(widgetKey = "", severity = "normal") {
+	const card = document.querySelector(
+		`[data-security-widget="${String(widgetKey || "")}"]`,
+	)
+	if (!card) return
+
+	card.classList.remove(
+		"security-widget-normal",
+		"security-widget-warn",
+		"security-widget-danger",
+	)
+
+	const next = ["normal", "warn", "danger"].includes(severity)
+		? severity
+		: "normal"
+	card.classList.add(`security-widget-${next}`)
+}
+
+function updateAdminSecurityWidgets() {
+	const todayStartMs = getAdminSecurityDayStartMs()
+	const todayActivities = adminSecurityRawDocs.filter(
+		(item) => toTimestampMs(item.createdAt) >= todayStartMs,
+	)
+
+	const totalLoginsToday = todayActivities.length
+	const failedLoginAttempts = todayActivities.filter(
+		(item) => item.status === "failure",
+	).length
+
+	const googleSignInCount = todayActivities.filter(
+		(item) => item.status === "success" && item.methodKey === "google",
+	).length
+	const emailSignInCount = todayActivities.filter(
+		(item) => item.status === "success" && item.methodKey === "email/password",
+	).length
+
+	const anonymousIdentities = new Set()
+	todayActivities.forEach((item) => {
+		if (item.methodKey !== "anonymous") return
+		const key = String(item.uid || item.attemptedEmail || item.email || item.id || "")
+			.trim()
+			.toLowerCase()
+		if (key) anonymousIdentities.add(key)
+	})
+
+	const activeUsersNow = new Set(
+		adminSessionsDocs.filter((item) => item.online).map((item) => item.uid),
+	).size
+
+	const newRegistrationUidSet = new Set()
+	const newRegistrationEmailSet = new Set()
+	adminUserDocs.forEach((item) => {
+		const createdAtMs = toTimestampMs(item.createdAt)
+		if (!createdAtMs || createdAtMs < todayStartMs) return
+		const uidKey = String(item.id || item.uid || "")
+			.trim()
+			.toLowerCase()
+		const emailKey = String(item.email || "")
+			.trim()
+			.toLowerCase()
+		if (uidKey) newRegistrationUidSet.add(uidKey)
+		if (emailKey) newRegistrationEmailSet.add(emailKey)
+	})
+
+	const returningCustomerSet = new Set()
+	todayActivities.forEach((item) => {
+		if (item.status !== "success") return
+		if (item.methodKey === "anonymous") return
+		const uidKey = String(item.uid || "")
+			.trim()
+			.toLowerCase()
+		const emailKey = String(item.email || item.attemptedEmail || "")
+			.trim()
+			.toLowerCase()
+
+		if (uidKey) {
+			if (!newRegistrationUidSet.has(uidKey)) returningCustomerSet.add(uidKey)
+			return
+		}
+
+		if (emailKey && !newRegistrationEmailSet.has(emailKey)) {
+			returningCustomerSet.add(emailKey)
+		}
+	})
+
+	const setCount = (id, value) => {
+		const el = document.getElementById(id)
+		if (el) el.textContent = String(value)
+	}
+
+	setCount("adminSecurityWidgetTotalLoginsToday", totalLoginsToday)
+	setCount("adminSecurityWidgetActiveUsersNow", activeUsersNow)
+	setCount("adminSecurityWidgetFailedLoginAttempts", failedLoginAttempts)
+	setCount("adminSecurityWidgetNewRegistrations", newRegistrationUidSet.size)
+	setCount("adminSecurityWidgetReturningCustomers", returningCustomerSet.size)
+	setCount("adminSecurityWidgetAnonymousUsers", anonymousIdentities.size)
+	setCount("adminSecurityWidgetGoogleSignIns", googleSignInCount)
+	setCount("adminSecurityWidgetEmailSignIns", emailSignInCount)
+
+	const failureRate = totalLoginsToday > 0 ? failedLoginAttempts / totalLoginsToday : 0
+	const anonymousShare =
+		totalLoginsToday > 0 ? anonymousIdentities.size / totalLoginsToday : 0
+
+	setAdminSecurityWidgetState(
+		"failed-login-attempts",
+		failedLoginAttempts >= 8 || failureRate >= 0.35
+			? "danger"
+			: failedLoginAttempts >= 3 || failureRate >= 0.15
+				? "warn"
+				: "normal",
+	)
+
+	setAdminSecurityWidgetState(
+		"anonymous-users",
+		anonymousIdentities.size >= 5 || anonymousShare >= 0.4
+			? "danger"
+			: anonymousIdentities.size >= 2 || anonymousShare >= 0.2
+				? "warn"
+				: "normal",
+	)
+
+	setAdminSecurityWidgetState(
+		"total-logins-today",
+		totalLoginsToday >= 220
+			? "danger"
+			: totalLoginsToday >= 120
+				? "warn"
+				: "normal",
+	)
+
+	setAdminSecurityWidgetState(
+		"active-users-now",
+		activeUsersNow >= 100 ? "danger" : activeUsersNow >= 50 ? "warn" : "normal",
+	)
+
+	setAdminSecurityWidgetState(
+		"new-registrations",
+		newRegistrationUidSet.size >= 70
+			? "danger"
+			: newRegistrationUidSet.size >= 30
+				? "warn"
+				: "normal",
+	)
+
+	setAdminSecurityWidgetState(
+		"returning-customers",
+		returningCustomerSet.size >= 140
+			? "danger"
+			: returningCustomerSet.size >= 80
+				? "warn"
+				: "normal",
+	)
+
+	setAdminSecurityWidgetState(
+		"google-signins",
+		googleSignInCount >= 90 ? "warn" : "normal",
+	)
+
+	setAdminSecurityWidgetState(
+		"email-signins",
+		emailSignInCount >= 130 ? "warn" : "normal",
+	)
 }
 
 function sortAdminSecurityActivities(items = [], mode = adminSecuritySortMode) {
@@ -1068,6 +1269,7 @@ function renderAdminSecurityActivities(docs = []) {
 	if (!mount) return
 
 	const normalized = docs.map(normalizeSecurityDoc)
+	adminSecurityRawDocs = normalized
 	const sorted = sortAdminSecurityActivities(normalized, adminSecuritySortMode)
 	adminSecurityDocs = sorted
 	const visibleRows = applyAdminSecurityRiskFilter(
@@ -1126,6 +1328,7 @@ function renderAdminSecurityActivities(docs = []) {
 	if (lockedEl) lockedEl.textContent = String(lockedCount)
 	if (repeatedWrongEl) repeatedWrongEl.textContent = String(repeatedWrongCount)
 	if (highRiskEl) highRiskEl.textContent = String(highRiskCount)
+	updateAdminSecurityWidgets()
 
 	const shouldEnableVerticalScroll = sorted.length > 4
 	mount.classList.toggle(
@@ -1325,6 +1528,7 @@ function renderAdminSessions(docs = []) {
 	const deduped = Array.from(dedupMap.values())
 	const sorted = sortAdminSessions(deduped, adminSessionsSortMode)
 	adminSessionsDocs = sorted
+	updateAdminSecurityWidgets()
 
 	const onlineSessions = sorted.filter((item) => item.online)
 	const onlineUsers = new Set(
@@ -3349,6 +3553,33 @@ function startAdminSecurityListener() {
 					"error",
 					`❌ Failed to watch login activities in realtime: ${error.message || "unknown error"}`,
 					"adminSecurityMessage",
+				)
+			},
+		)
+}
+
+function startAdminUsersListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminUsersListener()
+
+	adminUsersUnsubscribe = db
+		.collection("users")
+		.limit(1000)
+		.onSnapshot(
+			(snapshot) => {
+				adminUserDocs = snapshot.docs.map((doc) => ({
+					id: doc.id,
+					...doc.data(),
+				}))
+				updateAdminSecurityWidgets()
+			},
+			(error) => {
+				console.error("Admin users listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch users in realtime: ${error.message || "unknown error"}`,
+					"adminSecurityEventsMessage",
 				)
 			},
 		)

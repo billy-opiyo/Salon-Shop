@@ -708,6 +708,8 @@ const authUi = {
 	dashboardReviewsList: null,
 	dashboardFavoritesList: null,
 	dashboardFavoritesCount: null,
+	dashboardLoginHistoryList: null,
+	dashboardLoginHistoryCount: null,
 	dashboardProfileName: null,
 	dashboardProfileEmail: null,
 	dashboardProfilePhone: null,
@@ -1258,6 +1260,12 @@ function initAuthUiRefs() {
 	)
 	authUi.dashboardFavoritesCount = document.getElementById(
 		"dashboardFavoritesCount",
+	)
+	authUi.dashboardLoginHistoryList = document.getElementById(
+		"dashboardLoginHistoryList",
+	)
+	authUi.dashboardLoginHistoryCount = document.getElementById(
+		"dashboardLoginHistoryCount",
 	)
 	authUi.dashboardProfileName = document.getElementById("dashboardProfileName")
 	authUi.dashboardProfileEmail = document.getElementById(
@@ -2289,6 +2297,65 @@ function renderDashboardList(mount, items, emptyText) {
 	mount.innerHTML = items.map((item) => `<li>${item}</li>`).join("")
 }
 
+function getSecurityStatusLabel(status = "") {
+	const normalized = String(status || "")
+		.trim()
+		.toLowerCase()
+	return normalized === "failure" ? "Failed" : "Success"
+}
+
+function getSecurityMethodLabel(method = "") {
+	const normalized = String(method || "")
+		.trim()
+		.toLowerCase()
+	if (normalized === "google") return "Google"
+	if (
+		normalized === "email/password" ||
+		normalized === "password" ||
+		normalized === "email"
+	) {
+		return "Email/Password"
+	}
+	if (normalized === "anonymous") return "Anonymous"
+	return "Unknown"
+}
+
+function renderDashboardLoginHistory(items = []) {
+	if (authUi.dashboardLoginHistoryCount) {
+		authUi.dashboardLoginHistoryCount.textContent = String(items.length || 0)
+	}
+
+	const mount = authUi.dashboardLoginHistoryList
+	if (!mount) return
+
+	if (!Array.isArray(items) || !items.length) {
+		mount.innerHTML =
+			"<li>No login history yet. Your future sign-ins will appear here.</li>"
+		return
+	}
+
+	mount.innerHTML = items
+		.map((item) => {
+			const statusLabel = getSecurityStatusLabel(item.status)
+			const methodLabel = getSecurityMethodLabel(item.method)
+			const dateLabel = formatDateTime(item.createdAt)
+			const device = String(item.deviceType || "Unknown").trim()
+			const browser = String(item.browser || "Unknown").trim()
+			const location =
+				String(item.locationLabel || "").trim() ||
+				[
+					String(item.locationCity || "").trim(),
+					String(item.locationCountry || "").trim(),
+				]
+					.filter(Boolean)
+					.join(", ") ||
+				"Unknown"
+
+			return `<li>${escapeHtml(dateLabel)} • ${escapeHtml(statusLabel)} • ${escapeHtml(methodLabel)} • ${escapeHtml(device)} / ${escapeHtml(browser)} • ${escapeHtml(location)}</li>`
+		})
+		.join("")
+}
+
 function normalizeBookingStatus(status = "") {
 	const raw = String(status || "pending")
 		.trim()
@@ -2934,9 +3001,10 @@ async function loadUserDashboardData(userOrUid) {
 		let bookingsByUidSnap = null
 		let bookingsByEmailSnap = null
 		let reviewsSnap = null
+		let loginHistorySnap = null
 
 		try {
-			;[bookingsByUidSnap, reviewsSnap] = await Promise.all([
+			;[bookingsByUidSnap, reviewsSnap, loginHistorySnap] = await Promise.all([
 				db
 					.collection("bookings")
 					.where("uid", "==", uid)
@@ -2949,15 +3017,22 @@ async function loadUserDashboardData(userOrUid) {
 					.orderBy("createdAt", "desc")
 					.limit(5)
 					.get(),
+				db
+					.collection("loginActivities")
+					.where("uid", "==", uid)
+					.orderBy("createdAt", "desc")
+					.limit(12)
+					.get(),
 			])
 		} catch (indexedQueryError) {
 			console.warn(
 				"Indexed dashboard query failed, falling back to non-indexed fetch:",
 				indexedQueryError,
 			)
-			;[bookingsByUidSnap, reviewsSnap] = await Promise.all([
+			;[bookingsByUidSnap, reviewsSnap, loginHistorySnap] = await Promise.all([
 				db.collection("bookings").where("uid", "==", uid).get(),
 				db.collection("reviews").where("uid", "==", uid).get(),
+				db.collection("loginActivities").where("uid", "==", uid).get(),
 			])
 		}
 
@@ -3018,6 +3093,12 @@ async function loadUserDashboardData(userOrUid) {
 			reviewItems,
 			"No reviews submitted yet.",
 		)
+
+		const loginHistoryItems = [...(loginHistorySnap?.docs || [])]
+			.map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
+			.sort((a, b) => toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt))
+			.slice(0, 12)
+		renderDashboardLoginHistory(loginHistoryItems)
 
 		if (latestPhone && authUi.dashboardProfilePhone) {
 			authUi.dashboardProfilePhone.textContent = latestPhone
