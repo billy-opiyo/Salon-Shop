@@ -2998,43 +2998,61 @@ async function loadUserDashboardData(userOrUid) {
 	startDashboardFavoritesListener(uid)
 
 	try {
-		let bookingsByUidSnap = null
-		let bookingsByEmailSnap = null
-		let reviewsSnap = null
-		let loginHistorySnap = null
-
-		try {
-			;[bookingsByUidSnap, reviewsSnap, loginHistorySnap] = await Promise.all([
-				db
-					.collection("bookings")
-					.where("uid", "==", uid)
-					.orderBy("createdAt", "desc")
-					.limit(5)
-					.get(),
-				db
-					.collection("reviews")
-					.where("uid", "==", uid)
-					.orderBy("createdAt", "desc")
-					.limit(5)
-					.get(),
-				db
-					.collection("loginActivities")
-					.where("uid", "==", uid)
-					.orderBy("createdAt", "desc")
-					.limit(12)
-					.get(),
-			])
-		} catch (indexedQueryError) {
-			console.warn(
-				"Indexed dashboard query failed, falling back to non-indexed fetch:",
-				indexedQueryError,
-			)
-			;[bookingsByUidSnap, reviewsSnap, loginHistorySnap] = await Promise.all([
-				db.collection("bookings").where("uid", "==", uid).get(),
-				db.collection("reviews").where("uid", "==", uid).get(),
-				db.collection("loginActivities").where("uid", "==", uid).get(),
-			])
+		const getDashboardCollectionSnapshot = async ({
+			name = "",
+			indexedQuery,
+			fallbackQuery,
+		} = {}) => {
+			try {
+				return await indexedQuery.get()
+			} catch (indexedQueryError) {
+				console.warn(
+					`Indexed ${name} query failed, falling back to non-indexed fetch:`,
+					indexedQueryError,
+				)
+				try {
+					return await fallbackQuery.get()
+				} catch (fallbackQueryError) {
+					console.warn(`Fallback ${name} query failed:`, fallbackQueryError)
+					return null
+				}
+			}
 		}
+
+		const [bookingsByUidSnap, reviewsSnap, loginHistorySnap] =
+			await Promise.all([
+				getDashboardCollectionSnapshot({
+					name: "bookings",
+					indexedQuery: db
+						.collection("bookings")
+						.where("uid", "==", uid)
+						.orderBy("createdAt", "desc")
+						.limit(5),
+					fallbackQuery: db.collection("bookings").where("uid", "==", uid),
+				}),
+				getDashboardCollectionSnapshot({
+					name: "reviews",
+					indexedQuery: db
+						.collection("reviews")
+						.where("uid", "==", uid)
+						.orderBy("createdAt", "desc")
+						.limit(5),
+					fallbackQuery: db.collection("reviews").where("uid", "==", uid),
+				}),
+				getDashboardCollectionSnapshot({
+					name: "login history",
+					indexedQuery: db
+						.collection("loginActivities")
+						.where("uid", "==", uid)
+						.orderBy("createdAt", "desc")
+						.limit(12),
+					fallbackQuery: db
+						.collection("loginActivities")
+						.where("uid", "==", uid),
+				}),
+			])
+
+		let bookingsByEmailSnap = null
 
 		if (email) {
 			try {
@@ -3048,7 +3066,6 @@ async function loadUserDashboardData(userOrUid) {
 			}
 		}
 
-		const bookingItems = []
 		dashboardBookingDocs = []
 		let latestPhone = ""
 		const bookingDocMap = new Map()
@@ -3069,9 +3086,6 @@ async function loadUserDashboardData(userOrUid) {
 			const data = doc.data() || {}
 			if (!latestPhone && data.phone) latestPhone = data.phone
 			dashboardBookingDocs.push({ id: doc.id, ...data })
-			bookingItems.push(
-				`${escapeHtml(data.service || "Service")} • ${escapeHtml(data.date || "No date")} at ${escapeHtml(data.time || "No time")} • ${escapeHtml(data.status || "pending")}`,
-			)
 		})
 
 		const reviewItems = []
@@ -3104,7 +3118,25 @@ async function loadUserDashboardData(userOrUid) {
 			authUi.dashboardProfilePhone.textContent = latestPhone
 		}
 
-		if (authUi.dashboardMessage) clearFormMessage(authUi.dashboardMessage)
+		const hasBookingsAccessIssue = !bookingsByUidSnap
+		const hasReviewsAccessIssue = !reviewsSnap
+		const hasLoginHistoryAccessIssue = !loginHistorySnap
+
+		if (authUi.dashboardMessage) {
+			if (
+				hasBookingsAccessIssue ||
+				hasReviewsAccessIssue ||
+				hasLoginHistoryAccessIssue
+			) {
+				showFormMessage(
+					authUi.dashboardMessage,
+					"error",
+					"⚠️ Some dashboard sections could not load. Your available data is shown below.",
+				)
+			} else {
+				clearFormMessage(authUi.dashboardMessage)
+			}
+		}
 	} catch (error) {
 		console.error("Dashboard data load failed:", error)
 		if (authUi.dashboardMessage) {

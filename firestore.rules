@@ -516,8 +516,10 @@ service cloud.firestore {
       // Security logs are server-written only (Cloud Functions using Admin SDK bypass rules).
       allow create, update, delete: if false;
 
-      // Only admins can read login activity for security/fraud monitoring.
-      allow read: if isAdmin();
+      // Admins can read all login activity; users can read only their own entries.
+      allow read: if isAdmin() || (
+        isSignedIn() && resource.data.uid == request.auth.uid
+      );
     }
 
     match /securityAlerts/{alertId} {
