@@ -2090,6 +2090,14 @@ h6 {
     margin-bottom: 18px;
 }
 
+.admin-management-section[data-admin-section="security"] .admin-stats {
+    margin-bottom: 8px;
+}
+
+.admin-management-section[data-admin-section="security"] .admin-stats:last-of-type {
+    margin-bottom: 18px;
+}
+
 .admin-stat-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border);

@@ -28,6 +28,7 @@ let adminBookingDocs = []
 let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
 let adminSecuritySortMode = "newest"
+let adminSecurityRiskFilter = "all"
 let adminSessionsSortMode = "online-first"
 let adminSecurityAlertsSortMode = "newest"
 let adminAccountHistorySortMode = "newest"
@@ -943,6 +944,21 @@ function normalizeSecurityDoc(doc = {}) {
 				.filter(Boolean)
 		: []
 	const isSuspicious = doc.suspicious === true || suspiciousFlags.length > 0
+	const lockUntilMs = toTimestampMs(doc.lockUntil)
+	const lockActive =
+		doc.lockActive === true && Boolean(lockUntilMs && lockUntilMs > Date.now())
+	const failedAttemptsIn5m = Math.max(0, Number(doc.failedAttemptsIn5m || 0))
+	const failedAttemptsIn15m = Math.max(0, Number(doc.failedAttemptsIn15m || 0))
+	const riskScore = Math.max(0, Math.min(100, Number(doc.riskScore || 0)))
+	const riskLevelRaw = String(doc.riskLevel || "low")
+		.trim()
+		.toLowerCase()
+	const riskLevel = ["low", "medium", "high"].includes(riskLevelRaw)
+		? riskLevelRaw
+		: "low"
+	const riskReasons = Array.isArray(doc.riskReasons)
+		? doc.riskReasons.map((entry) => String(entry || "").trim()).filter(Boolean)
+		: []
 
 	return {
 		id: String(doc.id || ""),
@@ -964,6 +980,16 @@ function normalizeSecurityDoc(doc = {}) {
 		ipMasked: String(doc.ipMasked || "").trim() || "Masked",
 		status,
 		failureCode: String(doc.failureCode || "").trim(),
+		failedAttemptsIn5m,
+		failedAttemptsIn15m,
+		accountLockTriggered: doc.accountLockTriggered === true,
+		lockActive,
+		lockUntilMs,
+		lockUntil: doc.lockUntil || null,
+		riskScore,
+		riskLevel,
+		riskReasons,
+		trustScore: Math.max(0, Math.min(100, Number(doc.trustScore || 0))),
 		isSuspicious,
 		suspiciousFlags,
 		createdAt: doc.createdAt || null,
@@ -1001,6 +1027,42 @@ function sortAdminSecurityActivities(items = [], mode = adminSecuritySortMode) {
 	)
 }
 
+function applyAdminSecurityRiskFilter(items = [], riskFilter = "all") {
+	const mode = String(riskFilter || "all")
+		.trim()
+		.toLowerCase()
+	if (!mode || mode === "all") return [...items]
+	return items.filter(
+		(item) => String(item.riskLevel || "").toLowerCase() === mode,
+	)
+}
+
+function getAdminRiskFilterBadgeText(riskFilter = "all") {
+	const mode = String(riskFilter || "all")
+		.trim()
+		.toLowerCase()
+	if (!mode || mode === "all") return ""
+	if (mode === "high") return "Filtering: High Risk only"
+	if (mode === "medium") return "Filtering: Medium Risk only"
+	if (mode === "low") return "Filtering: Low Risk only"
+	return ""
+}
+
+function renderAdminRiskFilterBadge(riskFilter = "all") {
+	const badge = document.getElementById("adminSecurityRiskFilterBadge")
+	if (!badge) return
+
+	const text = getAdminRiskFilterBadgeText(riskFilter)
+	if (!text) {
+		badge.style.display = "none"
+		badge.textContent = ""
+		return
+	}
+
+	badge.style.display = "block"
+	badge.textContent = text
+}
+
 function renderAdminSecurityActivities(docs = []) {
 	const mount = document.getElementById("adminSecurityActivityList")
 	if (!mount) return
@@ -1008,21 +1070,62 @@ function renderAdminSecurityActivities(docs = []) {
 	const normalized = docs.map(normalizeSecurityDoc)
 	const sorted = sortAdminSecurityActivities(normalized, adminSecuritySortMode)
 	adminSecurityDocs = sorted
+	const visibleRows = applyAdminSecurityRiskFilter(
+		sorted,
+		adminSecurityRiskFilter,
+	)
+	renderAdminRiskFilterBadge(adminSecurityRiskFilter)
 
 	const total = sorted.length
 	const successCount = sorted.filter((item) => item.status === "success").length
 	const failedCount = sorted.filter((item) => item.status === "failure").length
 	const suspiciousCount = sorted.filter((item) => item.isSuspicious).length
+	const userIdentityKey = (item = {}) =>
+		String(
+			item.uid || item.email || item.attemptedEmail || item.ipMasked || item.id,
+		)
+			.trim()
+			.toLowerCase() || `activity:${String(item.id || "").trim()}`
+	const lockedUsers = new Set(
+		sorted
+			.filter((item) => item.lockActive || item.accountLockTriggered)
+			.map(userIdentityKey)
+			.filter(Boolean),
+	)
+	const repeatedWrongUsers = new Set(
+		sorted
+			.filter(
+				(item) =>
+					item.failedAttemptsIn5m >= 3 ||
+					item.failedAttemptsIn15m >= 5 ||
+					item.suspiciousFlags.includes("repeated_failures"),
+			)
+			.map(userIdentityKey)
+			.filter(Boolean),
+	)
+	const lockedCount = lockedUsers.size
+	const repeatedWrongCount = repeatedWrongUsers.size
+	const highRiskCount = sorted.filter(
+		(item) => item.riskLevel === "high",
+	).length
 
 	const totalEl = document.getElementById("adminSecurityTotalCount")
 	const successEl = document.getElementById("adminSecuritySuccessCount")
 	const failedEl = document.getElementById("adminSecurityFailedCount")
 	const suspiciousEl = document.getElementById("adminSecuritySuspiciousCount")
+	const lockedEl = document.getElementById("adminSecurityLockedCount")
+	const repeatedWrongEl = document.getElementById(
+		"adminSecurityRepeatedWrongCount",
+	)
+	const highRiskEl = document.getElementById("adminSecurityHighRiskCount")
 
 	if (totalEl) totalEl.textContent = String(total)
 	if (successEl) successEl.textContent = String(successCount)
 	if (failedEl) failedEl.textContent = String(failedCount)
 	if (suspiciousEl) suspiciousEl.textContent = String(suspiciousCount)
+	if (lockedEl) lockedEl.textContent = String(lockedCount)
+	if (repeatedWrongEl) repeatedWrongEl.textContent = String(repeatedWrongCount)
+	if (highRiskEl) highRiskEl.textContent = String(highRiskCount)
 
 	const shouldEnableVerticalScroll = sorted.length > 4
 	mount.classList.toggle(
@@ -1040,6 +1143,12 @@ function renderAdminSecurityActivities(docs = []) {
 		return
 	}
 
+	if (!visibleRows.length) {
+		mount.innerHTML =
+			'<div class="admin-empty-state">No login activity matches the selected risk filter.</div>'
+		return
+	}
+
 	mount.innerHTML = `
 		<table class="admin-security-table">
 			<thead>
@@ -1050,12 +1159,15 @@ function renderAdminSecurityActivities(docs = []) {
 					<th>Location</th>
 					<th>IP (Masked)</th>
 					<th>Status</th>
+					<th>Failed Attempts</th>
+					<th>Lock Status</th>
+					<th>Risk</th>
 					<th>Suspicious</th>
 					<th>Time</th>
 				</tr>
 			</thead>
 			<tbody>
-				${sorted
+				${visibleRows
 					.map((item) => {
 						const userLabel =
 							item.displayName || item.email || item.uid || "Unknown user"
@@ -1066,6 +1178,18 @@ function renderAdminSecurityActivities(docs = []) {
 						const suspiciousText = item.isSuspicious
 							? item.suspiciousFlags.join(", ") || "Flagged"
 							: "No"
+						const failedAttemptsText = `${item.failedAttemptsIn5m}/5m • ${item.failedAttemptsIn15m}/15m`
+						const lockText = item.lockActive
+							? `Active until ${formatAdminDate(item.lockUntil)}`
+							: item.accountLockTriggered
+								? "Triggered"
+								: "No"
+						const riskText = `${item.riskLevel.toUpperCase()} (${item.riskScore})`
+						const trustText = `Trust ${item.trustScore}`
+						const riskClass = getRiskStatusClass(item.riskLevel)
+						const riskReasonText = item.riskReasons.length
+							? ` • ${item.riskReasons.join(", ")}`
+							: ""
 
 						return `
 							<tr>
@@ -1075,6 +1199,9 @@ function renderAdminSecurityActivities(docs = []) {
 								<td>${escapeHtml(item.locationLabel)}</td>
 								<td>${escapeHtml(item.ipMasked)}</td>
 								<td><span class="admin-status ${statusClass}">${escapeHtml(item.status)}</span></td>
+								<td>${escapeHtml(failedAttemptsText)}</td>
+								<td>${escapeHtml(lockText)}</td>
+								<td><span class="admin-status ${riskClass}">${escapeHtml(riskText)}</span><div style="margin-top:4px; font-size:12px; opacity:.85;">${escapeHtml(trustText)}</div>${riskReasonText ? `<div style="margin-top:4px; font-size:12px; opacity:.85;">${escapeHtml(riskReasonText)}</div>` : ""}</td>
 								<td>${escapeHtml(suspiciousText)}</td>
 								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
 							</tr>
@@ -1096,7 +1223,10 @@ function normalizeSessionDoc(doc = {}) {
 	const lastActiveMs =
 		Number(doc.lastActiveAtMs || 0) || toTimestampMs(doc.lastActiveAt) || 0
 	const startedAtMs =
-		Number(doc.startedAtMs || 0) || toTimestampMs(doc.startedAt) || lastActiveMs || 0
+		Number(doc.startedAtMs || 0) ||
+		toTimestampMs(doc.startedAt) ||
+		lastActiveMs ||
+		0
 
 	return {
 		id: String(doc.id || ""),
@@ -1175,7 +1305,8 @@ function renderAdminSessions(docs = []) {
 		.filter((item) => item.uid && item.sessionId)
 		.map((item) => {
 			const isOnlineByHeartbeat =
-				item.online && nowMs - (item.lastActiveMs || 0) <= ADMIN_SESSION_STALE_AFTER_MS
+				item.online &&
+				nowMs - (item.lastActiveMs || 0) <= ADMIN_SESSION_STALE_AFTER_MS
 			return {
 				...item,
 				online: isOnlineByHeartbeat,
@@ -1196,7 +1327,9 @@ function renderAdminSessions(docs = []) {
 	adminSessionsDocs = sorted
 
 	const onlineSessions = sorted.filter((item) => item.online)
-	const onlineUsers = new Set(onlineSessions.map((item) => item.uid).filter(Boolean))
+	const onlineUsers = new Set(
+		onlineSessions.map((item) => item.uid).filter(Boolean),
+	)
 	const onlineCountByUid = new Map()
 	onlineSessions.forEach((item) => {
 		onlineCountByUid.set(item.uid, (onlineCountByUid.get(item.uid) || 0) + 1)
@@ -1212,7 +1345,8 @@ function renderAdminSessions(docs = []) {
 
 	if (totalEl) totalEl.textContent = String(sorted.length)
 	if (onlineUsersEl) onlineUsersEl.textContent = String(onlineUsers.size)
-	if (onlineSessionsEl) onlineSessionsEl.textContent = String(onlineSessions.length)
+	if (onlineSessionsEl)
+		onlineSessionsEl.textContent = String(onlineSessions.length)
 	if (multiDeviceEl) multiDeviceEl.textContent = String(multiDeviceUsers)
 
 	if (!sorted.length) {
@@ -1338,6 +1472,12 @@ function getAdminSeverityClass(severity = "medium") {
 	if (severity === "high") return "admin-status-cancelled"
 	if (severity === "low") return "admin-status-completed"
 	return "admin-status-pending"
+}
+
+function getRiskStatusClass(riskLevel = "low") {
+	if (riskLevel === "high") return "admin-status-cancelled"
+	if (riskLevel === "medium") return "admin-status-pending"
+	return "admin-status-completed"
 }
 
 function renderAdminSecurityAlerts(docs = []) {
@@ -1554,7 +1694,9 @@ function getTimelineTypeClass(type = "") {
 function normalizeTimelineDoc(doc = {}) {
 	const type = normalizeTimelineType(doc.type)
 	const context =
-		typeof doc.context === "object" && doc.context && !Array.isArray(doc.context)
+		typeof doc.context === "object" &&
+		doc.context &&
+		!Array.isArray(doc.context)
 			? doc.context
 			: {}
 	const summary =
@@ -3267,24 +3409,52 @@ function startAdminSessionsListener() {
 
 	stopAdminSessionsListener()
 
-	adminSessionsUnsubscribe = db.collectionGroup("sessions").limit(800).onSnapshot(
-		(snapshot) => {
-			const docs = snapshot.docs.map((doc) => ({
-				id: doc.id,
-				...doc.data(),
-				__name__: doc.ref,
-			}))
-			renderAdminSessions(docs)
-		},
-		(error) => {
-			console.error("Admin session tracking listener failed:", error)
-			setAdminMessage(
-				"error",
-				`❌ Failed to watch session tracking in realtime: ${error.message || "unknown error"}`,
-				"adminSecurityEventsMessage",
-			)
-		},
-	)
+	adminSessionsUnsubscribe = db
+		.collectionGroup("sessions")
+		.limit(800)
+		.onSnapshot(
+			(snapshot) => {
+				setAdminMessage("", "", "adminSecurityEventsMessage")
+				const docs = snapshot.docs.map((doc) => ({
+					id: doc.id,
+					...doc.data(),
+					__name__: doc.ref,
+				}))
+				renderAdminSessions(docs)
+			},
+			(error) => {
+				console.error("Admin session tracking listener failed:", error)
+
+				const code = String(error?.code || "")
+					.trim()
+					.toLowerCase()
+				const isPermissionDenied =
+					code === "permission-denied" ||
+					String(error?.message || "")
+						.toLowerCase()
+						.includes("missing or insufficient permissions")
+
+				if (isPermissionDenied) {
+					const mount = document.getElementById("adminSessionsList")
+					if (mount) {
+						mount.innerHTML =
+							'<div class="admin-empty-state">Session tracking is temporarily unavailable (permission denied). If rules were just deployed, sign out and sign back in, then refresh this page.</div>'
+					}
+					setAdminMessage(
+						"error",
+						"⚠️ Session tracking permission denied. Please sign out/in and refresh after Firestore rules deployment.",
+						"adminSecurityEventsMessage",
+					)
+					return
+				}
+
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch session tracking in realtime: ${error.message || "unknown error"}`,
+					"adminSecurityEventsMessage",
+				)
+			},
+		)
 }
 
 function startAdminTimelineListener() {
@@ -3337,6 +3507,9 @@ function initializeAdminPanel() {
 	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
 	const messagesSortSelect = document.getElementById("adminMessagesSortSelect")
 	const securitySortSelect = document.getElementById("adminSecuritySortSelect")
+	const securityRiskFilterSelect = document.getElementById(
+		"adminSecurityRiskFilterSelect",
+	)
 	const securityAlertsSortSelect = document.getElementById(
 		"adminSecurityAlertsSortSelect",
 	)
@@ -3746,6 +3919,14 @@ function initializeAdminPanel() {
 		securitySortSelect.value = adminSecuritySortMode
 		securitySortSelect.addEventListener("change", (event) => {
 			adminSecuritySortMode = event.target.value || "newest"
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityRiskFilterSelect) {
+		securityRiskFilterSelect.value = adminSecurityRiskFilter
+		securityRiskFilterSelect.addEventListener("change", (event) => {
+			adminSecurityRiskFilter = event.target.value || "all"
 			renderAdminSecurityActivities(adminSecurityDocs)
 		})
 	}

@@ -465,6 +465,13 @@ service cloud.firestore {
       }
     }
 
+    // Explicit collection-group support for admin session monitoring query:
+    // db.collectionGroup("sessions")
+    match /{document=**}/sessions/{sessionId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
     match /contactMessages/{messageId} {
       // Anyone signed in (anonymous auth included) can submit contact messages.
       allow create: if isSignedIn()

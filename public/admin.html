@@ -822,13 +822,25 @@
 								<div class="label">Suspicious</div>
 								<strong id="adminSecuritySuspiciousCount">0</strong>
 							</div>
-						</div>
-
-						<div class="admin-stats">
+							<div class="admin-stat-card">
+								<div class="label">Locked Accounts</div>
+								<strong id="adminSecurityLockedCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Repeated Wrong Passwords</div>
+								<strong id="adminSecurityRepeatedWrongCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">High Risk Logins</div>
+								<strong id="adminSecurityHighRiskCount">0</strong>
+							</div>
 							<div class="admin-stat-card">
 								<div class="label">Online Users</div>
 								<strong id="adminSessionsOnlineUsersCount">0</strong>
 							</div>
+						</div>
+
+						<div class="admin-stats">
 							<div class="admin-stat-card">
 								<div class="label">Online Sessions</div>
 								<strong id="adminSessionsOnlineCount">0</strong>
@@ -841,13 +853,13 @@
 								<div class="label">Security Alerts</div>
 								<strong id="adminSecurityAlertsTotalCount">0</strong>
 							</div>
-						</div>
-
-						<div class="admin-stats">
 							<div class="admin-stat-card">
 								<div class="label">Open Alerts</div>
 								<strong id="adminSecurityAlertsOpenCount">0</strong>
 							</div>
+						</div>
+
+						<div class="admin-stats">
 							<div class="admin-stat-card">
 								<div class="label">High Severity Alerts</div>
 								<strong id="adminSecurityAlertsHighCount">0</strong>
@@ -896,7 +908,23 @@
 								<option value="failed-first">Failed First</option>
 								<option value="suspicious-first">Suspicious First</option>
 							</select>
+							<label for="adminSecurityRiskFilterSelect">Risk Filter:</label>
+							<select
+								id="adminSecurityRiskFilterSelect"
+								class="admin-review-sort-select"
+							>
+								<option value="all">All Risks</option>
+								<option value="high">High</option>
+								<option value="medium">Medium</option>
+								<option value="low">Low</option>
+							</select>
 						</div>
+
+						<div
+							id="adminSecurityRiskFilterBadge"
+							class="admin-security-privacy-note"
+							style="margin: 8px 0 10px; display: none"
+						></div>
 
 						<div
 							class="admin-security-table-wrap"

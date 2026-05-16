@@ -22,6 +22,11 @@ const NAIROBI_TIMEZONE = "Africa/Nairobi"
 const NAIROBI_UTC_OFFSET_HOURS = 3
 const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
 const CONTACT_RATE_LIMI5T_COOLDOWN_MS = 60 * 1000
+const LOGIN_LOCK_WINDOW_MS = 15 * 60 * 1000
+const LOGIN_FAILED_WINDOW_MS = 5 * 60 * 1000
+const LOGIN_LOCK_THRESHOLD = 5
+const LOGIN_REPEAT_FAILURE_THRESHOLD = 3
+const LOGIN_LOCK_DURATION_MS = 30 * 60 * 1000
 const SECURITY_ALERT_SEVERITY = {
 	multiple_failed_login_attempts: "high",
 	new_device_detected: "medium",
@@ -164,6 +169,76 @@ function toMillis(value) {
 	}
 	const parsed = Date.parse(String(value))
 	return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function normalizeRiskLevel(level = "") {
+	const raw = String(level || "")
+		.trim()
+		.toLowerCase()
+	if (raw === "high") return "high"
+	if (raw === "medium") return "medium"
+	return "low"
+}
+
+function buildLoginRiskAssessment({
+	hasKnownDevice = true,
+	hasKnownCity = true,
+	hasKnownCountry = true,
+	failedAttemptsIn5m = 0,
+	failedAttemptsIn15m = 0,
+	accountLockTriggered = false,
+	isDifferentCountryQuickly = false,
+} = {}) {
+	const reasons = []
+	let score = 0
+
+	if (!hasKnownDevice) {
+		score += 25
+		reasons.push("new_browser")
+	}
+
+	if (!hasKnownCity) {
+		score += 15
+		reasons.push("new_city")
+	}
+
+	if (!hasKnownCountry || isDifferentCountryQuickly) {
+		score += 40
+		reasons.push("different_country")
+	}
+
+	if (failedAttemptsIn5m >= LOGIN_REPEAT_FAILURE_THRESHOLD) {
+		score += 25
+		reasons.push("many_failed_logins_short_window")
+	}
+
+	if (failedAttemptsIn15m >= LOGIN_LOCK_THRESHOLD) {
+		score += 35
+		reasons.push("many_failed_logins_lock_window")
+	}
+
+	if (accountLockTriggered) {
+		score += 45
+		reasons.push("account_locked")
+	}
+
+	const boundedScore = Math.max(0, Math.min(100, score))
+	let level = "low"
+	// Risk bands tuned to admin expectations:
+	// - New browser should be at least MEDIUM
+	// - Different country + repeated failed logins should become HIGH
+	if (boundedScore >= 60) {
+		level = "high"
+	} else if (boundedScore >= 25) {
+		level = "medium"
+	}
+
+	return {
+		riskScore: boundedScore,
+		riskLevel: normalizeRiskLevel(level),
+		riskReasons: [...new Set(reasons)],
+		trustScore: Math.max(0, 100 - boundedScore),
+	}
 }
 
 function buildRateLimitDocId(uid = "") {
@@ -519,6 +594,14 @@ exports.logLoginActivity = onCall(
 		const identityValue = uid || email || ipMasked
 
 		let suspiciousFlags = []
+		let failedAttemptsIn5m = 0
+		let failedAttemptsIn15m = 0
+		let accountLockTriggered = false
+		let lockUntilMs = 0
+		let hasKnownDeviceBrowser = true
+		let hasKnownCity = true
+		let hasKnownCountry = true
+		let countryChangedQuickly = false
 		try {
 			let recentQuery = admin
 				.firestore()
@@ -547,13 +630,30 @@ exports.logLoginActivity = onCall(
 			}
 
 			if (isFailure) {
-				const failuresInWindow = recent.filter((entry) => {
-					if (String(entry.status || "") !== "failure") return false
-					const age = nowMs - toMillis(entry.createdAt)
-					return age >= 0 && age <= 5 * 60 * 1000
-				}).length
-				if (failuresInWindow >= 2) {
+				// Include this current failed attempt in counters so thresholds trigger
+				// on the exact attempt users/admins expect (e.g. 3rd/5th failure).
+				failedAttemptsIn5m =
+					recent.filter((entry) => {
+						if (String(entry.status || "") !== "failure") return false
+						const age = nowMs - toMillis(entry.createdAt)
+						return age >= 0 && age <= LOGIN_FAILED_WINDOW_MS
+					}).length + 1
+
+				failedAttemptsIn15m =
+					recent.filter((entry) => {
+						if (String(entry.status || "") !== "failure") return false
+						const age = nowMs - toMillis(entry.createdAt)
+						return age >= 0 && age <= LOGIN_LOCK_WINDOW_MS
+					}).length + 1
+
+				if (failedAttemptsIn5m >= LOGIN_REPEAT_FAILURE_THRESHOLD) {
 					suspiciousFlags.push("repeated_failures")
+				}
+
+				if (failedAttemptsIn15m >= LOGIN_LOCK_THRESHOLD) {
+					accountLockTriggered = true
+					lockUntilMs = nowMs + LOGIN_LOCK_DURATION_MS
+					suspiciousFlags.push("locked_account")
 				}
 			}
 
@@ -563,14 +663,24 @@ exports.logLoginActivity = onCall(
 				)
 
 				if (priorSuccess.length) {
-					const hasSeenDeviceBrowser = priorSuccess.some(
+					hasKnownDeviceBrowser = priorSuccess.some(
 						(entry) =>
 							String(entry.deviceType || "") === deviceType &&
 							String(entry.browser || "") === browser,
 					)
-					if (!hasSeenDeviceBrowser) {
+					if (!hasKnownDeviceBrowser) {
 						suspiciousFlags.push("new_device_or_browser")
 					}
+
+					hasKnownCity = priorSuccess.some(
+						(entry) =>
+							String(entry.locationCity || "") === String(location.city || ""),
+					)
+					hasKnownCountry = priorSuccess.some(
+						(entry) =>
+							String(entry.locationCountry || "") ===
+							String(location.country || ""),
+					)
 
 					const lastSuccess = priorSuccess[0]
 					const lastCountry = String(lastSuccess.locationCountry || "")
@@ -583,6 +693,7 @@ exports.logLoginActivity = onCall(
 						lastSuccessAge >= 0 &&
 						lastSuccessAge <= 24 * 60 * 60 * 1000
 					) {
+						countryChangedQuickly = true
 						suspiciousFlags.push("country_changed_quickly")
 					}
 				}
@@ -597,6 +708,16 @@ exports.logLoginActivity = onCall(
 
 		suspiciousFlags = [...new Set(suspiciousFlags)]
 		const suspicious = suspiciousFlags.length > 0
+		const lockActive = Boolean(accountLockTriggered && lockUntilMs > Date.now())
+		const riskAssessment = buildLoginRiskAssessment({
+			hasKnownDevice: hasKnownDeviceBrowser,
+			hasKnownCity,
+			hasKnownCountry,
+			failedAttemptsIn5m,
+			failedAttemptsIn15m,
+			accountLockTriggered,
+			isDifferentCountryQuickly: countryChangedQuickly,
+		})
 
 		const activityRef = await admin
 			.firestore()
@@ -617,6 +738,17 @@ exports.logLoginActivity = onCall(
 				locationLabel: location.locationLabel,
 				ipMasked,
 				failureCode,
+				failedAttemptsIn5m,
+				failedAttemptsIn15m,
+				accountLockTriggered,
+				lockActive,
+				lockUntil: lockUntilMs
+					? admin.firestore.Timestamp.fromMillis(lockUntilMs)
+					: null,
+				riskScore: riskAssessment.riskScore,
+				riskLevel: riskAssessment.riskLevel,
+				riskReasons: riskAssessment.riskReasons,
+				trustScore: riskAssessment.trustScore,
 				suspicious,
 				suspiciousFlags,
 				source,
@@ -648,6 +780,13 @@ exports.logLoginActivity = onCall(
 			alertSpecs.push({
 				type: "rapid_repeated_logins",
 				message: "Rapid repeated login attempts detected",
+			})
+		}
+		if (accountLockTriggered) {
+			alertSpecs.push({
+				type: "multiple_failed_login_attempts",
+				message:
+					"Account temporarily locked due to repeated failed login attempts",
 			})
 		}
 
