@@ -1044,6 +1044,159 @@ function bindSessionPresenceLifecycle() {
 	})
 }
 
+function normalizeSecurityRestrictionState(raw = {}) {
+	const data =
+		typeof raw === "object" && raw && !Array.isArray(raw) ? raw : {}
+	return {
+		blockedUntilMs: Math.max(0, Number(data.blockedUntilMs || 0)),
+		forceLogoutAtMs: Math.max(0, Number(data.forceLogoutAtMs || 0)),
+		passwordResetRequired: data.passwordResetRequired === true,
+	}
+}
+
+async function getUserSecurityRestrictionStateByUid(uid = "") {
+	const safeUid = String(uid || "").trim()
+	if (!firebaseReady || !db || !safeUid) {
+		return normalizeSecurityRestrictionState({})
+	}
+
+	try {
+		const snap = await db.collection("users").doc(safeUid).get()
+		if (!snap.exists) return normalizeSecurityRestrictionState({})
+		const source = snap.data()?.securityRestrictions || {}
+		return normalizeSecurityRestrictionState(source)
+	} catch (error) {
+		console.warn("Failed to fetch user restrictions by uid:", error)
+		return normalizeSecurityRestrictionState({})
+	}
+}
+
+async function getUserSecurityRestrictionStateByEmail(email = "") {
+	const safeEmail = String(email || "")
+		.trim()
+		.toLowerCase()
+	if (!firebaseReady || !db || !safeEmail) {
+		return normalizeSecurityRestrictionState({})
+	}
+
+	try {
+		const snap = await db
+			.collection("users")
+			.where("email", "==", safeEmail)
+			.limit(1)
+			.get()
+		if (snap.empty) return normalizeSecurityRestrictionState({})
+		const source = snap.docs[0]?.data()?.securityRestrictions || {}
+		return normalizeSecurityRestrictionState(source)
+	} catch (error) {
+		console.warn("Failed to fetch user restrictions by email:", error)
+		return normalizeSecurityRestrictionState({})
+	}
+}
+
+function formatRestrictionUntilLabel(untilMs = 0) {
+	const ts = Number(untilMs || 0)
+	if (!ts) return ""
+	const date = new Date(ts)
+	if (Number.isNaN(date.getTime())) return ""
+	return date.toLocaleString()
+}
+
+async function forceRestrictedUserSignOut(message = "") {
+	await markCurrentSessionOffline()
+	stopSessionHeartbeat()
+	currentSessionId = ""
+
+	try {
+		if (auth?.currentUser) {
+			await auth.signOut()
+		}
+	} catch (error) {
+		console.warn("Restricted signout failed:", error)
+	}
+
+	if (message && authUi.message) {
+		showTimedAuthMessage("error", message)
+	}
+}
+
+async function enforceSignedInUserSecurityRestrictions(user, context = {}) {
+	if (!user || user.isAnonymous) return true
+
+	const nowMs = Date.now()
+	let claimBlockedUntilMs = 0
+	let claimForceLogoutAtMs = 0
+	let claimPasswordResetRequired = false
+
+	try {
+		const tokenResult = await user.getIdTokenResult(true)
+		const claims = tokenResult?.claims || {}
+		claimBlockedUntilMs = Math.max(0, Number(claims.accountBlockedUntilMs || 0))
+		claimForceLogoutAtMs = Math.max(0, Number(claims.forceLogoutAfterMs || 0))
+		claimPasswordResetRequired = claims.passwordResetRequired === true
+	} catch (error) {
+		console.warn("Token claim restriction check failed:", error)
+	}
+
+	const docRestrictions = await getUserSecurityRestrictionStateByUid(user.uid)
+	const blockedUntilMs = Math.max(
+		claimBlockedUntilMs,
+		docRestrictions.blockedUntilMs,
+	)
+	const forceLogoutAtMs = Math.max(
+		claimForceLogoutAtMs,
+		docRestrictions.forceLogoutAtMs,
+	)
+	const passwordResetRequired =
+		claimPasswordResetRequired || docRestrictions.passwordResetRequired
+
+	if (blockedUntilMs > nowMs) {
+		const untilLabel = formatRestrictionUntilLabel(blockedUntilMs)
+		await forceRestrictedUserSignOut(
+			`⛔ This account is temporarily blocked${untilLabel ? ` until ${untilLabel}` : ""}. Contact support if you need help.`,
+		)
+		return false
+	}
+
+	if (forceLogoutAtMs > 0) {
+		await forceRestrictedUserSignOut(
+			"🔒 Your session was ended by an administrator. Please sign in again if needed.",
+		)
+		return false
+	}
+
+	if (passwordResetRequired) {
+		if (user.email) {
+			try {
+				await auth.sendPasswordResetEmail(user.email)
+			} catch (error) {
+				console.warn("Forced reset email send failed:", error)
+			}
+		}
+
+		const source = String(context?.source || "").trim()
+		await forceRestrictedUserSignOut(
+			`🔐 Admin security policy requires a password reset${source ? ` (${source})` : ""}. We've sent reset instructions to your email.`,
+		)
+		return false
+	}
+
+	return true
+}
+
+async function checkTemporaryBlockBeforeEmailSignIn(email = "") {
+	const restriction = await getUserSecurityRestrictionStateByEmail(email)
+	const blockedUntilMs = Math.max(0, Number(restriction.blockedUntilMs || 0))
+	if (blockedUntilMs > Date.now()) {
+		return {
+			blocked: true,
+			blockedUntilMs,
+		}
+	}
+
+	return { blocked: false, blockedUntilMs: 0 }
+}
+
 async function trackLoginActivity({
 	method = "unknown",
 	status = "success",
@@ -1124,6 +1277,11 @@ async function finalizeGoogleSignInResult(user, context = {}) {
 	if (!user || user.isAnonymous) {
 		throw new Error("Google sign-in did not complete. Please try again.")
 	}
+
+	const allowed = await enforceSignedInUserSecurityRestrictions(user, {
+		source: context?.source || "google",
+	})
+	if (!allowed) return
 
 	setDashboardSignedInState(user)
 	closeAuthModal()
@@ -3302,6 +3460,18 @@ async function handleEmailAuthSubmit(event) {
 		)
 		let signedInUser = null
 
+		if (authMode === "signin") {
+			const precheck = await checkTemporaryBlockBeforeEmailSignIn(email)
+			if (precheck.blocked) {
+				const untilLabel = formatRestrictionUntilLabel(precheck.blockedUntilMs)
+				showTimedAuthMessage(
+					"error",
+					`⛔ This account is temporarily blocked${untilLabel ? ` until ${untilLabel}` : ""}.`,
+				)
+				return
+			}
+		}
+
 		if (authMode === "signup") {
 			if (currentUser?.isAnonymous) {
 				const linked = await currentUser.linkWithCredential(credential)
@@ -3328,6 +3498,12 @@ async function handleEmailAuthSubmit(event) {
 
 		signedInUser = signedInUser || auth.currentUser
 		if (signedInUser && !signedInUser.isAnonymous) {
+			const allowed = await enforceSignedInUserSecurityRestrictions(
+				signedInUser,
+				{ source: authMode === "signup" ? "email-signup" : "email-signin" },
+			)
+			if (!allowed) return
+
 			setDashboardSignedInState(signedInUser)
 			closeAuthModal()
 			const loggedInName = getUserDisplayName(signedInUser)
@@ -3979,6 +4155,11 @@ function attachAuthStateObserver() {
 
 	auth.onAuthStateChanged(async (user) => {
 		if (user && !user.isAnonymous) {
+			const allowed = await enforceSignedInUserSecurityRestrictions(user, {
+				source: "auth-state",
+			})
+			if (!allowed) return
+
 			setDashboardSignedInState(user)
 			if (!currentSessionId) currentSessionId = generateSessionId()
 			startSessionHeartbeat()

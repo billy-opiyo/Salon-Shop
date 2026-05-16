@@ -2232,6 +2232,36 @@ h6 {
     border-bottom: 0;
 }
 
+.admin-security-row-main td {
+    border-bottom: 0;
+}
+
+.admin-security-row-actions td {
+    padding-top: 6px;
+    padding-bottom: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    transition: background-color 0.2s ease;
+}
+
+.admin-security-row-main:hover + .admin-security-row-actions td {
+    background: rgba(200, 150, 62, 0.12);
+}
+
+.admin-security-inline-actions {
+    margin: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+}
+
+.admin-security-inline-actions .admin-action-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
 .admin-status {
     display: inline-flex;
     align-items: center;
@@ -3507,6 +3537,12 @@ h6 {
         gap: 8px;
     }
 
+    .admin-security-inline-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+    }
+
     .admin-booking-actions .admin-action-btn {
         width: 100%;
         min-width: 0;
@@ -3514,6 +3550,13 @@ h6 {
         white-space: normal;
         line-height: 1.25;
         padding: 9px 10px;
+    }
+
+    .admin-security-inline-actions .admin-action-btn {
+        width: auto;
+        min-width: max-content;
+        justify-content: center;
+        white-space: nowrap;
     }
 
     .admin-section-card {

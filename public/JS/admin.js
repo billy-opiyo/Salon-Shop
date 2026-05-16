@@ -7,6 +7,7 @@ const cloudinaryConfig = appConfig.cloudinary || {}
 let firebaseReady = false
 let db = null
 let auth = null
+let adminFunctionsService = null
 let adminFirebaseApp = null
 let adminUnlocked = false
 let adminBookingsUnsubscribe = null
@@ -56,6 +57,7 @@ const adminMessageHideTimers = new Map()
 const defaultAdminSection = "bookings"
 const ADMIN_APP_NAME = "royalBraidsAdminApp"
 const ADMIN_SESSION_STALE_AFTER_MS = 2 * 60 * 1000
+const ADMIN_SECURITY_BLOCK_DEFAULT_MINUTES = 60
 const ADMIN_REVIEW_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 }
@@ -837,6 +839,22 @@ function setAdminMessage(type, text, targetId = "adminMessage") {
 	adminMessageTimers.set(targetId, timer)
 }
 
+async function callAdminRestrictUserAction(payload = {}) {
+	if (
+		!firebaseReady ||
+		!adminFunctionsService ||
+		typeof adminFunctionsService.httpsCallable !== "function"
+	) {
+		throw new Error("Cloud Functions service is not ready yet.")
+	}
+
+	const callable = adminFunctionsService.httpsCallable(
+		"adminRestrictUserAccount",
+	)
+	const response = await callable(payload)
+	return response?.data || { ok: true }
+}
+
 function setAdminUnlockedState(value) {
 	adminUnlocked = value
 
@@ -1369,6 +1387,7 @@ function renderAdminSecurityActivities(docs = []) {
 					<th>Lock Status</th>
 					<th>Risk</th>
 					<th>Suspicious</th>
+					<th>Actions</th>
 					<th>Time</th>
 				</tr>
 			</thead>
@@ -1396,9 +1415,24 @@ function renderAdminSecurityActivities(docs = []) {
 						const riskReasonText = item.riskReasons.length
 							? ` • ${item.riskReasons.join(", ")}`
 							: ""
+						const securityIdentity = String(item.uid || "").trim()
+						const securityEmail = String(
+							item.email || item.attemptedEmail || "",
+						).trim()
+						const actionControls = securityIdentity
+							? `
+								<div class="admin-booking-actions admin-security-inline-actions">
+									<button class="admin-action-btn" data-security-action="temporary-block" data-uid="${escapeHtml(securityIdentity)}" data-email="${escapeHtml(securityEmail)}">Temp Block</button>
+									<button class="admin-action-btn danger" data-security-action="force-logout" data-uid="${escapeHtml(securityIdentity)}" data-email="${escapeHtml(securityEmail)}">Force Logout</button>
+									<button class="admin-action-btn" data-security-action="force-password-reset" data-uid="${escapeHtml(securityIdentity)}" data-email="${escapeHtml(securityEmail)}">Force Password Reset</button>
+									<button class="admin-action-btn" data-security-action="clear-restrictions" data-uid="${escapeHtml(securityIdentity)}" data-email="${escapeHtml(securityEmail)}">Clear Restrictions</button>
+								</div>
+							`
+							: '<span style="font-size:12px; opacity:.7;">No linked account for security actions</span>'
+						const actionCols = 12
 
 						return `
-							<tr>
+							<tr class="admin-security-row-main">
 								<td>${escapeHtml(userLabel)}</td>
 								<td>${escapeHtml(item.method)}</td>
 								<td>${escapeHtml(`${item.deviceType} ${item.browser}`)}</td>
@@ -1409,7 +1443,11 @@ function renderAdminSecurityActivities(docs = []) {
 								<td>${escapeHtml(lockText)}</td>
 								<td><span class="admin-status ${riskClass}">${escapeHtml(riskText)}</span><div style="margin-top:4px; font-size:12px; opacity:.85;">${escapeHtml(trustText)}</div>${riskReasonText ? `<div style="margin-top:4px; font-size:12px; opacity:.85;">${escapeHtml(riskReasonText)}</div>` : ""}</td>
 								<td>${escapeHtml(suspiciousText)}</td>
+								<td><span style="opacity:.7; font-size:12px;">See below</span></td>
 								<td>${escapeHtml(formatAdminDate(item.createdAt))}</td>
+							</tr>
+							<tr class="admin-security-row-actions">
+								<td colspan="${actionCols}">${actionControls}</td>
 							</tr>
 						`
 					})
@@ -3920,6 +3958,94 @@ function initializeAdminPanel() {
 		}
 	})
 
+	securityList.addEventListener("click", async (event) => {
+		const actionBtn = event.target.closest("button[data-security-action]")
+		if (!actionBtn || !adminUnlocked || !auth?.currentUser) return
+
+		const buttonAction = String(actionBtn.dataset.securityAction || "").trim()
+		const targetUid = String(actionBtn.dataset.uid || "").trim()
+		const targetEmail = String(actionBtn.dataset.email || "")
+			.trim()
+			.toLowerCase()
+
+		if (!buttonAction || !targetUid) return
+
+		let action = ""
+		let blockMinutes = 0
+		let confirmMessage = ""
+		let successMessage = ""
+
+		if (buttonAction === "temporary-block") {
+			action = "temporary_block"
+			const input = window.prompt(
+				"Enter temporary block duration in minutes (5 - 10080):",
+				String(ADMIN_SECURITY_BLOCK_DEFAULT_MINUTES),
+			)
+			if (input === null) return
+
+			blockMinutes = Number(input)
+			if (
+				!Number.isFinite(blockMinutes) ||
+				blockMinutes < 5 ||
+				blockMinutes > 10080
+			) {
+				setAdminMessage(
+					"error",
+					"❌ Enter a valid block duration between 5 and 10080 minutes.",
+					"adminSecurityEventsMessage",
+				)
+				return
+			}
+			confirmMessage = `Temporarily block this account for ${Math.round(blockMinutes)} minutes?`
+			successMessage = "✅ Account temporarily blocked."
+		} else if (buttonAction === "force-logout") {
+			action = "force_logout"
+			confirmMessage =
+				"Force logout this account from all active sessions immediately?"
+			successMessage = "✅ User has been forced to logout."
+		} else if (buttonAction === "force-password-reset") {
+			action = "force_password_reset"
+			confirmMessage =
+				"Force this user to reset password on next access and end current sessions?"
+			successMessage = "✅ Password reset has been forced for this account."
+		} else if (buttonAction === "clear-restrictions") {
+			action = "clear_restrictions"
+			confirmMessage =
+				"Clear all account restrictions (block, force logout, and forced password reset) for this user?"
+			successMessage = "✅ All restrictions cleared for this account."
+		} else {
+			return
+		}
+
+		const confirmed = await showAdminConfirmModal(confirmMessage, "Confirm")
+		if (!confirmed) return
+
+		const oldLabel = actionBtn.textContent
+		actionBtn.disabled = true
+		actionBtn.textContent = "Applying..."
+
+		try {
+			await callAdminRestrictUserAction({
+				action,
+				uid: targetUid,
+				email: targetEmail,
+				blockMinutes: Math.round(blockMinutes || 0),
+			})
+
+			setAdminMessage("success", successMessage, "adminSecurityEventsMessage")
+		} catch (error) {
+			console.error("Security account action failed:", error)
+			setAdminMessage(
+				"error",
+				`❌ Security action failed: ${error.message || "unknown error"}`,
+				"adminSecurityEventsMessage",
+			)
+		} finally {
+			actionBtn.disabled = false
+			actionBtn.textContent = oldLabel
+		}
+	})
+
 	if (schedulePrevBtn) {
 		schedulePrevBtn.addEventListener("click", () => {
 			moveAdminScheduleAnchorByDays(
@@ -4352,6 +4478,9 @@ async function initializeFirebaseServices() {
 
 	auth = firebase.auth(adminFirebaseApp)
 	db = firebase.firestore(adminFirebaseApp)
+	if (typeof firebase.functions === "function") {
+		adminFunctionsService = firebase.functions(adminFirebaseApp)
+	}
 
 	try {
 		await auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)

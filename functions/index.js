@@ -57,6 +57,13 @@ const ACTIVITY_TIMELINE_TYPES = {
 	review_edited: "review_edited",
 	contact_submitted: "contact_submitted",
 }
+const ADMIN_ALLOWED_EMAILS = new Set(["billyopiyo597@gmail.com"])
+const ADMIN_RESTRICTION_ACTIONS = new Set([
+	"temporary_block",
+	"force_logout",
+	"force_password_reset",
+	"clear_restrictions",
+])
 let ResendClient = null
 
 function getResendClient() {
@@ -98,6 +105,56 @@ function normalizeShortText(value = "", maxLen = 80) {
 	return String(value || "")
 		.trim()
 		.slice(0, maxLen)
+}
+
+function getCallerEmailFromRequest(request) {
+	return String(request?.auth?.token?.email || "")
+		.trim()
+		.toLowerCase()
+}
+
+function assertAdminCaller(request) {
+	if (!request?.auth?.uid) {
+		throw new HttpsError("unauthenticated", "Admin authentication required")
+	}
+
+	const callerEmail = getCallerEmailFromRequest(request)
+	if (!callerEmail || !ADMIN_ALLOWED_EMAILS.has(callerEmail)) {
+		throw new HttpsError(
+			"permission-denied",
+			"Only authorized admins can perform this action",
+		)
+	}
+
+	return callerEmail
+}
+
+async function resolveTargetUserRecord({ uid = "", email = "" } = {}) {
+	const cleanUid = String(uid || "").trim()
+	const cleanEmail = String(email || "")
+		.trim()
+		.toLowerCase()
+
+	if (cleanUid) {
+		try {
+			return await admin.auth().getUser(cleanUid)
+		} catch (_error) {
+			throw new HttpsError("not-found", "Target user account not found")
+		}
+	}
+
+	if (cleanEmail) {
+		try {
+			return await admin.auth().getUserByEmail(cleanEmail)
+		} catch (_error) {
+			throw new HttpsError("not-found", "Target user account not found")
+		}
+	}
+
+	throw new HttpsError(
+		"invalid-argument",
+		"Provide a valid target uid or email",
+	)
 }
 
 function normalizeAccountChangeType(value = "") {
@@ -880,6 +937,139 @@ exports.logAccountSecurityChange = onCall(
 		}
 
 		return { ok: true }
+	},
+)
+
+exports.adminRestrictUserAccount = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const adminEmail = assertAdminCaller(request)
+		const data = request.data || {}
+		const action = String(data.action || "")
+			.trim()
+			.toLowerCase()
+
+		if (!ADMIN_RESTRICTION_ACTIONS.has(action)) {
+			throw new HttpsError("invalid-argument", "Invalid restriction action")
+		}
+
+		const targetUser = await resolveTargetUserRecord({
+			uid: data.uid,
+			email: data.email,
+		})
+
+		const nowMs = Date.now()
+		const nowTs = admin.firestore.Timestamp.fromMillis(nowMs)
+		const targetUid = String(targetUser.uid || "").trim()
+		const targetEmail = String(targetUser.email || "")
+			.trim()
+			.toLowerCase()
+
+		const userRef = admin.firestore().collection("users").doc(targetUid)
+		const userSnap = await userRef.get()
+		const existingRestrictions =
+			userSnap.exists &&
+			typeof userSnap.data()?.securityRestrictions === "object" &&
+			userSnap.data()?.securityRestrictions &&
+			!Array.isArray(userSnap.data()?.securityRestrictions)
+				? userSnap.data().securityRestrictions
+				: {}
+
+		const nextRestrictions = {
+			...existingRestrictions,
+			updatedAt: nowTs,
+			updatedBy: adminEmail,
+		}
+		const nextClaims = { ...(targetUser.customClaims || {}) }
+
+		let blockedUntilMs = 0
+		let forceLogoutAtMs = 0
+		let passwordResetRequired = false
+
+		if (action === "temporary_block") {
+			const blockMinutes = Math.max(
+				5,
+				Math.min(10080, Number(data.blockMinutes || 60)),
+			)
+			blockedUntilMs = nowMs + blockMinutes * 60 * 1000
+			nextRestrictions.blockedUntilMs = blockedUntilMs
+			nextRestrictions.blockReason =
+				normalizeShortText(
+					data.reason || "Temporary block applied by admin",
+					200,
+				) || "Temporary block applied by admin"
+			nextClaims.accountBlockedUntilMs = blockedUntilMs
+		}
+
+		if (action === "force_logout") {
+			forceLogoutAtMs = nowMs
+			nextRestrictions.forceLogoutAtMs = forceLogoutAtMs
+			nextClaims.forceLogoutAfterMs = forceLogoutAtMs
+		}
+
+		if (action === "force_password_reset") {
+			passwordResetRequired = true
+			nextRestrictions.passwordResetRequired = true
+			nextRestrictions.passwordResetRequestedAtMs = nowMs
+			nextClaims.passwordResetRequired = true
+			nextClaims.passwordResetRequiredAtMs = nowMs
+		}
+
+		if (action === "clear_restrictions") {
+			blockedUntilMs = 0
+			forceLogoutAtMs = 0
+			passwordResetRequired = false
+			nextRestrictions.blockedUntilMs = 0
+			nextRestrictions.blockReason = ""
+			nextRestrictions.forceLogoutAtMs = 0
+			nextRestrictions.passwordResetRequired = false
+			nextRestrictions.passwordResetRequestedAtMs = 0
+			nextRestrictions.clearedAt = nowTs
+			nextRestrictions.clearedBy = adminEmail
+
+			nextClaims.accountBlockedUntilMs = 0
+			nextClaims.forceLogoutAfterMs = 0
+			nextClaims.passwordResetRequired = false
+			nextClaims.passwordResetRequiredAtMs = 0
+		}
+
+		await userRef.set(
+			{
+				email: targetEmail,
+				securityRestrictions: nextRestrictions,
+				updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+			},
+			{ merge: true },
+		)
+
+		await admin.auth().setCustomUserClaims(targetUid, nextClaims)
+		await admin.auth().revokeRefreshTokens(targetUid)
+
+		await admin
+			.firestore()
+			.collection("adminSecurityActions")
+			.add({
+				action,
+				targetUid,
+				targetEmail,
+				blockedUntilMs: blockedUntilMs || null,
+				forceLogoutAtMs: forceLogoutAtMs || null,
+				passwordResetRequired,
+				performedBy: adminEmail,
+				createdAt: admin.firestore.FieldValue.serverTimestamp(),
+			})
+
+		return {
+			ok: true,
+			action,
+			targetUid,
+			targetEmail,
+			blockedUntilMs,
+			forceLogoutAtMs,
+			passwordResetRequired,
+		}
 	},
 )
 
