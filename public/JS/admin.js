@@ -1072,7 +1072,9 @@ function updateAdminSecurityWidgets() {
 	const anonymousIdentities = new Set()
 	todayActivities.forEach((item) => {
 		if (item.methodKey !== "anonymous") return
-		const key = String(item.uid || item.attemptedEmail || item.email || item.id || "")
+		const key = String(
+			item.uid || item.attemptedEmail || item.email || item.id || "",
+		)
 			.trim()
 			.toLowerCase()
 		if (key) anonymousIdentities.add(key)
@@ -1132,7 +1134,8 @@ function updateAdminSecurityWidgets() {
 	setCount("adminSecurityWidgetGoogleSignIns", googleSignInCount)
 	setCount("adminSecurityWidgetEmailSignIns", emailSignInCount)
 
-	const failureRate = totalLoginsToday > 0 ? failedLoginAttempts / totalLoginsToday : 0
+	const failureRate =
+		totalLoginsToday > 0 ? failedLoginAttempts / totalLoginsToday : 0
 	const anonymousShare =
 		totalLoginsToday > 0 ? anonymousIdentities.size / totalLoginsToday : 0
 
@@ -1553,6 +1556,16 @@ function renderAdminSessions(docs = []) {
 		onlineSessionsEl.textContent = String(onlineSessions.length)
 	if (multiDeviceEl) multiDeviceEl.textContent = String(multiDeviceUsers)
 
+	const shouldEnableVerticalScroll = sorted.length > 4
+	mount.classList.toggle(
+		"is-vertical-scroll-active",
+		shouldEnableVerticalScroll,
+	)
+	mount.setAttribute(
+		"data-scroll-active",
+		shouldEnableVerticalScroll ? "true" : "false",
+	)
+
 	if (!sorted.length) {
 		mount.innerHTML =
 			'<div class="admin-empty-state">No active session data yet. User sessions will appear here in realtime.</div>'
@@ -1707,6 +1720,16 @@ function renderAdminSecurityAlerts(docs = []) {
 	if (openEl) openEl.textContent = String(openCount)
 	if (highEl) highEl.textContent = String(highCount)
 
+	const shouldEnableVerticalScroll = sorted.length > 4
+	mount.classList.toggle(
+		"is-vertical-scroll-active",
+		shouldEnableVerticalScroll,
+	)
+	mount.setAttribute(
+		"data-scroll-active",
+		shouldEnableVerticalScroll ? "true" : "false",
+	)
+
 	if (!sorted.length) {
 		mount.innerHTML =
 			'<div class="admin-empty-state">No security alerts yet. Alerts will appear here in realtime.</div>'
@@ -1821,6 +1844,16 @@ function renderAdminAccountHistory(docs = []) {
 
 	const totalEl = document.getElementById("adminAccountHistoryTotalCount")
 	if (totalEl) totalEl.textContent = String(sorted.length)
+
+	const shouldEnableVerticalScroll = sorted.length > 4
+	mount.classList.toggle(
+		"is-vertical-scroll-active",
+		shouldEnableVerticalScroll,
+	)
+	mount.setAttribute(
+		"data-scroll-active",
+		shouldEnableVerticalScroll ? "true" : "false",
+	)
 
 	if (!sorted.length) {
 		mount.innerHTML =
@@ -1972,6 +2005,16 @@ function renderAdminTimeline(docs = []) {
 
 	const totalEl = document.getElementById("adminTimelineTotalCount")
 	if (totalEl) totalEl.textContent = String(sorted.length)
+
+	const shouldEnableVerticalScroll = sorted.length > 4
+	mount.classList.toggle(
+		"is-vertical-scroll-active",
+		shouldEnableVerticalScroll,
+	)
+	mount.setAttribute(
+		"data-scroll-active",
+		shouldEnableVerticalScroll ? "true" : "false",
+	)
 
 	if (!sorted.length) {
 		mount.innerHTML =
