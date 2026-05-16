@@ -3847,6 +3847,36 @@ h6 {
     margin-bottom: 12px;
 }
 
+.admin-security-controls {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.admin-security-controls-row {
+    justify-content: flex-start;
+}
+
+.admin-security-field-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
+.admin-security-controls-row:first-child {
+    flex-wrap: nowrap;
+}
+
+.admin-security-controls .admin-review-sort-select,
+.admin-security-controls input.admin-review-sort-select {
+    min-width: 170px;
+}
+
+.admin-security-controls .btn {
+    min-height: 40px;
+}
+
 .reviews-sort-label,
 .admin-review-list-head label {
     color: var(--text-secondary);
@@ -3988,6 +4018,15 @@ h6 {
     .admin-review-sort-select {
         width: 100%;
         min-width: 0;
+    }
+
+    .admin-security-controls .btn {
+        width: 100%;
+    }
+
+    .admin-security-field-group,
+    .admin-security-controls-row:first-child {
+        flex-wrap: wrap;
     }
 
     .gallery-grid {

@@ -953,27 +953,144 @@
 						</p>
 						<br />
 
-						<div class="admin-review-list-head">
-							<label for="adminSecuritySortSelect">Sort Activity:</label>
-							<select
-								id="adminSecuritySortSelect"
-								class="admin-review-sort-select"
-							>
-								<option value="newest">Newest</option>
-								<option value="oldest">Oldest</option>
-								<option value="failed-first">Failed First</option>
-								<option value="suspicious-first">Suspicious First</option>
-							</select>
-							<label for="adminSecurityRiskFilterSelect">Risk Filter:</label>
-							<select
-								id="adminSecurityRiskFilterSelect"
-								class="admin-review-sort-select"
-							>
-								<option value="all">All Risks</option>
-								<option value="high">High</option>
-								<option value="medium">Medium</option>
-								<option value="low">Low</option>
-							</select>
+						<div class="admin-security-controls">
+							<div class="admin-review-list-head admin-security-controls-row">
+								<div class="admin-security-field-group">
+									<label for="adminSecuritySortSelect">Sort Activity:</label>
+									<select
+										id="adminSecuritySortSelect"
+										class="admin-review-sort-select"
+									>
+										<option value="newest">Newest</option>
+										<option value="oldest">Oldest</option>
+										<option value="failed-first">Failed First</option>
+										<option value="suspicious-first">Suspicious First</option>
+									</select>
+								</div>
+
+								<div class="admin-security-field-group">
+									<label for="adminSecurityProviderFilterSelect"
+										>Sign-in Provider:</label
+									>
+									<select
+										id="adminSecurityProviderFilterSelect"
+										class="admin-review-sort-select"
+									>
+										<option value="all">All Providers</option>
+										<option value="google">Google</option>
+										<option value="email/password">Email/Password</option>
+										<option value="anonymous">Anonymous</option>
+										<option value="unknown">Unknown</option>
+									</select>
+								</div>
+							</div>
+
+							<div class="admin-review-list-head admin-security-controls-row">
+								<label for="adminSecurityRiskFilterSelect">Risk Filter:</label>
+								<select
+									id="adminSecurityRiskFilterSelect"
+									class="admin-review-sort-select"
+								>
+									<option value="all">All Risks</option>
+									<option value="high">High</option>
+									<option value="medium">Medium</option>
+									<option value="low">Low</option>
+								</select>
+
+								<label for="adminSecurityDateFilter">Date:</label>
+								<input
+									type="date"
+									id="adminSecurityDateFilter"
+									class="admin-review-sort-select"
+								/>
+
+								<label for="adminSecurityDateFromFilter">From:</label>
+								<input
+									type="date"
+									id="adminSecurityDateFromFilter"
+									class="admin-review-sort-select"
+								/>
+
+								<label for="adminSecurityDateToFilter">To:</label>
+								<input
+									type="date"
+									id="adminSecurityDateToFilter"
+									class="admin-review-sort-select"
+								/>
+
+								<label for="adminSecurityDeviceFilterSelect">Device:</label>
+								<select
+									id="adminSecurityDeviceFilterSelect"
+									class="admin-review-sort-select"
+								>
+									<option value="all">All Devices</option>
+									<option value="desktop">Desktop</option>
+									<option value="mobile">Mobile</option>
+									<option value="tablet">Tablet</option>
+									<option value="unknown">Unknown</option>
+								</select>
+
+								<label for="adminSecurityUserFilterSelect">User:</label>
+								<select
+									id="adminSecurityUserFilterSelect"
+									class="admin-review-sort-select"
+								>
+									<option value="all">All Users</option>
+									<option value="known-user">Known Users</option>
+									<option value="anonymous">Anonymous</option>
+								</select>
+
+								<label for="adminSecurityCountryFilterInput">Country:</label>
+								<input
+									type="text"
+									id="adminSecurityCountryFilterInput"
+									class="admin-review-sort-select"
+									placeholder="e.g. Kenya"
+								/>
+
+								<label for="adminSecurityStatusFilterSelect"
+									>Login Status:</label
+								>
+								<select
+									id="adminSecurityStatusFilterSelect"
+									class="admin-review-sort-select"
+								>
+									<option value="all">All Statuses</option>
+									<option value="success">Successful Logins</option>
+									<option value="failure">Failed Logins</option>
+								</select>
+							</div>
+
+							<div class="admin-review-list-head admin-security-controls-row">
+								<label for="adminSecuritySearchInput">Search:</label>
+								<input
+									type="search"
+									id="adminSecuritySearchInput"
+									class="admin-review-sort-select"
+									placeholder="Email, Username, or Booking ID"
+								/>
+								<button
+									type="button"
+									class="btn btn-outline"
+									id="adminSecurityExportCsvBtn"
+								>
+									Export CSV
+								</button>
+								<button
+									type="button"
+									class="btn btn-outline"
+									id="adminSecurityExportExcelBtn"
+								>
+									Export Excel
+								</button>
+								<button
+									type="button"
+									class="btn btn-outline"
+									id="adminSecurityClearFiltersBtn"
+								>
+									Clear All Filters
+								</button>
+							</div>
 						</div>
 
 						<div

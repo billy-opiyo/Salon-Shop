@@ -216,7 +216,7 @@ This project is built to:
 
 - Firebase admin login + allowed email guard
 - Password visibility toggle
-- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages**
+- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages, Security**
 - Confirmation modal for destructive actions
 
 ### Bookings + Schedule
@@ -249,6 +249,36 @@ This project is built to:
 - Sort modes (newest/oldest/status/name)
 - Status transitions: `new`, `read`, `resolved`
 
+### Security
+
+- Dedicated **Security** tab in admin console with realtime monitoring blocks for:
+  - Login activity (`loginActivities`)
+  - Session tracking (`collectionGroup("sessions")`)
+  - Security alerts (`securityAlerts`)
+  - Account change history (`accountChangeHistory`)
+  - User behavior timeline (`activityTimeline`)
+- Security counters/widgets:
+  - Total/success/failed logins
+  - Suspicious events, locked accounts, repeated wrong passwords, high-risk logins
+  - Online users + online sessions + multi-device user detection
+  - Daily KPI widgets (today logins, failed attempts, new registrations, returning users, provider mix)
+- Advanced login activity controls:
+  - Sort: newest, oldest, failed-first, suspicious-first
+  - Filters: risk, date, date range, provider, device, known/anonymous user, country, status
+  - Search by email/username/booking ID
+  - Export visible rows to CSV/Excel
+  - Clear all filters action
+- Risk and anomaly model surfaced in UI:
+  - Risk level (`low` / `medium` / `high`) with score and trust score
+  - Repeated failures, rapid repeated logins, new device/browser, country-change anomalies
+  - Temporary lock indicators from backend (`lockUntil`, failed-attempt windows)
+- Inline admin incident response actions (per linked user):
+  - **Temp Block** (`temporary_block`)
+  - **Force Logout** (`force_logout`)
+  - **Force Password Reset** (`force_password_reset`)
+  - **Clear Restrictions** (`clear_restrictions`)
+  - Backed by callable function `adminRestrictUserAccount`
+
 ---
 
 ## 9. Firestore Data Model
@@ -278,6 +308,13 @@ Core behavior:
 - Public reads only where intended (`galleryStyles`, `blogs`, approved reviews, slot availability)
 - Waitlist create/read/update constraints added
 - Internal `rateLimits` collection is not client-readable/writeable
+- Security collections are server-written only (no direct client create/update/delete):
+  - `loginActivities`
+  - `securityAlerts`
+  - `accountChangeHistory`
+  - `activityTimeline`
+- Admin-only security reads are enforced for dashboard monitoring collections.
+- Session monitoring rules support admin `collectionGroup("sessions")` reads.
 
 ---
 
@@ -292,6 +329,9 @@ File: `functions/index.js`
 - `updateReviewRateLimit` (on review create)
 - `updateContactRateLimit` (on contact create)
 - `notifyWaitlistOnSlotOpen` (on booking slot deletion)
+- `logLoginActivity` (callable login telemetry + risk/scoring + alert triggers)
+- `logAccountSecurityChange` (callable account security-change audit + optional alert)
+- `adminRestrictUserAccount` (callable admin security actions: block/logout/reset/clear)
 
 Required function secrets include:
 
@@ -465,6 +505,148 @@ Expected: successful execution logs for:
 - `sendBookingConfirmationWhatsApp`
 - `sendUpcomingBookingWhatsAppReminders`
 - `notifyWaitlistOnSlotOpen`
+
+### I) Security tab testing procedure (all Security features)
+
+Use this procedure to validate the full **Admin → Security** module end-to-end.
+
+#### 0) Prerequisites
+
+1. Deploy latest Firestore rules and functions:
+   - `firebase deploy --only firestore:rules`
+   - `firebase deploy --only functions`
+2. Sign in as an allowed admin user in `admin.html`.
+3. Keep Firestore Console open for these collections:
+   - `loginActivities`
+   - `securityAlerts`
+   - `accountChangeHistory`
+   - `activityTimeline`
+   - `adminSecurityActions`
+   - `users/{uid}` (for `securityRestrictions` updates)
+
+#### 1) Open Security tab + validate realtime counters/widgets
+
+1. In admin panel, open **Security** tab.
+2. Confirm Security cards render (not empty/broken) for:
+   - total/success/failed/suspicious/locked/repeated wrong/high-risk
+   - online users/sessions/multi-device
+   - alerts/account changes/timeline totals
+3. Expected:
+   - Values update automatically when new activity is logged.
+   - No permission errors shown in the Security message areas.
+
+#### 2) Generate login activity test data
+
+1. From one or more browser sessions/devices, perform:
+   - Successful login(s)
+   - Failed login attempts (wrong password)
+2. Include mixed providers if available (email/password, anonymous, Google).
+3. Expected:
+   - New docs appear in `loginActivities`.
+   - Security table updates in realtime.
+   - Failed attempts increase failed counters.
+   - Suspicious/risk flags appear when thresholds are reached.
+
+#### 3) Verify risk analysis and lock behavior
+
+1. Trigger repeated failed attempts within short windows.
+2. Confirm rows show:
+   - `failedAttemptsIn5m` / `failedAttemptsIn15m`
+   - `accountLockTriggered` / active lock state and lock-until timestamp
+   - risk level/score and trust score
+3. Expected:
+   - Suspicious flags such as `repeated_failures`, `rapid_repeated_logins`, or lock indicators appear.
+   - High-risk counters increment accordingly.
+
+#### 4) Test sorting, filtering, search, and badge behavior
+
+1. Test **Sort Activity** options: Newest, Oldest, Failed First, Suspicious First.
+2. Apply filters one-by-one and in combination:
+   - Risk, Provider, Date, From/To, Device, User type, Country, Status
+3. Use search input with known email/username/booking id fragments.
+4. Click **Clear All Filters**.
+5. Expected:
+   - Visible rows match selected criteria.
+   - Risk filter badge reflects selected risk scope.
+   - Clear resets controls and returns full visible list.
+
+#### 5) Test export features (CSV + Excel)
+
+1. With filtered results visible, click **Export CSV**.
+2. Click **Export Excel**.
+3. Open downloaded files and verify columns include status/risk/attempt windows/lock state and metadata.
+4. Expected:
+   - Files download successfully.
+   - Export respects current filtered visible rows.
+   - If no rows are visible, UI shows a "no logs to export" error message.
+
+#### 6) Test per-user security response actions
+
+From any activity row linked to a known user (`uid` present), run each action:
+
+1. **Temp Block**
+   - Enter block duration (e.g., 15 minutes) and confirm.
+   - Expected:
+     - Success message appears.
+     - `users/{uid}.securityRestrictions.blockedUntilMs` updated.
+     - `adminSecurityActions` logs action.
+2. **Force Logout**
+   - Confirm action.
+   - Expected:
+     - Success message appears.
+     - Claims/refresh tokens are revoked by backend.
+     - Action logged in `adminSecurityActions`.
+3. **Force Password Reset**
+   - Confirm action.
+   - Expected:
+     - `passwordResetRequired` flags set in user restrictions/claims.
+     - Action logged.
+4. **Clear Restrictions**
+   - Confirm action.
+   - Expected:
+     - Restriction flags/claims reset to neutral values.
+     - `clearedAt/clearedBy` recorded.
+
+#### 7) Validate session tracking table
+
+1. Keep one user signed in from multiple devices/tabs if possible.
+2. In Security tab, use **Sort Sessions** modes:
+   - Online First
+   - Last Active (Newest)
+   - Longest Session
+   - Multi-Device First
+3. Expected:
+   - Session rows update in realtime.
+   - Online and multi-device counters reflect active test state.
+
+#### 8) Validate security alerts feed
+
+1. Trigger scenarios that create alerts (repeated failures/new device/unusual country or account security changes).
+2. Check `securityAlerts` collection and Security Alerts table.
+3. Test **Sort Alerts** modes: Newest, Oldest, High Severity First, Open First.
+4. Expected:
+   - Alerts appear with correct severity/status metadata.
+   - Open/high counters update.
+
+#### 9) Validate account changes and timeline feeds
+
+1. Perform account events (e.g., password/email change from user side).
+2. Confirm `accountChangeHistory` receives entries.
+3. Confirm timeline actions appear in `activityTimeline`.
+4. Test sort controls:
+   - Account Changes: Newest, Oldest, Critical First, Change Type
+   - Timeline: Newest, Oldest, Bookings First, Reviews First, Contact First
+5. Expected:
+   - Both tables refresh in realtime and counts update correctly.
+
+#### 10) Permission/security regression check
+
+1. Sign out admin or use non-admin account.
+2. Attempt to access Security data.
+3. Expected:
+   - Firestore rules prevent unauthorized reads for admin-only security collections.
+   - No client can directly create/update/delete `loginActivities`, `securityAlerts`, `accountChangeHistory`, or `activityTimeline`.
+   - Only callable backend paths write these security records.
 
 ---
 

@@ -31,6 +31,15 @@ let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
 let adminSecuritySortMode = "newest"
 let adminSecurityRiskFilter = "all"
+let adminSecurityDateFilter = ""
+let adminSecurityDateFromFilter = ""
+let adminSecurityDateToFilter = ""
+let adminSecurityDeviceFilter = "all"
+let adminSecurityProviderFilter = "all"
+let adminSecurityUserFilter = "all"
+let adminSecurityCountryFilter = ""
+let adminSecurityStatusFilter = "all"
+let adminSecuritySearchTerm = ""
 let adminSessionsSortMode = "online-first"
 let adminSecurityAlertsSortMode = "newest"
 let adminAccountHistorySortMode = "newest"
@@ -42,6 +51,7 @@ let adminAccountHistoryDocs = []
 let adminTimelineDocs = []
 let adminSecurityRawDocs = []
 let adminUserDocs = []
+let adminSecurityVisibleRows = []
 let adminGalleryPreviewObjectUrl = ""
 const ADMIN_SCHEDULE_VIEWS = {
 	day: "day",
@@ -1259,6 +1269,288 @@ function applyAdminSecurityRiskFilter(items = [], riskFilter = "all") {
 	)
 }
 
+function applyAdminSecurityAdvancedFilters(items = []) {
+	const dateFilter = String(adminSecurityDateFilter || "").trim()
+	const dateFromFilter = String(adminSecurityDateFromFilter || "").trim()
+	const dateToFilter = String(adminSecurityDateToFilter || "").trim()
+	const deviceFilter = String(adminSecurityDeviceFilter || "all")
+		.trim()
+		.toLowerCase()
+	const providerFilter = String(adminSecurityProviderFilter || "all")
+		.trim()
+		.toLowerCase()
+	const userFilter = String(adminSecurityUserFilter || "all")
+		.trim()
+		.toLowerCase()
+	const countryFilter = String(adminSecurityCountryFilter || "")
+		.trim()
+		.toLowerCase()
+	const statusFilter = String(adminSecurityStatusFilter || "all")
+		.trim()
+		.toLowerCase()
+	const searchTerm = String(adminSecuritySearchTerm || "")
+		.trim()
+		.toLowerCase()
+
+	if (
+		!dateFilter &&
+		!dateFromFilter &&
+		!dateToFilter &&
+		deviceFilter === "all" &&
+		providerFilter === "all" &&
+		userFilter === "all" &&
+		!countryFilter &&
+		statusFilter === "all" &&
+		!searchTerm
+	) {
+		return [...items]
+	}
+
+	return items.filter((item) => {
+		const createdAtMs = toTimestampMs(item.createdAt)
+		const createdAtDateKey = createdAtMs
+			? formatAdminDateKey(new Date(createdAtMs))
+			: ""
+
+		if (dateFilter && createdAtDateKey !== dateFilter) return false
+		if (dateFromFilter && (!createdAtDateKey || createdAtDateKey < dateFromFilter)) {
+			return false
+		}
+		if (dateToFilter && (!createdAtDateKey || createdAtDateKey > dateToFilter)) {
+			return false
+		}
+
+		if (deviceFilter !== "all") {
+			const itemDevice = String(item.deviceType || "unknown")
+				.trim()
+				.toLowerCase()
+			if (itemDevice !== deviceFilter) return false
+		}
+
+		if (providerFilter !== "all") {
+			const itemProvider = String(item.methodKey || "unknown")
+				.trim()
+				.toLowerCase()
+			if (itemProvider !== providerFilter) return false
+		}
+
+		if (userFilter === "anonymous") {
+			if (String(item.methodKey || "").toLowerCase() !== "anonymous") {
+				return false
+			}
+		}
+		if (userFilter === "known-user") {
+			const isAnonymous =
+				String(item.methodKey || "").toLowerCase() === "anonymous"
+			if (isAnonymous) return false
+		}
+
+		if (countryFilter) {
+			const locationText = String(item.locationLabel || "").toLowerCase()
+			if (!locationText.includes(countryFilter)) return false
+		}
+
+		if (statusFilter === "success" && item.status !== "success") return false
+		if (statusFilter === "failure" && item.status !== "failure") return false
+
+		if (searchTerm) {
+			const searchableText = [
+				item.email,
+				item.attemptedEmail,
+				item.displayName,
+				item.uid,
+				item.id,
+			]
+				.map((value) => String(value || "").toLowerCase())
+				.join(" ")
+			if (!searchableText.includes(searchTerm)) return false
+		}
+
+		return true
+	})
+}
+
+function downloadAdminSecurityExportFile(content, filename, mimeType) {
+	const blob = new Blob([content], { type: mimeType })
+	const url = URL.createObjectURL(blob)
+	const anchor = document.createElement("a")
+	anchor.href = url
+	anchor.download = filename
+	document.body.appendChild(anchor)
+	anchor.click()
+	anchor.remove()
+	URL.revokeObjectURL(url)
+}
+
+function escapeAdminSecurityExportCell(value = "") {
+	const text = String(value ?? "")
+	if (/[",\n]/.test(text)) {
+		return `"${text.replace(/"/g, '""')}"`
+	}
+	return text
+}
+
+function exportAdminSecurityLogsAsCSV() {
+	const rows = Array.isArray(adminSecurityVisibleRows)
+		? adminSecurityVisibleRows
+		: []
+	if (!rows.length) {
+		setAdminMessage(
+			"error",
+			"❌ No security logs available to export with current filters.",
+			"adminSecurityEventsMessage",
+		)
+		return
+	}
+
+	const headers = [
+		"Timestamp",
+		"User",
+		"Email",
+		"UID",
+		"Method",
+		"Device",
+		"Browser",
+		"Country",
+		"Location",
+		"Status",
+		"Risk Level",
+		"Risk Score",
+		"Trust Score",
+		"Failed Attempts 5m",
+		"Failed Attempts 15m",
+		"Lock Active",
+		"Booking ID",
+	]
+
+	const lines = [headers.map(escapeAdminSecurityExportCell).join(",")]
+
+	rows.forEach((item) => {
+		const values = [
+			formatAdminDate(item.createdAt),
+			item.displayName || "",
+			item.email || item.attemptedEmail || "",
+			item.uid || "",
+			item.method || "",
+			item.deviceType || "",
+			item.browser || "",
+			String(item.locationLabel || "").split(",").pop()?.trim() || "",
+			item.locationLabel || "",
+			item.status || "",
+			item.riskLevel || "",
+			item.riskScore || 0,
+			item.trustScore || 0,
+			item.failedAttemptsIn5m || 0,
+			item.failedAttemptsIn15m || 0,
+			item.lockActive ? "Yes" : "No",
+			item.id || "",
+		]
+
+		lines.push(values.map(escapeAdminSecurityExportCell).join(","))
+	})
+
+	const dateTag = formatAdminDateKey(new Date()) || "export"
+	downloadAdminSecurityExportFile(
+		`${lines.join("\n")}`,
+		`security-logs-${dateTag}.csv`,
+		"text/csv;charset=utf-8;",
+	)
+
+	setAdminMessage(
+		"success",
+		"✅ Security logs exported as CSV.",
+		"adminSecurityEventsMessage",
+	)
+}
+
+function exportAdminSecurityLogsAsExcel() {
+	const rows = Array.isArray(adminSecurityVisibleRows)
+		? adminSecurityVisibleRows
+		: []
+	if (!rows.length) {
+		setAdminMessage(
+			"error",
+			"❌ No security logs available to export with current filters.",
+			"adminSecurityEventsMessage",
+		)
+		return
+	}
+
+	const headers = [
+		"Timestamp",
+		"User",
+		"Email",
+		"UID",
+		"Method",
+		"Device",
+		"Browser",
+		"Country",
+		"Location",
+		"Status",
+		"Risk Level",
+		"Risk Score",
+		"Trust Score",
+		"Failed Attempts 5m",
+		"Failed Attempts 15m",
+		"Lock Active",
+		"Booking ID",
+	]
+
+	const tableRows = rows
+		.map((item) => {
+			const values = [
+				formatAdminDate(item.createdAt),
+				item.displayName || "",
+				item.email || item.attemptedEmail || "",
+				item.uid || "",
+				item.method || "",
+				item.deviceType || "",
+				item.browser || "",
+				String(item.locationLabel || "").split(",").pop()?.trim() || "",
+				item.locationLabel || "",
+				item.status || "",
+				item.riskLevel || "",
+				item.riskScore || 0,
+				item.trustScore || 0,
+				item.failedAttemptsIn5m || 0,
+				item.failedAttemptsIn15m || 0,
+				item.lockActive ? "Yes" : "No",
+				item.id || "",
+			]
+
+			return `<tr>${values
+				.map((value) => `<td>${escapeHtml(value)}</td>`)
+				.join("")}</tr>`
+		})
+		.join("")
+
+	const excelHtml = `
+<html>
+<head>
+<meta charset="UTF-8" />
+</head>
+<body>
+<table border="1">
+<thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+<tbody>${tableRows}</tbody>
+</table>
+</body>
+</html>`
+
+	const dateTag = formatAdminDateKey(new Date()) || "export"
+	downloadAdminSecurityExportFile(
+		excelHtml,
+		`security-logs-${dateTag}.xls`,
+		"application/vnd.ms-excel;charset=utf-8;",
+	)
+
+	setAdminMessage(
+		"success",
+		"✅ Security logs exported as Excel.",
+		"adminSecurityEventsMessage",
+	)
+}
+
 function getAdminRiskFilterBadgeText(riskFilter = "all") {
 	const mode = String(riskFilter || "all")
 		.trim()
@@ -1293,10 +1585,12 @@ function renderAdminSecurityActivities(docs = []) {
 	adminSecurityRawDocs = normalized
 	const sorted = sortAdminSecurityActivities(normalized, adminSecuritySortMode)
 	adminSecurityDocs = sorted
-	const visibleRows = applyAdminSecurityRiskFilter(
+	const riskFilteredRows = applyAdminSecurityRiskFilter(
 		sorted,
 		adminSecurityRiskFilter,
 	)
+	const visibleRows = applyAdminSecurityAdvancedFilters(riskFilteredRows)
+	adminSecurityVisibleRows = visibleRows
 	renderAdminRiskFilterBadge(adminSecurityRiskFilter)
 
 	const total = sorted.length
@@ -3822,6 +4116,40 @@ function initializeAdminPanel() {
 	const securityRiskFilterSelect = document.getElementById(
 		"adminSecurityRiskFilterSelect",
 	)
+	const securityDateFilterInput = document.getElementById(
+		"adminSecurityDateFilter",
+	)
+	const securityDateFromFilterInput = document.getElementById(
+		"adminSecurityDateFromFilter",
+	)
+	const securityDateToFilterInput = document.getElementById(
+		"adminSecurityDateToFilter",
+	)
+	const securityDeviceFilterSelect = document.getElementById(
+		"adminSecurityDeviceFilterSelect",
+	)
+	const securityProviderFilterSelect = document.getElementById(
+		"adminSecurityProviderFilterSelect",
+	)
+	const securityUserFilterSelect = document.getElementById(
+		"adminSecurityUserFilterSelect",
+	)
+	const securityCountryFilterInput = document.getElementById(
+		"adminSecurityCountryFilterInput",
+	)
+	const securityStatusFilterSelect = document.getElementById(
+		"adminSecurityStatusFilterSelect",
+	)
+	const securitySearchInput = document.getElementById("adminSecuritySearchInput")
+	const securityExportCsvBtn = document.getElementById(
+		"adminSecurityExportCsvBtn",
+	)
+	const securityExportExcelBtn = document.getElementById(
+		"adminSecurityExportExcelBtn",
+	)
+	const securityClearFiltersBtn = document.getElementById(
+		"adminSecurityClearFiltersBtn",
+	)
 	const securityAlertsSortSelect = document.getElementById(
 		"adminSecurityAlertsSortSelect",
 	)
@@ -4328,6 +4656,123 @@ function initializeAdminPanel() {
 		securityRiskFilterSelect.addEventListener("change", (event) => {
 			adminSecurityRiskFilter = event.target.value || "all"
 			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityDateFilterInput) {
+		securityDateFilterInput.value = adminSecurityDateFilter
+		securityDateFilterInput.addEventListener("change", (event) => {
+			adminSecurityDateFilter = String(event.target.value || "").trim()
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityDateFromFilterInput) {
+		securityDateFromFilterInput.value = adminSecurityDateFromFilter
+		securityDateFromFilterInput.addEventListener("change", (event) => {
+			adminSecurityDateFromFilter = String(event.target.value || "").trim()
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityDateToFilterInput) {
+		securityDateToFilterInput.value = adminSecurityDateToFilter
+		securityDateToFilterInput.addEventListener("change", (event) => {
+			adminSecurityDateToFilter = String(event.target.value || "").trim()
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityDeviceFilterSelect) {
+		securityDeviceFilterSelect.value = adminSecurityDeviceFilter
+		securityDeviceFilterSelect.addEventListener("change", (event) => {
+			adminSecurityDeviceFilter = event.target.value || "all"
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityProviderFilterSelect) {
+		securityProviderFilterSelect.value = adminSecurityProviderFilter
+		securityProviderFilterSelect.addEventListener("change", (event) => {
+			adminSecurityProviderFilter = event.target.value || "all"
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityUserFilterSelect) {
+		securityUserFilterSelect.value = adminSecurityUserFilter
+		securityUserFilterSelect.addEventListener("change", (event) => {
+			adminSecurityUserFilter = event.target.value || "all"
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityCountryFilterInput) {
+		securityCountryFilterInput.value = adminSecurityCountryFilter
+		securityCountryFilterInput.addEventListener("input", (event) => {
+			adminSecurityCountryFilter = String(event.target.value || "").trim()
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityStatusFilterSelect) {
+		securityStatusFilterSelect.value = adminSecurityStatusFilter
+		securityStatusFilterSelect.addEventListener("change", (event) => {
+			adminSecurityStatusFilter = event.target.value || "all"
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securitySearchInput) {
+		securitySearchInput.value = adminSecuritySearchTerm
+		securitySearchInput.addEventListener("input", (event) => {
+			adminSecuritySearchTerm = String(event.target.value || "").trim()
+			renderAdminSecurityActivities(adminSecurityDocs)
+		})
+	}
+
+	if (securityExportCsvBtn) {
+		securityExportCsvBtn.addEventListener("click", () => {
+			exportAdminSecurityLogsAsCSV()
+		})
+	}
+
+	if (securityExportExcelBtn) {
+		securityExportExcelBtn.addEventListener("click", () => {
+			exportAdminSecurityLogsAsExcel()
+		})
+	}
+
+	if (securityClearFiltersBtn) {
+		securityClearFiltersBtn.addEventListener("click", () => {
+			adminSecurityRiskFilter = "all"
+			adminSecurityDateFilter = ""
+			adminSecurityDateFromFilter = ""
+			adminSecurityDateToFilter = ""
+			adminSecurityDeviceFilter = "all"
+			adminSecurityProviderFilter = "all"
+			adminSecurityUserFilter = "all"
+			adminSecurityCountryFilter = ""
+			adminSecurityStatusFilter = "all"
+			adminSecuritySearchTerm = ""
+
+			if (securityRiskFilterSelect) securityRiskFilterSelect.value = "all"
+			if (securityDateFilterInput) securityDateFilterInput.value = ""
+			if (securityDateFromFilterInput) securityDateFromFilterInput.value = ""
+			if (securityDateToFilterInput) securityDateToFilterInput.value = ""
+			if (securityDeviceFilterSelect) securityDeviceFilterSelect.value = "all"
+			if (securityProviderFilterSelect) securityProviderFilterSelect.value = "all"
+			if (securityUserFilterSelect) securityUserFilterSelect.value = "all"
+			if (securityCountryFilterInput) securityCountryFilterInput.value = ""
+			if (securityStatusFilterSelect) securityStatusFilterSelect.value = "all"
+			if (securitySearchInput) securitySearchInput.value = ""
+
+			renderAdminSecurityActivities(adminSecurityDocs)
+			setAdminMessage(
+				"success",
+				"✅ Security filters cleared.",
+				"adminSecurityEventsMessage",
+			)
 		})
 	}
 
