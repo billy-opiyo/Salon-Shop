@@ -54,6 +54,7 @@ let adminSecurityRawDocs = []
 let adminUserDocs = []
 let adminSecurityVisibleRows = []
 let adminGalleryPreviewObjectUrl = ""
+let activeAdminGalleryServiceCategory = "hair-services"
 const ADMIN_SCHEDULE_VIEWS = {
 	day: "day",
 	week: "week",
@@ -80,6 +81,21 @@ const ADMIN_SERVICE_CATEGORY_DEFINITIONS = [
 	{ key: "eyebrow-lash-services", label: "Eyebrow & Lash Services" },
 	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
 ]
+const ADMIN_GALLERY_SERVICE_FILTER_DEFINITIONS = [
+	{ key: "hair-services", label: "Braids" },
+	{ key: "beauty-spa-services", label: "Beauty Spa" },
+	{ key: "nail-services", label: "Nails" },
+	{ key: "makeup-services", label: "Makeup" },
+	{ key: "barber-services", label: "Barber" },
+	{ key: "eyebrow-lash-services", label: "Eyebrows & Lash" },
+	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
+]
+const ADMIN_GALLERY_SERVICE_LABEL_MAP = Object.fromEntries(
+	ADMIN_GALLERY_SERVICE_FILTER_DEFINITIONS.map((item) => [
+		item.key,
+		item.label,
+	]),
+)
 const ADMIN_REVIEW_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 }
@@ -867,11 +883,11 @@ function renderAdminServiceCategorySettings() {
 	const inactiveCount = categories.length - activeCount
 
 	const renderCategoryCard = (item) => {
-			const switchId = `adminServiceCategory_${item.key}`
-			const stateText = item.enabled ? "Visible on website" : "Hidden on website"
-			const stateClass = item.enabled ? "is-visible" : "is-hidden"
+		const switchId = `adminServiceCategory_${item.key}`
+		const stateText = item.enabled ? "Visible on website" : "Hidden on website"
+		const stateClass = item.enabled ? "is-visible" : "is-hidden"
 
-			return `
+		return `
 				<article class="admin-service-category-card ${item.enabled ? "is-enabled" : "is-disabled"}">
 					<div class="admin-service-category-main">
 						<div class="admin-service-category-copy">
@@ -917,7 +933,8 @@ function renderAdminServiceCategorySettings() {
 					<p>These categories are visible on the live website and booking form.</p>
 				</header>
 				<div class="admin-service-settings-cards">${
-					activeCardsHtml || '<div class="admin-service-settings-empty">No active categories right now.</div>'
+					activeCardsHtml ||
+					'<div class="admin-service-settings-empty">No active categories right now.</div>'
 				}</div>
 			</section>
 			<section class="admin-service-settings-group is-inactive-group">
@@ -926,7 +943,8 @@ function renderAdminServiceCategorySettings() {
 					<p>These categories are hidden from public view until re-enabled.</p>
 				</header>
 				<div class="admin-service-settings-cards">${
-					inactiveCardsHtml || '<div class="admin-service-settings-empty">All categories are currently active.</div>'
+					inactiveCardsHtml ||
+					'<div class="admin-service-settings-empty">All categories are currently active.</div>'
 				}</div>
 			</section>
 		</div>
@@ -3148,6 +3166,10 @@ function galleryDocToViewModel(doc) {
 	return {
 		id: doc.id,
 		styleName: doc.styleName || "Untitled Style",
+		serviceName: doc.serviceName || doc.styleName || "",
+		serviceCategory: normalizeAdminGalleryServiceCategory(
+			doc.serviceCategory || "hair-services",
+		),
 		styleType: doc.styleType || "N/A",
 		length: doc.length || "N/A",
 		size: doc.size || "N/A",
@@ -3340,6 +3362,99 @@ function escapeHtml(value) {
 		.replace(/'/g, "&#39;")
 }
 
+function normalizeAdminGalleryServiceCategory(value = "") {
+	const normalized = String(value || "")
+		.trim()
+		.toLowerCase()
+	if (
+		ADMIN_GALLERY_SERVICE_FILTER_DEFINITIONS.some(
+			(item) => item.key === normalized,
+		)
+	) {
+		return normalized
+	}
+	return "hair-services"
+}
+
+function getAdminGalleryServiceLabel(categoryKey = "") {
+	const normalized = normalizeAdminGalleryServiceCategory(categoryKey)
+	return ADMIN_GALLERY_SERVICE_LABEL_MAP[normalized] || "Braids"
+}
+
+function updateAdminGalleryFeaturedLabels(categoryKey = "hair-services") {
+	const normalizedCategory = normalizeAdminGalleryServiceCategory(categoryKey)
+	const label = getAdminGalleryServiceLabel(normalizedCategory)
+	const trendingLabel = document.getElementById("galleryFeaturedTrendingLabel")
+	const mostBookedLabel = document.getElementById(
+		"galleryFeaturedMostBookedLabel",
+	)
+
+	if (trendingLabel) {
+		trendingLabel.textContent = `Trending ${label}`
+	}
+	if (mostBookedLabel) {
+		mostBookedLabel.textContent = `Most Booked ${label}`
+	}
+}
+
+function applyAdminGalleryServiceCategoryToForm(categoryKey = "hair-services") {
+	const normalizedCategory = normalizeAdminGalleryServiceCategory(categoryKey)
+	activeAdminGalleryServiceCategory = normalizedCategory
+
+	const hiddenCategory = document.getElementById("galleryServiceCategory")
+	if (hiddenCategory) {
+		hiddenCategory.value = normalizedCategory
+	}
+
+	const serviceNameInput = document.getElementById("galleryServiceName")
+	if (serviceNameInput) {
+		const serviceLabel = getAdminGalleryServiceLabel(normalizedCategory)
+		serviceNameInput.placeholder = `e.g. ${serviceLabel} Style`
+	}
+	updateAdminGalleryFeaturedLabels(normalizedCategory)
+
+	const filterButtons = document.querySelectorAll(
+		"#adminGalleryServiceFilters [data-admin-gallery-service]",
+	)
+	filterButtons.forEach((button) => {
+		const buttonKey = normalizeAdminGalleryServiceCategory(
+			button.dataset.adminGalleryService,
+		)
+		button.classList.toggle("active", buttonKey === normalizedCategory)
+	})
+
+	const isBraids = normalizedCategory === "hair-services"
+	const braidsOnlyFields = document.querySelectorAll(
+		"[data-braids-only='true']",
+	)
+	braidsOnlyFields.forEach((field) => {
+		field.style.display = isBraids ? "" : "none"
+		const controls = field.querySelectorAll("input, select, textarea")
+		controls.forEach((control) => {
+			const requiresForBraids = control.hasAttribute("required")
+			if (requiresForBraids) {
+				control.dataset.requiredWhenBraids = "true"
+			}
+			if (isBraids) {
+				if (control.dataset.requiredWhenBraids === "true") {
+					control.setAttribute("required", "required")
+				}
+			} else {
+				control.removeAttribute("required")
+				if (control.type === "checkbox") {
+					control.checked = false
+				} else if (control.tagName === "SELECT") {
+					control.value = ""
+				} else if (control.type !== "file") {
+					control.value = ""
+				}
+			}
+		})
+	})
+
+	updateGalleryPreview()
+}
+
 function setGalleryPreviewImage(src = "") {
 	const previewImage = document.getElementById("adminGalleryPreviewImage")
 	const placeholder = document.getElementById("adminGalleryPreviewPlaceholder")
@@ -3399,6 +3514,12 @@ function updateGalleryPreview() {
 		document.getElementById("galleryStyleName")?.value?.trim() || ""
 	const styleType =
 		document.getElementById("galleryStyleType")?.value?.trim() || ""
+	const serviceName =
+		document.getElementById("galleryServiceName")?.value?.trim() || ""
+	const serviceCategory = normalizeAdminGalleryServiceCategory(
+		document.getElementById("galleryServiceCategory")?.value ||
+			activeAdminGalleryServiceCategory,
+	)
 	const length = document.getElementById("galleryLength")?.value || ""
 	const size = document.getElementById("gallerySize")?.value || ""
 	const timeTaken =
@@ -3427,7 +3548,13 @@ function updateGalleryPreview() {
 	}
 
 	if (previewMeta) {
-		previewMeta.textContent = `${styleType || "Type"} • ${length || "Length"} • ${size || "Size"}`
+		const serviceLabel =
+			serviceName || getAdminGalleryServiceLabel(serviceCategory)
+		if (serviceCategory === "hair-services") {
+			previewMeta.textContent = `${serviceLabel} • ${styleType || "Type"} • ${length || "Length"} • ${size || "Size"}`
+		} else {
+			previewMeta.textContent = `${serviceLabel} • ${styleType || "Type"}`
+		}
 	}
 
 	if (previewDetails) {
@@ -3496,6 +3623,8 @@ function bindGalleryPreviewEvents() {
 	const ids = [
 		"galleryStyleName",
 		"galleryStyleType",
+		"galleryServiceName",
+		"galleryServiceCategory",
 		"galleryLength",
 		"gallerySize",
 		"galleryTimeTaken",
@@ -3527,6 +3656,8 @@ function resetGalleryForm() {
 
 	form.reset()
 	document.getElementById("galleryEditId").value = ""
+	document.getElementById("galleryServiceName").value = ""
+	applyAdminGalleryServiceCategoryToForm("hair-services")
 	document.getElementById("adminGalleryFormTitle").textContent =
 		"Add New Gallery Style"
 	document.getElementById("adminGallerySaveBtn").textContent =
@@ -3548,6 +3679,12 @@ function loadGalleryItemForEditing(id) {
 	document.getElementById("galleryEditId").value = item.id
 	document.getElementById("galleryStyleName").value = item.styleName || ""
 	document.getElementById("galleryStyleType").value = item.styleType || ""
+	document.getElementById("galleryServiceName").value =
+		item.serviceName || item.styleName || ""
+	const serviceCategory = normalizeAdminGalleryServiceCategory(
+		item.serviceCategory || "hair-services",
+	)
+	applyAdminGalleryServiceCategoryToForm(serviceCategory)
 	document.getElementById("galleryLength").value = item.length || ""
 	document.getElementById("gallerySize").value = item.size || ""
 	document.getElementById("galleryTimeTaken").value = item.timeTaken || ""
@@ -3622,7 +3759,7 @@ function renderAdminGallery(docs) {
         </div>
         <div class="admin-gallery-content">
           <h4>${item.styleName}</h4>
-          <p>${item.styleType} • ${item.length} • ${item.size}</p>
+          <p>${getAdminGalleryServiceLabel(item.serviceCategory)} • ${item.styleType}${item.serviceCategory === "hair-services" ? ` • ${item.length} • ${item.size}` : ""}</p>
           <p>Stylist: ${item.stylistName} • Time: ${item.timeTaken}</p>
           <div class="admin-gallery-tags">
             ${item.featuredTrending ? "<span>Trending</span>" : ""}
@@ -3675,6 +3812,10 @@ async function saveGalleryItem(event) {
 	const editId = document.getElementById("galleryEditId").value.trim()
 
 	const styleName = document.getElementById("galleryStyleName").value.trim()
+	const serviceName = document.getElementById("galleryServiceName").value.trim()
+	const serviceCategory = normalizeAdminGalleryServiceCategory(
+		document.getElementById("galleryServiceCategory").value,
+	)
 	const styleType = document.getElementById("galleryStyleType").value.trim()
 	const length = document.getElementById("galleryLength").value
 	const size = document.getElementById("gallerySize").value
@@ -3693,18 +3834,20 @@ async function saveGalleryItem(event) {
 	const beforeImageFile =
 		document.getElementById("galleryBeforeImage").files?.[0]
 
-	if (
-		!styleName ||
-		!styleType ||
-		!length ||
-		!size ||
-		!timeTaken ||
-		!hairType ||
-		!stylistName
-	) {
+	const isBraidsCategory = serviceCategory === "hair-services"
+	if (!styleName || !serviceName || !styleType || !timeTaken || !stylistName) {
 		setAdminMessage(
 			"error",
 			"❌ Please complete all required fields.",
+			"adminGalleryMessage",
+		)
+		return
+	}
+
+	if (isBraidsCategory && (!length || !size || !hairType)) {
+		setAdminMessage(
+			"error",
+			"❌ Braids entries require length, size, and hair type.",
 			"adminGalleryMessage",
 		)
 		return
@@ -3739,12 +3882,14 @@ async function saveGalleryItem(event) {
 
 		const payload = {
 			styleName,
+			serviceName,
+			serviceCategory,
 			styleType,
-			length,
-			size,
+			length: isBraidsCategory ? length : "",
+			size: isBraidsCategory ? size : "",
 			timeTaken,
 			priceRange,
-			hairType,
+			hairType: isBraidsCategory ? hairType : "",
 			stylistName,
 			imageUrl,
 			beforeImageUrl,
@@ -4697,6 +4842,20 @@ function initializeAdminPanel() {
 			event.preventDefault()
 			event.stopPropagation()
 			void saveGalleryItem(event)
+		})
+	}
+
+	const adminGalleryServiceFilters = document.getElementById(
+		"adminGalleryServiceFilters",
+	)
+	if (adminGalleryServiceFilters) {
+		adminGalleryServiceFilters.addEventListener("click", (event) => {
+			const button = event.target.closest("[data-admin-gallery-service]")
+			if (!button) return
+			const selectedCategory = normalizeAdminGalleryServiceCategory(
+				button.dataset.adminGalleryService,
+			)
+			applyAdminGalleryServiceCategoryToForm(selectedCategory)
 		})
 	}
 

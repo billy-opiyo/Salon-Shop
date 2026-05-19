@@ -454,6 +454,65 @@
 
 							<form class="admin-gallery-form" id="adminGalleryForm">
 								<input type="hidden" id="galleryEditId" />
+								<div
+									class="admin-gallery-service-filters"
+									id="adminGalleryServiceFilters"
+								>
+									<button
+										type="button"
+										class="gallery-filter-chip active"
+										data-admin-gallery-service="hair-services"
+									>
+										Braids
+									</button>
+									<button
+										type="button"
+										class="gallery-filter-chip"
+										data-admin-gallery-service="beauty-spa-services"
+									>
+										Beauty Spa
+									</button>
+									<button
+										type="button"
+										class="gallery-filter-chip"
+										data-admin-gallery-service="nail-services"
+									>
+										Nails
+									</button>
+									<button
+										type="button"
+										class="gallery-filter-chip"
+										data-admin-gallery-service="makeup-services"
+									>
+										Makeup
+									</button>
+									<button
+										type="button"
+										class="gallery-filter-chip"
+										data-admin-gallery-service="barber-services"
+									>
+										Barber
+									</button>
+									<button
+										type="button"
+										class="gallery-filter-chip"
+										data-admin-gallery-service="eyebrow-lash-services"
+									>
+										Eyebrows &amp; Lash
+									</button>
+									<button
+										type="button"
+										class="gallery-filter-chip"
+										data-admin-gallery-service="bridal-event-packages"
+									>
+										Bridal / Event Packages
+									</button>
+								</div>
+								<input
+									type="hidden"
+									id="galleryServiceCategory"
+									value="hair-services"
+								/>
 								<div class="admin-gallery-form-head">
 									<h3 id="adminGalleryFormTitle">Add New Gallery Style</h3>
 									<button
@@ -484,7 +543,19 @@
 											required
 										/>
 									</div>
-									<div class="form-group">
+									<div class="form-group full">
+										<label for="galleryServiceName">Service Name *</label>
+										<input
+											type="text"
+											id="galleryServiceName"
+											placeholder="e.g. Knotless Braids"
+											required
+										/>
+									</div>
+									<div
+										class="form-group admin-braids-field"
+										data-braids-only="true"
+									>
 										<label for="galleryLength">Length *</label>
 										<select id="galleryLength" required>
 											<option value="">Select length</option>
@@ -493,7 +564,10 @@
 											<option value="Long">Long</option>
 										</select>
 									</div>
-									<div class="form-group">
+									<div
+										class="form-group admin-braids-field"
+										data-braids-only="true"
+									>
 										<label for="gallerySize">Size *</label>
 										<select id="gallerySize" required>
 											<option value="">Select size</option>
@@ -519,7 +593,10 @@
 											placeholder="e.g. KSh 4,000 - 6,000"
 										/>
 									</div>
-									<div class="form-group">
+									<div
+										class="form-group admin-braids-field"
+										data-braids-only="true"
+									>
 										<label for="galleryHairType">Hair Length/Type Used *</label>
 										<input
 											type="text"
@@ -560,11 +637,15 @@
 									<div class="form-group full admin-checkbox-group">
 										<label>
 											<input type="checkbox" id="galleryFeaturedTrending" />
-											Trending Braids
+											<span id="galleryFeaturedTrendingLabel"
+												>Trending Braids</span
+											>
 										</label>
 										<label>
 											<input type="checkbox" id="galleryFeaturedMostBooked" />
-											Most Booked Style
+											<span id="galleryFeaturedMostBookedLabel"
+												>Most Booked Braids</span
+											>
 										</label>
 									</div>
 								</div>

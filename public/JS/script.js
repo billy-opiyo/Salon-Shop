@@ -637,9 +637,94 @@ let dashboardRescheduleAvailabilityUnsubscribe = null
 let gallerySlideshowTimers = []
 let gallerySortBy = "recommended"
 const galleryFiltersState = {
+	service: "all",
 	length: "all",
 	size: "all",
 	styleType: "all",
+}
+
+const GALLERY_SERVICE_FILTER_DEFINITIONS = [
+	{ key: "all", label: "All" },
+	{ key: "hair-services", label: "Braids" },
+	{ key: "beauty-spa-services", label: "Beauty Spa" },
+	{ key: "nail-services", label: "Nails" },
+	{ key: "makeup-services", label: "Makeup" },
+	{ key: "barber-services", label: "Barber" },
+	{ key: "eyebrow-lash-services", label: "Eyebrows & Lash" },
+	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
+]
+
+const GALLERY_SERVICE_DISPLAY_LABELS = {
+	all: "All",
+	"hair-services": "Braids",
+	"beauty-spa-services": "Beauty Spa",
+	"nail-services": "Nails",
+	"makeup-services": "Makeup",
+	"barber-services": "Barber",
+	"eyebrow-lash-services": "Eyebrows & Lash",
+	"bridal-event-packages": "Bridal / Event Packages",
+}
+
+function getGalleryFeaturedCategoryLabel(categoryKey = "all") {
+	const normalized = String(categoryKey || "all").trim().toLowerCase()
+	if (normalized === "all") return "Styles"
+	return getGalleryServiceLabel(normalized)
+}
+
+const GALLERY_SERVICE_KEYWORDS = {
+	"hair-services": [
+		"braid",
+		"twist",
+		"cornrow",
+		"knotless",
+		"fulani",
+		"loc",
+		"hair",
+	],
+	"beauty-spa-services": [
+		"facial",
+		"body",
+		"spa",
+		"steam",
+		"skin",
+		"sauna",
+		"acne",
+	],
+	"nail-services": ["nail", "manicure", "pedicure", "acrylic", "gel"],
+	"makeup-services": ["makeup", "bridal makeup", "glam", "foundation"],
+	"barber-services": ["barber", "fade", "beard", "cut", "shave"],
+	"eyebrow-lash-services": ["eyebrow", "brow", "lash", "eyelash"],
+	"bridal-event-packages": ["bridal", "event", "wedding", "package"],
+}
+
+function inferGalleryServiceCategory(item = {}) {
+	const existingCategory = String(item.serviceCategory || item.category || "")
+		.trim()
+		.toLowerCase()
+	if (existingCategory && existingCategory !== "all") {
+		return existingCategory
+	}
+
+	const bag = [item.styleName, item.styleType, item.serviceName]
+		.filter(Boolean)
+		.join(" ")
+		.toLowerCase()
+
+	for (const [categoryKey, keywords] of Object.entries(GALLERY_SERVICE_KEYWORDS)) {
+		if (keywords.some((keyword) => bag.includes(keyword))) {
+			return categoryKey
+		}
+	}
+
+	return "hair-services"
+}
+
+function getGalleryServiceLabel(categoryKey = "") {
+	const normalized = String(categoryKey || "all").trim().toLowerCase()
+	return (
+		GALLERY_SERVICE_DISPLAY_LABELS[normalized] ||
+		GALLERY_SERVICE_DISPLAY_LABELS.all
+	)
 }
 const preloadedBeforeImageUrls = new Set()
 
@@ -4923,6 +5008,8 @@ function normalizeGalleryItem(item = {}) {
 	const styleName = item.styleName || item.title || "Untitled Style"
 	const styleType = item.styleType || "General"
 	const stylistName = item.stylistName || item.stylist || "Royal Braids Team"
+	const serviceName = item.serviceName || styleName
+	const serviceCategory = inferGalleryServiceCategory(item)
 	const imageUrl = item.imageUrl || item.img || ""
 	const beforeImageUrl = item.beforeImageUrl || ""
 	const hasBeforeAfter =
@@ -4934,6 +5021,9 @@ function normalizeGalleryItem(item = {}) {
 		id: item.id || "",
 		styleName,
 		styleType,
+		serviceName,
+		serviceCategory,
+		serviceLabel: getGalleryServiceLabel(serviceCategory),
 		stylistName,
 		length: item.length || "Medium",
 		size: item.size || "Medium",
@@ -4981,6 +5071,30 @@ function renderGalleryFilterGroup(groupKey, mountId, prefixLabel) {
 }
 
 function renderGalleryFilters() {
+	const serviceWrap = document.getElementById("galleryServiceFilters")
+	if (serviceWrap) {
+		serviceWrap.innerHTML = GALLERY_SERVICE_FILTER_DEFINITIONS.map((item) => {
+			const active = galleryFiltersState.service === item.key
+			return `<button class="gallery-filter-chip ${active ? "active" : ""}" data-filter-group="service" data-filter-value="${item.key}">${item.label}</button>`
+		}).join("")
+	}
+
+	const braidsOnly = galleryFiltersState.service === "hair-services"
+	const note = document.getElementById("galleryBraidsOnlyNote")
+	if (note) {
+		note.style.display = braidsOnly ? "block" : "none"
+	}
+
+	const braidsFilterGroups = [
+		document.getElementById("galleryLengthFilters"),
+		document.getElementById("gallerySizeFilters"),
+		document.getElementById("galleryStyleTypeFilters"),
+	]
+	braidsFilterGroups.forEach((group) => {
+		if (!group) return
+		group.style.display = braidsOnly ? "flex" : "none"
+	})
+
 	renderGalleryFilterGroup("length", "galleryLengthFilters", "Lengths")
 	renderGalleryFilterGroup("size", "gallerySizeFilters", "Sizes")
 	renderGalleryFilterGroup(
@@ -4992,6 +5106,18 @@ function renderGalleryFilters() {
 
 function applyGalleryFilters() {
 	filteredGalleryData = galleryData.filter((item) => {
+		if (
+			galleryFiltersState.service !== "all" &&
+			item.serviceCategory !== galleryFiltersState.service
+		) {
+			return false
+		}
+
+		const isBraidsMode = galleryFiltersState.service === "hair-services"
+		if (!isBraidsMode) {
+			return true
+		}
+
 		if (
 			galleryFiltersState.length !== "all" &&
 			item.length !== galleryFiltersState.length
@@ -5106,19 +5232,43 @@ function setGallerySort(sortValue = "recommended") {
 	gallerySortBy = sortValue
 	showAllGallery = false
 	const button = document.getElementById("viewAllGallery")
-	if (button) button.textContent = "View All Braids"
+	if (button) {
+		button.textContent =
+			galleryFiltersState.service === "hair-services"
+				? "View All Braids"
+				: "View All Gallery"
+	}
 	renderGallery()
 }
 
 function renderFeaturedStyles() {
 	const trendingList = document.getElementById("trendingBraidsList")
 	const mostBookedList = document.getElementById("mostBookedStylesList")
+	const trendingHeading = document.getElementById("trendingStylesHeading")
+	const mostBookedHeading = document.getElementById("mostBookedStylesHeading")
 	if (!trendingList || !mostBookedList) return
 
-	const trending = galleryData
+	const featuredCategoryLabel = getGalleryFeaturedCategoryLabel(
+		galleryFiltersState.service,
+	)
+	if (trendingHeading) {
+		trendingHeading.textContent = `🔥 Trending ${featuredCategoryLabel}`
+	}
+	if (mostBookedHeading) {
+		mostBookedHeading.textContent = `⭐ Most Booked ${featuredCategoryLabel}`
+	}
+
+	const source =
+		galleryFiltersState.service === "all"
+			? galleryData
+			: galleryData.filter(
+					(item) => item.serviceCategory === galleryFiltersState.service,
+				)
+
+	const trending = source
 		.filter((item) => item.featuredTrending)
 		.slice(0, 6)
-	const mostBooked = galleryData
+	const mostBooked = source
 		.filter((item) => item.featuredMostBooked)
 		.slice(0, 6)
 
@@ -5129,7 +5279,7 @@ function renderFeaturedStyles() {
 						`<button class="gallery-feature-pill" data-feature-open="${item.id || item.styleName}">${item.styleName}</button>`,
 				)
 				.join("")
-		: '<span class="gallery-feature-empty">No trending styles yet.</span>'
+		: `<span class="gallery-feature-empty">No trending ${featuredCategoryLabel.toLowerCase()} yet.</span>`
 
 	mostBookedList.innerHTML = mostBooked.length
 		? mostBooked
@@ -5138,7 +5288,7 @@ function renderFeaturedStyles() {
 						`<button class="gallery-feature-pill" data-feature-open="${item.id || item.styleName}">${item.styleName}</button>`,
 				)
 				.join("")
-		: '<span class="gallery-feature-empty">No most booked styles yet.</span>'
+		: `<span class="gallery-feature-empty">No most booked ${featuredCategoryLabel.toLowerCase()} yet.</span>`
 }
 
 function renderGallery() {
@@ -5181,7 +5331,7 @@ function renderGallery() {
 			}
       <div class="gallery-overlay">
         <h4>${item.styleName}</h4>
-        <p>${item.styleType} • by ${item.stylistName}</p>
+        <p>${item.serviceLabel} • ${item.styleType} • by ${item.stylistName}</p>
         ${hasBeforeAfterPair ? '<span class="before-after">Before & After</span>' : ""}
         <button type="button" class="gallery-save-favorite-btn" data-fav-style-id="${escapeHtml(item.id || "")}" aria-pressed="false">♡ Save</button>
       </div>
@@ -5226,16 +5376,29 @@ function toggleGalleryView() {
 	renderGallery()
 	const button = document.getElementById("viewAllGallery")
 	if (button) {
-		button.textContent = showAllGallery ? "View Less Braids" : "View All Braids"
+		const noun =
+			galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
+		button.textContent = showAllGallery ? `View Less ${noun}` : `View All ${noun}`
 	}
 }
 
 function setGalleryFilter(group, value) {
 	galleryFiltersState[group] = value
+
+	if (group === "service" && value !== "hair-services") {
+		galleryFiltersState.length = "all"
+		galleryFiltersState.size = "all"
+		galleryFiltersState.styleType = "all"
+	}
+
 	showAllGallery = false
 	const button = document.getElementById("viewAllGallery")
-	if (button) button.textContent = "View All Braids"
+	if (button) {
+		const noun = galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
+		button.textContent = `View All ${noun}`
+	}
 	renderGalleryFilters()
+	renderFeaturedStyles()
 	renderGallery()
 }
 
@@ -5248,6 +5411,7 @@ function isMatchingGalleryItem(item, idOrName) {
 }
 
 function resetGalleryFiltersState() {
+	galleryFiltersState.service = "all"
 	galleryFiltersState.length = "all"
 	galleryFiltersState.size = "all"
 	galleryFiltersState.styleType = "all"
@@ -5268,7 +5432,11 @@ function openGalleryItemByIdOrName(idOrName) {
 		showAllGallery = true
 		renderGallery()
 		const button = document.getElementById("viewAllGallery")
-		if (button) button.textContent = "View Less Braids"
+		if (button) {
+			const noun =
+				galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
+			button.textContent = `View Less ${noun}`
+		}
 
 		visible = getVisibleGalleryData()
 		index = visible.findIndex((item) => isMatchingGalleryItem(item, idOrName))
@@ -5283,7 +5451,7 @@ function openGalleryItemByIdOrName(idOrName) {
 	renderGalleryFilters()
 	renderGallery()
 	const button = document.getElementById("viewAllGallery")
-	if (button) button.textContent = "View Less Braids"
+	if (button) button.textContent = "View Less Gallery"
 
 	visible = getVisibleGalleryData()
 	index = visible.findIndex((item) => isMatchingGalleryItem(item, idOrName))

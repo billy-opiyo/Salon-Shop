@@ -273,6 +273,64 @@
 					id="galleryFilters"
 				>
 					<div class="gallery-sort-row">
+						<div class="gallery-service-filter-wrap" id="galleryServiceFilters">
+							<button
+								class="gallery-filter-chip active"
+								data-filter-group="service"
+								data-filter-value="all"
+							>
+								All
+							</button>
+							<button
+								class="gallery-filter-chip"
+								data-filter-group="service"
+								data-filter-value="hair-services"
+							>
+								Braids
+							</button>
+							<button
+								class="gallery-filter-chip"
+								data-filter-group="service"
+								data-filter-value="beauty-spa-services"
+							>
+								Beauty Spa
+							</button>
+							<button
+								class="gallery-filter-chip"
+								data-filter-group="service"
+								data-filter-value="nail-services"
+							>
+								Nails
+							</button>
+							<button
+								class="gallery-filter-chip"
+								data-filter-group="service"
+								data-filter-value="makeup-services"
+							>
+								Makeup
+							</button>
+							<button
+								class="gallery-filter-chip"
+								data-filter-group="service"
+								data-filter-value="barber-services"
+							>
+								Barber
+							</button>
+							<button
+								class="gallery-filter-chip"
+								data-filter-group="service"
+								data-filter-value="eyebrow-lash-services"
+							>
+								Eyebrows &amp; Lash
+							</button>
+							<button
+								class="gallery-filter-chip"
+								data-filter-group="service"
+								data-filter-value="bridal-event-packages"
+							>
+								Bridal / Event Packages
+							</button>
+						</div>
 						<label class="gallery-sort-label" for="gallerySortSelect"
 							>Sort By:</label
 						>
@@ -316,15 +374,18 @@
 							All Style Types
 						</button>
 					</div>
+					<div class="gallery-braids-only-note" id="galleryBraidsOnlyNote">
+						Braids-only filters (Length, Size, Style Type)
+					</div>
 				</div>
 
 				<div class="gallery-featured-wrap animate-on-scroll delay-1">
 					<div class="gallery-featured-block" id="trendingBraidsBlock">
-						<h3>🔥 Trending Braids</h3>
+						<h3 id="trendingStylesHeading">🔥 Trending Braids</h3>
 						<div class="gallery-featured-list" id="trendingBraidsList"></div>
 					</div>
 					<div class="gallery-featured-block" id="mostBookedStylesBlock">
-						<h3>⭐ Most Booked Styles</h3>
+						<h3 id="mostBookedStylesHeading">⭐ Most Booked Braids</h3>
 						<div class="gallery-featured-list" id="mostBookedStylesList"></div>
 					</div>
 				</div>
