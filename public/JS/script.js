@@ -2,101 +2,479 @@
 
 // ============ DATA ============
 const servicesData = [
+	// Hair Services
+	{
+		name: "Hair Braiding",
+		desc: "Professional protective braiding tailored to your preferred look.",
+		price: "From KSh 3,000",
+		duration: "2-5 hrs",
+		icon: "scissors",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
 	{
 		name: "Box Braids",
-		desc: "Classic box braids with synthetic or natural hair extensions",
-		price: "KSh 3,500",
-		duration: "3-4 hrs",
+		desc: "Classic sectioned braids for a neat, long-lasting protective style.",
+		price: "From KSh 3,500",
+		duration: "3-5 hrs",
 		icon: "scissors",
-		category: "braids",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
 	},
 	{
 		name: "Knotless Braids",
-		desc: "Seamless, pain-free braids that protect your edges",
-		price: "KSh 4,500",
-		duration: "4-5 hrs",
+		desc: "Lightweight knot-free braids with less tension on the scalp.",
+		price: "From KSh 4,500",
+		duration: "4-6 hrs",
 		icon: "scissors",
-		category: "braids",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Cornrows",
+		desc: "Clean scalp braids in classic straight-back or custom patterns.",
+		price: "From KSh 1,500",
+		duration: "1-3 hrs",
+		icon: "heart",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
 	},
 	{
 		name: "Fulani Braids",
-		desc: "Traditional Fulani style with beads and accessories",
-		price: "KSh 4,000",
-		duration: "4 hrs",
-		icon: "scissors",
-		category: "braids",
-	},
-	{
-		name: "Senegalese Twists",
-		desc: "Elegant rope twists for a sophisticated look",
-		price: "KSh 4,000",
-		duration: "4-5 hrs",
-		icon: "feather",
-		category: "twists",
-	},
-	{
-		name: "Passion Twists",
-		desc: "Bohemian-style twists with curly ends",
-		price: "KSh 3,800",
-		duration: "3-4 hrs",
-		icon: "feather",
-		category: "twists",
-	},
-	{
-		name: "Marley Twists",
-		desc: "Chunky, natural-looking twists",
-		price: "KSh 3,500",
-		duration: "3-4 hrs",
-		icon: "feather",
-		category: "twists",
-	},
-	{
-		name: "Cornrows - Straight",
-		desc: "Classic straight back cornrows",
-		price: "KSh 1,500",
-		duration: "1-2 hrs",
-		icon: "heart",
-		category: "cornrows",
-	},
-	{
-		name: "Cornrows - Designs",
-		desc: "Intricate cornrow patterns and designs",
-		price: "KSh 2,500",
-		duration: "2-3 hrs",
-		icon: "heart",
-		category: "cornrows",
+		desc: "Signature center-parted braids with stylish side detailing.",
+		price: "From KSh 4,000",
+		duration: "3-5 hrs",
+		icon: "crown",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
 	},
 	{
 		name: "Stitch Braids",
-		desc: "Trendy cornrows with stitch-like parts",
-		price: "KSh 2,000",
-		duration: "2 hrs",
+		desc: "Precise feed-in braids with crisp stitch-like parting lines.",
+		price: "From KSh 2,500",
+		duration: "2-4 hrs",
 		icon: "heart",
-		category: "cornrows",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
 	},
 	{
-		name: "Goddess Braids",
-		desc: "Large, elegant braids fit for royalty",
-		price: "KSh 3,000",
+		name: "Faux Locs",
+		desc: "Trendy loc-inspired protective style with natural movement.",
+		price: "From KSh 4,500",
+		duration: "4-6 hrs",
+		icon: "feather",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Hair Styling",
+		desc: "Finish and style your hair for daily elegance or special events.",
+		price: "From KSh 1,500",
+		duration: "45-90 mins",
+		icon: "crown",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Hair Cutting",
+		desc: "Precision cuts for a polished, healthy shape and finish.",
+		price: "From KSh 1,200",
+		duration: "30-60 mins",
+		icon: "scissors",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Hair Coloring",
+		desc: "Custom coloring, toning, and touch-ups for vibrant results.",
+		price: "From KSh 3,500",
+		duration: "2-3 hrs",
+		icon: "droplet",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Hair Relaxing",
+		desc: "Chemical relaxing service for smooth, manageable hair texture.",
+		price: "From KSh 2,800",
+		duration: "1.5-2 hrs",
+		icon: "droplet",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Hair Treatment",
+		desc: "Moisture and repair treatments to restore hair strength and shine.",
+		price: "From KSh 2,000",
+		duration: "1-1.5 hrs",
+		icon: "droplet",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Wig Installation",
+		desc: "Secure and natural-looking wig installation with perfect blending.",
+		price: "From KSh 3,000",
+		duration: "1.5-2.5 hrs",
+		icon: "crown",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Weaving/Extensions",
+		desc: "Professional install of weaves and extensions for added volume.",
+		price: "From KSh 3,500",
+		duration: "2-4 hrs",
+		icon: "feather",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+	{
+		name: "Hair Washing & Blow Dry",
+		desc: "Deep cleanse and smooth blow-dry finish for refreshed hair.",
+		price: "From KSh 1,500",
+		duration: "45-75 mins",
+		icon: "droplet",
+		category: "hair-services",
+		categoryLabel: "Hair Services",
+	},
+
+	// Beauty Spa Services
+	{
+		name: "Facials",
+		desc: "Glow-boosting facial care customized to your skin type.",
+		price: "From KSh 2,500",
+		duration: "60 mins",
+		icon: "heart",
+		category: "beauty-spa-services",
+		categoryLabel: "Beauty Spa Services",
+	},
+	{
+		name: "Body Scrubs",
+		desc: "Exfoliating body treatments for softer, brighter skin.",
+		price: "From KSh 3,000",
+		duration: "60-75 mins",
+		icon: "heart",
+		category: "beauty-spa-services",
+		categoryLabel: "Beauty Spa Services",
+	},
+	{
+		name: "Steam Therapy",
+		desc: "Relaxing steam sessions to open pores and release tension.",
+		price: "From KSh 2,000",
+		duration: "30-45 mins",
+		icon: "feather",
+		category: "beauty-spa-services",
+		categoryLabel: "Beauty Spa Services",
+	},
+	{
+		name: "Skin Treatments",
+		desc: "Targeted professional treatment for specific skin concerns.",
+		price: "From KSh 3,500",
+		duration: "60-90 mins",
+		icon: "droplet",
+		category: "beauty-spa-services",
+		categoryLabel: "Beauty Spa Services",
+	},
+	{
+		name: "Sauna",
+		desc: "Detoxifying sauna therapy for wellness and improved circulation.",
+		price: "From KSh 2,000",
+		duration: "30-45 mins",
+		icon: "feather",
+		category: "beauty-spa-services",
+		categoryLabel: "Beauty Spa Services",
+	},
+	{
+		name: "Body Polishing",
+		desc: "Full-body polish for smoother texture and radiant finish.",
+		price: "From KSh 3,800",
+		duration: "75 mins",
+		icon: "heart",
+		category: "beauty-spa-services",
+		categoryLabel: "Beauty Spa Services",
+	},
+	{
+		name: "Acne Treatment",
+		desc: "Clarifying care to reduce breakouts and calm inflammation.",
+		price: "From KSh 3,200",
+		duration: "60 mins",
+		icon: "droplet",
+		category: "beauty-spa-services",
+		categoryLabel: "Beauty Spa Services",
+	},
+	{
+		name: "Skin Brightening",
+		desc: "Tone-evening treatment to enhance natural skin radiance.",
+		price: "From KSh 3,500",
+		duration: "60 mins",
+		icon: "gift",
+		category: "beauty-spa-services",
+		categoryLabel: "Beauty Spa Services",
+	},
+
+	// Nail Services
+	{
+		name: "Manicure",
+		desc: "Classic manicure for clean, polished, healthy-looking nails.",
+		price: "From KSh 1,200",
+		duration: "45 mins",
+		icon: "heart",
+		category: "nail-services",
+		categoryLabel: "Nail Services",
+	},
+	{
+		name: "Pedicure",
+		desc: "Foot care and nail grooming for comfort and beauty.",
+		price: "From KSh 1,500",
+		duration: "60 mins",
+		icon: "heart",
+		category: "nail-services",
+		categoryLabel: "Nail Services",
+	},
+	{
+		name: "Gel Polish",
+		desc: "High-shine long-wear gel finish with rich color options.",
+		price: "From KSh 1,800",
+		duration: "45-60 mins",
+		icon: "gift",
+		category: "nail-services",
+		categoryLabel: "Nail Services",
+	},
+	{
+		name: "Acrylic Nails",
+		desc: "Custom acrylic extensions for durable shape and length.",
+		price: "From KSh 2,500",
+		duration: "75-90 mins",
+		icon: "crown",
+		category: "nail-services",
+		categoryLabel: "Nail Services",
+	},
+	{
+		name: "Nail Art",
+		desc: "Creative nail designs, accents, and event-ready detailing.",
+		price: "From KSh 2,000",
+		duration: "60-90 mins",
+		icon: "gift",
+		category: "nail-services",
+		categoryLabel: "Nail Services",
+	},
+	{
+		name: "Nail Repair",
+		desc: "Fix broken, chipped, or lifted nails with expert repair care.",
+		price: "From KSh 800",
+		duration: "30-45 mins",
+		icon: "heart",
+		category: "nail-services",
+		categoryLabel: "Nail Services",
+	},
+
+	// Makeup Services
+	{
+		name: "Bridal Makeup",
+		desc: "Premium long-wear bridal glam with trial and customization.",
+		price: "From KSh 8,000",
 		duration: "2-3 hrs",
 		icon: "crown",
-		category: "special",
+		category: "makeup-services",
+		categoryLabel: "Makeup Services",
 	},
 	{
-		name: "Lemonade Braids",
-		desc: "Side-swept cornrows inspired by Beyoncé",
-		price: "KSh 2,500",
-		duration: "2-3 hrs",
+		name: "Party Makeup",
+		desc: "Event-ready makeup with flawless finish and photo-ready look.",
+		price: "From KSh 3,500",
+		duration: "75-90 mins",
+		icon: "gift",
+		category: "makeup-services",
+		categoryLabel: "Makeup Services",
+	},
+	{
+		name: "Photoshoot Makeup",
+		desc: "Camera-optimized makeup designed for studio and outdoor shoots.",
+		price: "From KSh 4,500",
+		duration: "90-120 mins",
 		icon: "crown",
-		category: "special",
+		category: "makeup-services",
+		categoryLabel: "Makeup Services",
 	},
 	{
-		name: "Kids Braiding",
-		desc: "Gentle braiding services for children",
-		price: "KSh 1,500",
-		duration: "1-2 hrs",
+		name: "Everyday Makeup",
+		desc: "Soft, natural everyday glam for work and casual outings.",
+		price: "From KSh 2,500",
+		duration: "45-60 mins",
+		icon: "heart",
+		category: "makeup-services",
+		categoryLabel: "Makeup Services",
+	},
+	{
+		name: "Eyelash Installation",
+		desc: "Precision lash application for fuller, defined eye looks.",
+		price: "From KSh 1,800",
+		duration: "45-60 mins",
+		icon: "feather",
+		category: "makeup-services",
+		categoryLabel: "Makeup Services",
+	},
+
+	// Barber Services
+	{
+		name: "Haircuts",
+		desc: "Modern and classic cuts tailored for men and boys.",
+		price: "From KSh 800",
+		duration: "30-45 mins",
+		icon: "scissors",
+		category: "barber-services",
+		categoryLabel: "Barber Services",
+	},
+	{
+		name: "Beard Grooming",
+		desc: "Shape, trim, and style your beard for a clean finish.",
+		price: "From KSh 700",
+		duration: "20-30 mins",
+		icon: "scissors",
+		category: "barber-services",
+		categoryLabel: "Barber Services",
+	},
+	{
+		name: "Hair Dye",
+		desc: "Color refresh and grey coverage tailored to your preference.",
+		price: "From KSh 1,500",
+		duration: "45-60 mins",
+		icon: "droplet",
+		category: "barber-services",
+		categoryLabel: "Barber Services",
+	},
+	{
+		name: "Kids Haircuts",
+		desc: "Comfort-first grooming for children in a friendly setup.",
+		price: "From KSh 600",
+		duration: "20-30 mins",
 		icon: "smile",
-		category: "special",
+		category: "barber-services",
+		categoryLabel: "Barber Services",
+	},
+	{
+		name: "Lineups/Fades",
+		desc: "Sharp lineups and clean fade transitions done professionally.",
+		price: "From KSh 900",
+		duration: "30-40 mins",
+		icon: "scissors",
+		category: "barber-services",
+		categoryLabel: "Barber Services",
+	},
+
+	// Massage & Wellness
+	{
+		name: "Full Body Massage",
+		desc: "Relaxing full-body massage to release stress and fatigue.",
+		price: "From KSh 4,000",
+		duration: "60-90 mins",
+		icon: "heart",
+		category: "massage-wellness",
+		categoryLabel: "Massage & Wellness",
+	},
+	{
+		name: "Deep Tissue Massage",
+		desc: "Targeted pressure massage for deep muscle relief.",
+		price: "From KSh 4,500",
+		duration: "60-90 mins",
+		icon: "heart",
+		category: "massage-wellness",
+		categoryLabel: "Massage & Wellness",
+	},
+	{
+		name: "Hot Stone Massage",
+		desc: "Warm stone therapy to ease tension and improve circulation.",
+		price: "From KSh 5,000",
+		duration: "75-90 mins",
+		icon: "gift",
+		category: "massage-wellness",
+		categoryLabel: "Massage & Wellness",
+	},
+	{
+		name: "Neck & Shoulder Massage",
+		desc: "Focused relief for upper body stiffness and posture stress.",
+		price: "From KSh 2,500",
+		duration: "30-45 mins",
+		icon: "heart",
+		category: "massage-wellness",
+		categoryLabel: "Massage & Wellness",
+	},
+
+	// Eyebrow & Lash Services
+	{
+		name: "Eyebrow Shaping",
+		desc: "Defined brow shaping to complement your face and style.",
+		price: "From KSh 900",
+		duration: "20-30 mins",
+		icon: "heart",
+		category: "eyebrow-lash-services",
+		categoryLabel: "Eyebrow & Lash Services",
+	},
+	{
+		name: "Eyebrow Tinting",
+		desc: "Tint enhancement for fuller, naturally defined brows.",
+		price: "From KSh 1,200",
+		duration: "20-30 mins",
+		icon: "droplet",
+		category: "eyebrow-lash-services",
+		categoryLabel: "Eyebrow & Lash Services",
+	},
+	{
+		name: "Eyelash Extension",
+		desc: "Classic or volume lash extension application by experts.",
+		price: "From KSh 2,800",
+		duration: "90-120 mins",
+		icon: "feather",
+		category: "eyebrow-lash-services",
+		categoryLabel: "Eyebrow & Lash Services",
+	},
+	{
+		name: "Lash Lift",
+		desc: "Lift and curl natural lashes for a longer-looking effect.",
+		price: "From KSh 2,200",
+		duration: "45-60 mins",
+		icon: "feather",
+		category: "eyebrow-lash-services",
+		categoryLabel: "Eyebrow & Lash Services",
+	},
+
+	// Bridal / Event Packages
+	{
+		name: "Bridal Hair + Makeup",
+		desc: "Complete bridal glam with coordinated hair and makeup artistry.",
+		price: "From KSh 12,000",
+		duration: "3-4 hrs",
+		icon: "crown",
+		category: "bridal-event-packages",
+		categoryLabel: "Bridal / Event Packages",
+	},
+	{
+		name: "Wedding Beauty Packages",
+		desc: "Custom beauty bundle packages for brides and bridal teams.",
+		price: "From KSh 20,000",
+		duration: "Half day",
+		icon: "gift",
+		category: "bridal-event-packages",
+		categoryLabel: "Bridal / Event Packages",
+	},
+	{
+		name: "Graduation Package",
+		desc: "Hair, makeup, and finishing touches for graduation celebrations.",
+		price: "From KSh 7,500",
+		duration: "2-3 hrs",
+		icon: "gift",
+		category: "bridal-event-packages",
+		categoryLabel: "Bridal / Event Packages",
+	},
+	{
+		name: "Photoshoot Package",
+		desc: "Styled hair and makeup package tailored for photo sessions.",
+		price: "From KSh 8,500",
+		duration: "2-3 hrs",
+		icon: "crown",
+		category: "bridal-event-packages",
+		categoryLabel: "Bridal / Event Packages",
 	},
 ]
 
@@ -1045,8 +1423,7 @@ function bindSessionPresenceLifecycle() {
 }
 
 function normalizeSecurityRestrictionState(raw = {}) {
-	const data =
-		typeof raw === "object" && raw && !Array.isArray(raw) ? raw : {}
+	const data = typeof raw === "object" && raw && !Array.isArray(raw) ? raw : {}
 	return {
 		blockedUntilMs: Math.max(0, Number(data.blockedUntilMs || 0)),
 		forceLogoutAtMs: Math.max(0, Number(data.forceLogoutAtMs || 0)),
@@ -4341,33 +4718,78 @@ function handleAvailabilityWatch() {
 
 function renderServices(filter = "all") {
 	const grid = document.getElementById("servicesGrid")
-	const filtered =
-		filter === "all"
-			? servicesData
-			: servicesData.filter((s) => s.category === filter)
-	grid.innerHTML = filtered
-		.map(
-			(s, i) => `
-    <div class="service-card animate-on-scroll visible delay-${(i % 4) + 1}" id="service-${s.name
+	if (!grid) return
+
+	const categoryLabelMap = {
+		"hair-services": "Hair Services",
+		"beauty-spa-services": "Beauty Spa Services",
+		"nail-services": "Nail Services",
+		"makeup-services": "Makeup Services",
+		"barber-services": "Barber Services",
+		"massage-wellness": "Massage & Wellness",
+		"eyebrow-lash-services": "Eyebrow & Lash Services",
+		"bridal-event-packages": "Bridal / Event Packages",
+	}
+
+	const getCategoryLabel = (categoryKey = "") => {
+		if (categoryLabelMap[categoryKey]) return categoryLabelMap[categoryKey]
+		return String(categoryKey || "")
+			.replace(/-/g, " ")
+			.replace(/\b\w/g, (m) => m.toUpperCase())
+	}
+
+	const renderServiceCard = (service, index = 0) => {
+		const safeServiceId = service.name
 			.toLowerCase()
 			.replace(/[^a-z0-9]+/g, "-")
-			.replace(/^-|-$/g, "")}">
+			.replace(/^-|-$/g, "")
+		return `
+    <div class="service-card animate-on-scroll visible delay-${(index % 4) + 1}" id="service-${safeServiceId}">
       <div class="service-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPaths[s.icon] || iconPaths.scissors}</svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPaths[service.icon] || iconPaths.scissors}</svg>
       </div>
-      <h3>${s.name}</h3>
-      <p>${s.desc}</p>
+      <h3>${service.name}</h3>
+      <p>${service.desc}</p>
       <div>
-        <span class="service-price">${s.price}</span>
+        <span class="service-price">${service.price}</span>
         <span class="service-duration">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-          ${s.duration}
+          ${service.duration}
         </span>
       </div>
-      <button class="service-book-btn" onclick="selectService('${s.name}')">Book This Service</button>
+      <button class="service-book-btn" onclick="selectService('${service.name}')">Book This Service</button>
     </div>
-  `,
-		)
+  `
+	}
+
+	if (filter !== "all") {
+		grid.classList.remove("is-grouped")
+		const filtered = servicesData.filter((s) => s.category === filter)
+		grid.innerHTML = filtered.map((s, i) => renderServiceCard(s, i)).join("")
+		return
+	}
+
+	grid.classList.add("is-grouped")
+	const categoryOrder = [...new Set(servicesData.map((s) => s.category))]
+	grid.innerHTML = categoryOrder
+		.map((categoryKey) => {
+			const categoryServices = servicesData.filter(
+				(service) => service.category === categoryKey,
+			)
+			if (!categoryServices.length) return ""
+
+			return `
+      <section class="services-category-group" data-category="${categoryKey}">
+        <header class="services-category-header">
+          <h3 class="services-category-title">${getCategoryLabel(categoryKey)}</h3>
+          <p class="services-category-count">${categoryServices.length} service${categoryServices.length === 1 ? "" : "s"}</p>
+        </header>
+        <div class="services-category-grid">
+          ${categoryServices.map((service, index) => renderServiceCard(service, index)).join("")}
+        </div>
+      </section>
+    `
+		})
 		.join("")
 }
 
@@ -5765,12 +6187,24 @@ function populateServiceSelect() {
 		.querySelectorAll("optgroup, option[data-dynamic-service='true']")
 		.forEach((node) => node.remove())
 
+	const categoryLabelMap = {
+		"hair-services": "Hair Services",
+		"beauty-spa-services": "Beauty Spa Services",
+		"nail-services": "Nail Services",
+		"makeup-services": "Makeup Services",
+		"barber-services": "Barber Services",
+		"massage-wellness": "Massage & Wellness",
+		"eyebrow-lash-services": "Eyebrow & Lash Services",
+		"bridal-event-packages": "Bridal / Event Packages",
+	}
+
 	const categories = ["all", ...new Set(servicesData.map((s) => s.category))]
 	categories.forEach((cat) => {
 		if (cat === "all") return
 		const services = servicesData.filter((s) => s.category === cat)
 		const optgroup = document.createElement("optgroup")
-		optgroup.label = cat.charAt(0).toUpperCase() + cat.slice(1)
+		optgroup.label =
+			categoryLabelMap[cat] || cat.charAt(0).toUpperCase() + cat.slice(1)
 		services.forEach((s) => {
 			const opt = document.createElement("option")
 			opt.value = s.name
