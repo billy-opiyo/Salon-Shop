@@ -66,6 +66,13 @@ This project is built to:
 - Expanded **Admin operations**:
   - Schedule tab with day/week calendar view and quick booking actions
   - Existing CRUD/moderation modules maintained for gallery, blogs, reviews, and messages
+- Added **Service Category Visibility Management**:
+  - New **Services** tab in admin console for category ON/OFF controls
+  - Realtime settings stored in `siteSettings/serviceCategories`
+  - Public services list, booking service dropdown, and gallery/service filters respect enabled categories
+- Added **Client Security History in Dashboard**:
+  - Client dashboard now renders per-user login activity history
+  - Backed by callable security logging and `loginActivities` read access scoped to owner/admin
 
 ---
 
@@ -216,7 +223,7 @@ This project is built to:
 
 - Firebase admin login + allowed email guard
 - Password visibility toggle
-- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages, Security**
+- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages, Services, Security**
 - Confirmation modal for destructive actions
 
 ### Bookings + Schedule
@@ -248,6 +255,16 @@ This project is built to:
 - Realtime inbox + status stats
 - Sort modes (newest/oldest/status/name)
 - Status transitions: `new`, `read`, `resolved`
+
+### Services
+
+- New **Services** admin tab for realtime service-category visibility control
+- Toggle categories between active/inactive states with grouped cards and counters
+- Saves to `siteSettings/serviceCategories` and updates public UI behavior live
+- Public runtime consumes these settings to:
+  - Hide disabled categories from Services section tabs/cards
+  - Remove disabled category options from booking service dropdown
+  - Exclude disabled-category items from gallery/filter results
 
 ### Security
 
@@ -647,6 +664,43 @@ From any activity row linked to a known user (`uid` present), run each action:
    - Firestore rules prevent unauthorized reads for admin-only security collections.
    - No client can directly create/update/delete `loginActivities`, `securityAlerts`, `accountChangeHistory`, or `activityTimeline`.
    - Only callable backend paths write these security records.
+
+### J) Services tab category-visibility testing (new feature)
+
+Use this to verify the new **Admin → Services** controls and public-site sync.
+
+1. Sign in as allowed admin and open **Services** tab in `admin.html`.
+2. Confirm category cards render in two grouped lists:
+   - Active Services
+   - Inactive Services
+3. Toggle at least two categories OFF (e.g., `barber-services`, `nail-services`) and click **Save Category Settings**.
+4. Expected in Firestore:
+   - `siteSettings/serviceCategories` document updates with boolean flags per category.
+   - `updatedAt` and `updatedBy` fields are written.
+5. Open public `index.html` and verify disabled categories are removed from:
+   - Services tabs/cards
+   - Booking form service dropdown
+   - Gallery items/filter outputs (disabled category items not shown)
+6. Re-enable those categories and save again.
+7. Expected:
+   - Public UI returns those categories without page-break regressions.
+   - Admin success message confirms live application.
+
+### K) Client dashboard login-history testing (new feature)
+
+Use this to validate the user-facing **Security & Privacy** block in dashboard.
+
+1. Log in with a normal client account and open **My Dashboard**.
+2. Confirm **Security & Privacy** card renders with login-history count badge.
+3. Trigger additional sign-in events (e.g., sign out/in, different browser/device if possible).
+4. Expected in Firestore:
+   - New entries appear in `loginActivities` for that user identity.
+5. Expected in dashboard:
+   - Login history list updates with date/time, status, method, device/browser, and location label.
+   - Count badge increments in realtime.
+6. Permission check:
+   - Use a different non-admin account and confirm it cannot read another user’s entries.
+   - Admin account can still review activity from Security tab.
 
 ---
 
