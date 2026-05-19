@@ -858,25 +858,79 @@ function renderAdminServiceCategorySettings() {
 	const mount = document.getElementById("adminServiceCategoryToggles")
 	if (!mount) return
 
-	mount.innerHTML = ADMIN_SERVICE_CATEGORY_DEFINITIONS.map((item) => {
-		const enabled = adminServiceCategoriesDraft[item.key] !== false
-		return `
-			<article class="admin-service-category-card">
-				<label class="admin-service-category-toggle" for="adminServiceCategory_${escapeHtml(item.key)}">
-					<span>${escapeHtml(item.label)}</span>
-					<input
-						type="checkbox"
-						id="adminServiceCategory_${escapeHtml(item.key)}"
-						data-service-category-toggle="${escapeHtml(item.key)}"
-						${enabled ? "checked" : ""}
-					/>
-				</label>
-				<div class="admin-service-category-state">
-					${enabled ? "✅ Visible on website" : "❌ Hidden on website"}
-				</div>
-			</article>
-		`
-	}).join("")
+	const categories = ADMIN_SERVICE_CATEGORY_DEFINITIONS.map((item) => ({
+		...item,
+		enabled: adminServiceCategoriesDraft[item.key] !== false,
+	}))
+
+	const activeCount = categories.filter((item) => item.enabled).length
+	const inactiveCount = categories.length - activeCount
+
+	const renderCategoryCard = (item) => {
+			const switchId = `adminServiceCategory_${item.key}`
+			const stateText = item.enabled ? "Visible on website" : "Hidden on website"
+			const stateClass = item.enabled ? "is-visible" : "is-hidden"
+
+			return `
+				<article class="admin-service-category-card ${item.enabled ? "is-enabled" : "is-disabled"}">
+					<div class="admin-service-category-main">
+						<div class="admin-service-category-copy">
+							<div class="admin-service-category-title-row">
+								<h4 class="admin-service-category-title">${escapeHtml(item.label)}</h4>
+								<span class="admin-service-category-pill ${stateClass}">${item.enabled ? "ACTIVE" : "OFF"}</span>
+							</div>
+							<p class="admin-service-category-state ${stateClass}">${escapeHtml(stateText)}</p>
+						</div>
+						<label class="admin-service-toggle" for="${escapeHtml(switchId)}" aria-label="Toggle ${escapeHtml(item.label)}">
+							<input
+								type="checkbox"
+								id="${escapeHtml(switchId)}"
+								data-service-category-toggle="${escapeHtml(item.key)}"
+								${item.enabled ? "checked" : ""}
+							/>
+							<span class="admin-service-toggle-slider" aria-hidden="true"></span>
+						</label>
+					</div>
+				</article>
+			`
+	}
+
+	const sortedActive = categories
+		.filter((item) => item.enabled)
+		.sort((a, b) => a.label.localeCompare(b.label))
+	const sortedInactive = categories
+		.filter((item) => !item.enabled)
+		.sort((a, b) => a.label.localeCompare(b.label))
+
+	const activeCardsHtml = sortedActive.map(renderCategoryCard).join("")
+	const inactiveCardsHtml = sortedInactive.map(renderCategoryCard).join("")
+
+	mount.innerHTML = `
+		<div class="admin-service-settings-summary" aria-live="polite">
+			<div class="admin-service-settings-summary-item is-active">Active: <strong>${activeCount}</strong></div>
+			<div class="admin-service-settings-summary-item is-inactive">Inactive: <strong>${inactiveCount}</strong></div>
+		</div>
+		<div class="admin-service-settings-groups">
+			<section class="admin-service-settings-group is-active-group">
+				<header class="admin-service-settings-group-head">
+					<h4 class="admin-service-settings-group-title"><span class="admin-service-settings-group-icon is-active" aria-hidden="true">✓</span> Active Services</h4>
+					<p>These categories are visible on the live website and booking form.</p>
+				</header>
+				<div class="admin-service-settings-cards">${
+					activeCardsHtml || '<div class="admin-service-settings-empty">No active categories right now.</div>'
+				}</div>
+			</section>
+			<section class="admin-service-settings-group is-inactive-group">
+				<header class="admin-service-settings-group-head">
+					<h4 class="admin-service-settings-group-title"><span class="admin-service-settings-group-icon is-inactive" aria-hidden="true">⏸</span> Inactive Services</h4>
+					<p>These categories are hidden from public view until re-enabled.</p>
+				</header>
+				<div class="admin-service-settings-cards">${
+					inactiveCardsHtml || '<div class="admin-service-settings-empty">All categories are currently active.</div>'
+				}</div>
+			</section>
+		</div>
+	`
 }
 
 async function saveAdminServiceCategorySettings() {
