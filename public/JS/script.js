@@ -666,7 +666,9 @@ const GALLERY_SERVICE_DISPLAY_LABELS = {
 }
 
 function getGalleryFeaturedCategoryLabel(categoryKey = "all") {
-	const normalized = String(categoryKey || "all").trim().toLowerCase()
+	const normalized = String(categoryKey || "all")
+		.trim()
+		.toLowerCase()
 	if (normalized === "all") return "Styles"
 	return getGalleryServiceLabel(normalized)
 }
@@ -710,7 +712,9 @@ function inferGalleryServiceCategory(item = {}) {
 		.join(" ")
 		.toLowerCase()
 
-	for (const [categoryKey, keywords] of Object.entries(GALLERY_SERVICE_KEYWORDS)) {
+	for (const [categoryKey, keywords] of Object.entries(
+		GALLERY_SERVICE_KEYWORDS,
+	)) {
 		if (keywords.some((keyword) => bag.includes(keyword))) {
 			return categoryKey
 		}
@@ -720,7 +724,9 @@ function inferGalleryServiceCategory(item = {}) {
 }
 
 function getGalleryServiceLabel(categoryKey = "") {
-	const normalized = String(categoryKey || "all").trim().toLowerCase()
+	const normalized = String(categoryKey || "all")
+		.trim()
+		.toLowerCase()
 	return (
 		GALLERY_SERVICE_DISPLAY_LABELS[normalized] ||
 		GALLERY_SERVICE_DISPLAY_LABELS.all
@@ -1847,6 +1853,12 @@ function getVisibleServicesData() {
 	)
 }
 
+function isServiceCategoryEnabled(categoryKey = "") {
+	const normalizedKey = String(categoryKey || "").trim()
+	if (!normalizedKey || normalizedKey === "all") return true
+	return enabledServiceCategories[normalizedKey] !== false
+}
+
 function syncServicesTabsVisibility() {
 	const tabs = Array.from(document.querySelectorAll(".services-tab"))
 	if (!tabs.length) return
@@ -1863,7 +1875,9 @@ function syncServicesTabsVisibility() {
 	})
 
 	const visibleTabs = tabs.filter((tab) => tab.style.display !== "none")
-	const activeVisibleTab = visibleTabs.find((tab) => tab.classList.contains("active"))
+	const activeVisibleTab = visibleTabs.find((tab) =>
+		tab.classList.contains("active"),
+	)
 	if (!activeVisibleTab && visibleTabs.length) {
 		visibleTabs[0].classList.add("active")
 		activeServicesFilter = String(visibleTabs[0].dataset.filter || "all")
@@ -1878,13 +1892,22 @@ function stopServiceCategorySettingsListener() {
 }
 
 function applyServiceCategorySettings(rawCategories = {}) {
-	enabledServiceCategories = normalizeEnabledServiceCategoriesState(rawCategories)
+	enabledServiceCategories =
+		normalizeEnabledServiceCategoriesState(rawCategories)
 
 	if (
 		activeServicesFilter !== "all" &&
 		enabledServiceCategories[activeServicesFilter] === false
 	) {
 		activeServicesFilter = "all"
+	}
+
+	if (!isServiceCategoryEnabled(galleryFiltersState.service)) {
+		galleryFiltersState.service = "all"
+		galleryFiltersState.length = "all"
+		galleryFiltersState.size = "all"
+		galleryFiltersState.styleType = "all"
+		showAllGallery = false
 	}
 
 	const serviceSelect = document.getElementById("serviceSelect")
@@ -1894,12 +1917,16 @@ function applyServiceCategorySettings(rawCategories = {}) {
 		selectedBookingValue === CUSTOM_SERVICE_OPTION_VALUE
 			? customServiceInput?.value?.trim() || ""
 			: selectedBookingValue
-	const currentReviewService = document.getElementById("reviewService")?.value || ""
+	const currentReviewService =
+		document.getElementById("reviewService")?.value || ""
 
 	syncServicesTabsVisibility()
 	renderServices(activeServicesFilter)
 	populateReviewServiceSelect()
 	populateServiceSelect()
+	renderGalleryFilters()
+	renderFeaturedStyles()
+	renderGallery()
 	setBookingServiceValue(currentBookingService)
 
 	const reviewSelect = document.getElementById("reviewService")
@@ -4935,7 +4962,8 @@ function renderServices(filter = "all") {
 	const visibleServices = getVisibleServicesData()
 	const requestedFilter = String(filter || "all")
 	const normalizedFilter =
-		requestedFilter !== "all" && enabledServiceCategories[requestedFilter] === false
+		requestedFilter !== "all" &&
+		enabledServiceCategories[requestedFilter] === false
 			? "all"
 			: requestedFilter
 	activeServicesFilter = normalizedFilter
@@ -4975,7 +5003,9 @@ function renderServices(filter = "all") {
 
 	if (normalizedFilter !== "all") {
 		grid.classList.remove("is-grouped")
-		const filtered = visibleServices.filter((s) => s.category === normalizedFilter)
+		const filtered = visibleServices.filter(
+			(s) => s.category === normalizedFilter,
+		)
 		grid.innerHTML = filtered.map((s, i) => renderServiceCard(s, i)).join("")
 		return
 	}
@@ -5073,10 +5103,14 @@ function renderGalleryFilterGroup(groupKey, mountId, prefixLabel) {
 function renderGalleryFilters() {
 	const serviceWrap = document.getElementById("galleryServiceFilters")
 	if (serviceWrap) {
-		serviceWrap.innerHTML = GALLERY_SERVICE_FILTER_DEFINITIONS.map((item) => {
-			const active = galleryFiltersState.service === item.key
-			return `<button class="gallery-filter-chip ${active ? "active" : ""}" data-filter-group="service" data-filter-value="${item.key}">${item.label}</button>`
-		}).join("")
+		serviceWrap.innerHTML = GALLERY_SERVICE_FILTER_DEFINITIONS.filter(
+			(item) => item.key === "all" || isServiceCategoryEnabled(item.key),
+		)
+			.map((item) => {
+				const active = galleryFiltersState.service === item.key
+				return `<button class="gallery-filter-chip ${active ? "active" : ""}" data-filter-group="service" data-filter-value="${item.key}">${item.label}</button>`
+			})
+			.join("")
 	}
 
 	const braidsOnly = galleryFiltersState.service === "hair-services"
@@ -5106,6 +5140,10 @@ function renderGalleryFilters() {
 
 function applyGalleryFilters() {
 	filteredGalleryData = galleryData.filter((item) => {
+		if (!isServiceCategoryEnabled(item.serviceCategory)) {
+			return false
+		}
+
 		if (
 			galleryFiltersState.service !== "all" &&
 			item.serviceCategory !== galleryFiltersState.service
@@ -5260,14 +5298,16 @@ function renderFeaturedStyles() {
 
 	const source =
 		galleryFiltersState.service === "all"
-			? galleryData
+			? galleryData.filter((item) =>
+					isServiceCategoryEnabled(item.serviceCategory),
+				)
 			: galleryData.filter(
-					(item) => item.serviceCategory === galleryFiltersState.service,
+					(item) =>
+						item.serviceCategory === galleryFiltersState.service &&
+						isServiceCategoryEnabled(item.serviceCategory),
 				)
 
-	const trending = source
-		.filter((item) => item.featuredTrending)
-		.slice(0, 6)
+	const trending = source.filter((item) => item.featuredTrending).slice(0, 6)
 	const mostBooked = source
 		.filter((item) => item.featuredMostBooked)
 		.slice(0, 6)
@@ -5378,7 +5418,9 @@ function toggleGalleryView() {
 	if (button) {
 		const noun =
 			galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
-		button.textContent = showAllGallery ? `View Less ${noun}` : `View All ${noun}`
+		button.textContent = showAllGallery
+			? `View Less ${noun}`
+			: `View All ${noun}`
 	}
 }
 
@@ -5394,7 +5436,8 @@ function setGalleryFilter(group, value) {
 	showAllGallery = false
 	const button = document.getElementById("viewAllGallery")
 	if (button) {
-		const noun = galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
+		const noun =
+			galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
 		button.textContent = `View All ${noun}`
 	}
 	renderGalleryFilters()
@@ -6478,30 +6521,48 @@ function populateServiceSelect() {
 	const select = document.getElementById("serviceSelect")
 	if (!select) return
 	select
-		.querySelectorAll("optgroup, option[data-dynamic-service='true']")
+		.querySelectorAll("option[data-dynamic-service='true']")
 		.forEach((node) => node.remove())
 	const visibleServices = getVisibleServicesData()
 	const categories = ["all", ...new Set(visibleServices.map((s) => s.category))]
 	categories.forEach((cat) => {
 		if (cat === "all") return
 		const services = visibleServices.filter((s) => s.category === cat)
-		const optgroup = document.createElement("optgroup")
-		optgroup.label =
+		const categoryLabel =
 			SERVICE_CATEGORY_LABEL_MAP[cat] ||
 			cat.charAt(0).toUpperCase() + cat.slice(1)
+
+		const categoryHeader = document.createElement("option")
+		categoryHeader.value = ""
+		categoryHeader.textContent = `◆  ${categoryLabel.toUpperCase()}  ◆`
+		categoryHeader.disabled = true
+		categoryHeader.dataset.dynamicService = "true"
+		categoryHeader.dataset.categoryHeader = "true"
+		select.appendChild(categoryHeader)
+
 		services.forEach((s) => {
 			const opt = document.createElement("option")
 			opt.value = s.name
 			opt.textContent = `${s.name} (${s.price})`
-			optgroup.appendChild(opt)
+			opt.dataset.dynamicService = "true"
+			select.appendChild(opt)
 		})
-		select.appendChild(optgroup)
 	})
+
+	const customCategoryHeader = document.createElement("option")
+	customCategoryHeader.value = ""
+	customCategoryHeader.textContent = "◆  OTHER SERVICES  ◆"
+	customCategoryHeader.disabled = true
+	customCategoryHeader.dataset.dynamicService = "true"
+	customCategoryHeader.dataset.categoryHeader = "true"
+	customCategoryHeader.dataset.customCategoryHeader = "true"
+	select.appendChild(customCategoryHeader)
 
 	const customOption = document.createElement("option")
 	customOption.value = CUSTOM_SERVICE_OPTION_VALUE
-	customOption.textContent = "Other (Type Service)"
+	customOption.textContent = "✨ Other Service (Type Yours)"
 	customOption.dataset.dynamicService = "true"
+	customOption.dataset.customServiceOption = "true"
 	select.appendChild(customOption)
 }
 

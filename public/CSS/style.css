@@ -3,6 +3,10 @@
     --primary: #C8963E;
     --primary-dark: #A6792D;
     --primary-light: #E8C27A;
+    --focus-blue: #3B82F6;
+    --focus-blue-soft: rgba(59, 130, 246, 0.28);
+    --focus-gold: #C8963E;
+    --focus-gold-soft: rgba(200, 150, 62, 0.28);
     --accent-purple: #6B2E7A;
     --accent-pink: #B84E7A;
     --bg-primary: #0A0A0A;
@@ -42,7 +46,7 @@ html {
     scroll-padding-top: calc(var(--nav-height) + 16px);
     font-size: 16px;
     scrollbar-width: thin;
-    scrollbar-color: var(--primary) var(--bg-secondary);
+    scrollbar-color: #e0ac4f #1b1712;
 }
 
 section[id] {
@@ -56,6 +60,8 @@ body {
     line-height: 1.6;
     overflow-x: hidden;
     transition: var(--transition);
+    scrollbar-width: thin;
+    scrollbar-color: #e0ac4f #1b1712;
 }
 
 body::-webkit-scrollbar {
@@ -164,7 +170,29 @@ textarea {
 }
 
 select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     cursor: pointer;
+    padding-right: 46px;
+    background-color: var(--bg-card);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%23C8963E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 14px;
+}
+
+select:hover:not(:disabled) {
+    border-color: rgba(200, 150, 62, 0.72);
+}
+
+select:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+select::-ms-expand {
+    display: none;
 }
 
 input[type="color"] {
@@ -206,11 +234,17 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 }
 
 input:focus,
-select:focus,
 textarea:focus {
     border-color: var(--primary);
     outline: none;
     box-shadow: 0 0 0 4px var(--shadow);
+}
+
+select:focus,
+select:focus-visible {
+    border-color: var(--focus-gold);
+    outline: none;
+    box-shadow: 0 0 0 4px var(--focus-gold-soft);
 }
 
 button {
@@ -2394,17 +2428,17 @@ h6 {
     transition: var(--transition-fast);
 }
 
-.admin-service-toggle input:checked + .admin-service-toggle-slider {
+.admin-service-toggle input:checked+.admin-service-toggle-slider {
     background: linear-gradient(135deg, var(--primary), var(--primary-light));
     border-color: rgba(200, 150, 62, 0.85);
 }
 
-.admin-service-toggle input:checked + .admin-service-toggle-slider::after {
+.admin-service-toggle input:checked+.admin-service-toggle-slider::after {
     transform: translateX(24px);
     background: #0a0a0a;
 }
 
-.admin-service-toggle input:focus-visible + .admin-service-toggle-slider {
+.admin-service-toggle input:focus-visible+.admin-service-toggle-slider {
     box-shadow: 0 0 0 4px rgba(200, 150, 62, 0.22);
 }
 
@@ -4165,14 +4199,8 @@ h6 {
 .gallery-sort-select {
     width: auto;
     min-width: 220px;
-    padding: 9px 12px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--bg-card);
-    color: var(--text-primary);
     font-size: 0.85rem;
     font-weight: 500;
-    cursor: pointer;
 }
 
 .gallery-sort-select option {
@@ -4230,14 +4258,8 @@ h6 {
 .admin-review-sort-select {
     width: auto;
     min-width: 220px;
-    padding: 9px 12px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--bg-card);
-    color: var(--text-primary);
     font-size: 0.85rem;
     font-weight: 500;
-    cursor: pointer;
 }
 
 .reviews-sort-select option,
@@ -5556,10 +5578,7 @@ body.light-mode .submit-booking::before {
 body.light-mode .btn-outline,
 body.light-mode .auth-btn,
 body.light-mode .gallery-filter-chip,
-body.light-mode .services-tab,
-body.light-mode .reviews-sort-select,
-body.light-mode .gallery-sort-select,
-body.light-mode .admin-review-sort-select {
+body.light-mode .services-tab {
     border-color: #b58852;
     color: #5a3a1d;
     background: #fff8ef;
@@ -5612,16 +5631,29 @@ body.light-mode textarea {
     color: var(--text-primary);
 }
 
+body.light-mode select {
+    background-color: #fffdf9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%239b6b2e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 14px;
+}
+
 body.light-mode input::placeholder,
 body.light-mode textarea::placeholder {
     color: #8a7461;
 }
 
 body.light-mode input:focus,
-body.light-mode select:focus,
 body.light-mode textarea:focus {
     border-color: #a06a2a;
     box-shadow: 0 0 0 4px rgba(185, 126, 52, 0.22);
+}
+
+body.light-mode select:focus,
+body.light-mode select:focus-visible {
+    border-color: #b67f34;
+    box-shadow: 0 0 0 4px rgba(182, 127, 52, 0.24);
 }
 
 body.light-mode .form-group label,
@@ -6185,6 +6217,87 @@ body.light-mode input[type="datetime-local"]::-webkit-calendar-picker-indicator 
 select option {
     background: var(--bg-card);
     color: var(--text-primary);
+}
+
+body.light-mode select option {
+    background: #fffdf9;
+    color: var(--text-primary);
+}
+
+/* Booking service select scrollbar theming */
+#serviceSelect {
+    scrollbar-width: thin;
+    scrollbar-color: #e0ac4f #1b1712;
+}
+
+#serviceSelect::-webkit-scrollbar {
+    width: 10px;
+}
+
+#serviceSelect::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, rgba(200, 150, 62, 0.2), rgba(200, 150, 62, 0.08));
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.3);
+}
+
+#serviceSelect::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--primary-light), var(--primary));
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.35);
+}
+
+#serviceSelect::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+}
+
+body.light-mode #serviceSelect {
+    scrollbar-color: #c8963e #eadfce;
+}
+
+body.light-mode #serviceSelect::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #efe4d4, #e6d9c6);
+}
+
+body.light-mode #serviceSelect::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #e8c27a, #c8963e);
+    border-color: rgba(166, 121, 45, 0.28);
+}
+
+/* Booking service list option highlighting */
+#serviceSelect option:checked,
+#serviceSelect option:hover,
+#serviceSelect option:focus {
+    background: linear-gradient(180deg, #e8c27a, #c8963e) !important;
+    color: #0a0a0a !important;
+}
+
+/* Service category headers inside booking dropdown */
+#serviceSelect option[data-category-header="true"] {
+    background: linear-gradient(180deg, rgba(200, 150, 62, 0.3), rgba(200, 150, 62, 0.16)) !important;
+    color: var(--primary-light) !important;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+}
+
+#serviceSelect option[data-custom-category-header="true"] {
+    background: linear-gradient(180deg, rgba(200, 150, 62, 0.34), rgba(200, 150, 62, 0.2)) !important;
+    color: #ffe3ae !important;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+}
+
+body.light-mode #serviceSelect option[data-category-header="true"] {
+    background: linear-gradient(180deg, #f1dfbe, #e8cf9f) !important;
+    color: #5f431d !important;
+}
+
+body.light-mode #serviceSelect option[data-custom-category-header="true"] {
+    background: linear-gradient(180deg, #f2e2c5, #e5cfa6) !important;
+    color: #5f431d !important;
 }
 
 /* ============ UTILITY ============ */
