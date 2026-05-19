@@ -267,6 +267,11 @@ service cloud.firestore {
       allow read, create, update, delete: if false;
     }
 
+    match /siteSettings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
     match /galleryStyles/{styleId} {
       // Public gallery is visible to everyone (including unauthenticated clients).
       allow read: if true;

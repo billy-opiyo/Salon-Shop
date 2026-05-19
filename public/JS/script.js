@@ -1025,6 +1025,20 @@ const timeSlots = [
 ]
 
 const CUSTOM_SERVICE_OPTION_VALUE = "__custom_service__"
+const SERVICE_SETTINGS_DOC_PATH = ["siteSettings", "serviceCategories"]
+const SERVICE_CATEGORY_DEFINITIONS = [
+	{ key: "hair-services", label: "Hair Services" },
+	{ key: "beauty-spa-services", label: "Beauty Spa Services" },
+	{ key: "nail-services", label: "Nail Services" },
+	{ key: "makeup-services", label: "Makeup Services" },
+	{ key: "barber-services", label: "Barber Services" },
+	{ key: "massage-wellness", label: "Massage & Wellness" },
+	{ key: "eyebrow-lash-services", label: "Eyebrow & Lash Services" },
+	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
+]
+const SERVICE_CATEGORY_LABEL_MAP = Object.fromEntries(
+	SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, item.label]),
+)
 
 // ============ FIREBASE + CLOUDINARY CONFIG ============
 const appConfig = window.APP_CONFIG || {}
@@ -1037,6 +1051,7 @@ let db = null
 let auth = null
 let functionsService = null
 let activeAvailabilityUnsubscribe = null
+let serviceCategorySettingsUnsubscribe = null
 let authMode = "signin"
 let authObserverAttached = false
 let shouldAutoFocusDashboardAfterAuth = false
@@ -1044,6 +1059,10 @@ let googleAuthInProgress = false
 let sessionHeartbeatTimer = null
 let currentSessionId = ""
 let sessionPresenceBound = false
+let activeServicesFilter = "all"
+let enabledServiceCategories = Object.fromEntries(
+	SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, true]),
+)
 
 const SESSION_HEARTBEAT_INTERVAL_MS = 60 * 1000
 const SESSION_STALE_AFTER_MS = 2 * 60 * 1000
@@ -1719,6 +1738,114 @@ function canInitializeFirebase() {
 	)
 }
 
+function getDefaultEnabledServiceCategoriesState() {
+	return Object.fromEntries(
+		SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, true]),
+	)
+}
+
+function normalizeEnabledServiceCategoriesState(raw = {}) {
+	const defaults = getDefaultEnabledServiceCategoriesState()
+	const source =
+		typeof raw === "object" && raw && !Array.isArray(raw) ? raw : defaults
+
+	SERVICE_CATEGORY_DEFINITIONS.forEach((item) => {
+		defaults[item.key] = source[item.key] !== false
+	})
+
+	return defaults
+}
+
+function getVisibleServicesData() {
+	return servicesData.filter(
+		(service) => enabledServiceCategories[service.category] !== false,
+	)
+}
+
+function syncServicesTabsVisibility() {
+	const tabs = Array.from(document.querySelectorAll(".services-tab"))
+	if (!tabs.length) return
+
+	tabs.forEach((tab) => {
+		const filterKey = String(tab.dataset.filter || "all").trim()
+		const visible =
+			filterKey === "all" || enabledServiceCategories[filterKey] !== false
+		tab.style.display = visible ? "" : "none"
+
+		if (!visible) {
+			tab.classList.remove("active")
+		}
+	})
+
+	const visibleTabs = tabs.filter((tab) => tab.style.display !== "none")
+	const activeVisibleTab = visibleTabs.find((tab) => tab.classList.contains("active"))
+	if (!activeVisibleTab && visibleTabs.length) {
+		visibleTabs[0].classList.add("active")
+		activeServicesFilter = String(visibleTabs[0].dataset.filter || "all")
+	}
+}
+
+function stopServiceCategorySettingsListener() {
+	if (typeof serviceCategorySettingsUnsubscribe === "function") {
+		serviceCategorySettingsUnsubscribe()
+		serviceCategorySettingsUnsubscribe = null
+	}
+}
+
+function applyServiceCategorySettings(rawCategories = {}) {
+	enabledServiceCategories = normalizeEnabledServiceCategoriesState(rawCategories)
+
+	if (
+		activeServicesFilter !== "all" &&
+		enabledServiceCategories[activeServicesFilter] === false
+	) {
+		activeServicesFilter = "all"
+	}
+
+	const serviceSelect = document.getElementById("serviceSelect")
+	const customServiceInput = document.getElementById("customServiceInput")
+	const selectedBookingValue = serviceSelect?.value || ""
+	const currentBookingService =
+		selectedBookingValue === CUSTOM_SERVICE_OPTION_VALUE
+			? customServiceInput?.value?.trim() || ""
+			: selectedBookingValue
+	const currentReviewService = document.getElementById("reviewService")?.value || ""
+
+	syncServicesTabsVisibility()
+	renderServices(activeServicesFilter)
+	populateReviewServiceSelect()
+	populateServiceSelect()
+	setBookingServiceValue(currentBookingService)
+
+	const reviewSelect = document.getElementById("reviewService")
+	if (reviewSelect) {
+		const canRestoreReviewValue = Array.from(reviewSelect.options).some(
+			(option) => option.value === currentReviewService,
+		)
+		reviewSelect.value = canRestoreReviewValue ? currentReviewService : ""
+	}
+}
+
+function startServiceCategorySettingsListener() {
+	if (!firebaseReady || !db) return
+
+	stopServiceCategorySettingsListener()
+
+	serviceCategorySettingsUnsubscribe = db
+		.collection(SERVICE_SETTINGS_DOC_PATH[0])
+		.doc(SERVICE_SETTINGS_DOC_PATH[1])
+		.onSnapshot(
+			(snapshot) => {
+				const data = snapshot.exists ? snapshot.data() || {} : {}
+				applyServiceCategorySettings(data.categories)
+			},
+			(error) => {
+				console.error("Service category settings listener failed:", error)
+				applyServiceCategorySettings(getDefaultEnabledServiceCategoriesState())
+			},
+		)
+}
+
 async function initializeFirebaseServices() {
 	if (!canInitializeFirebase()) return
 
@@ -1743,6 +1870,7 @@ async function initializeFirebaseServices() {
 	}
 
 	firebaseReady = true
+	startServiceCategorySettingsListener()
 
 	const persistedUser = auth.currentUser
 	if (persistedUser && !persistedUser.isAnonymous) {
@@ -4719,20 +4847,18 @@ function handleAvailabilityWatch() {
 function renderServices(filter = "all") {
 	const grid = document.getElementById("servicesGrid")
 	if (!grid) return
-
-	const categoryLabelMap = {
-		"hair-services": "Hair Services",
-		"beauty-spa-services": "Beauty Spa Services",
-		"nail-services": "Nail Services",
-		"makeup-services": "Makeup Services",
-		"barber-services": "Barber Services",
-		"massage-wellness": "Massage & Wellness",
-		"eyebrow-lash-services": "Eyebrow & Lash Services",
-		"bridal-event-packages": "Bridal / Event Packages",
-	}
+	const visibleServices = getVisibleServicesData()
+	const requestedFilter = String(filter || "all")
+	const normalizedFilter =
+		requestedFilter !== "all" && enabledServiceCategories[requestedFilter] === false
+			? "all"
+			: requestedFilter
+	activeServicesFilter = normalizedFilter
 
 	const getCategoryLabel = (categoryKey = "") => {
-		if (categoryLabelMap[categoryKey]) return categoryLabelMap[categoryKey]
+		if (SERVICE_CATEGORY_LABEL_MAP[categoryKey]) {
+			return SERVICE_CATEGORY_LABEL_MAP[categoryKey]
+		}
 		return String(categoryKey || "")
 			.replace(/-/g, " ")
 			.replace(/\b\w/g, (m) => m.toUpperCase())
@@ -4762,18 +4888,18 @@ function renderServices(filter = "all") {
   `
 	}
 
-	if (filter !== "all") {
+	if (normalizedFilter !== "all") {
 		grid.classList.remove("is-grouped")
-		const filtered = servicesData.filter((s) => s.category === filter)
+		const filtered = visibleServices.filter((s) => s.category === normalizedFilter)
 		grid.innerHTML = filtered.map((s, i) => renderServiceCard(s, i)).join("")
 		return
 	}
 
 	grid.classList.add("is-grouped")
-	const categoryOrder = [...new Set(servicesData.map((s) => s.category))]
+	const categoryOrder = [...new Set(visibleServices.map((s) => s.category))]
 	grid.innerHTML = categoryOrder
 		.map((categoryKey) => {
-			const categoryServices = servicesData.filter(
+			const categoryServices = visibleServices.filter(
 				(service) => service.category === categoryKey,
 			)
 			if (!categoryServices.length) return ""
@@ -6136,7 +6262,7 @@ function populateReviewServiceSelect() {
 	const select = document.getElementById("reviewService")
 	if (!select) return
 	select.innerHTML = '<option value="">Select Service (Optional)</option>'
-	servicesData.forEach((service) => {
+	getVisibleServicesData().forEach((service) => {
 		const option = document.createElement("option")
 		option.value = service.name
 		option.textContent = service.name
@@ -6186,25 +6312,15 @@ function populateServiceSelect() {
 	select
 		.querySelectorAll("optgroup, option[data-dynamic-service='true']")
 		.forEach((node) => node.remove())
-
-	const categoryLabelMap = {
-		"hair-services": "Hair Services",
-		"beauty-spa-services": "Beauty Spa Services",
-		"nail-services": "Nail Services",
-		"makeup-services": "Makeup Services",
-		"barber-services": "Barber Services",
-		"massage-wellness": "Massage & Wellness",
-		"eyebrow-lash-services": "Eyebrow & Lash Services",
-		"bridal-event-packages": "Bridal / Event Packages",
-	}
-
-	const categories = ["all", ...new Set(servicesData.map((s) => s.category))]
+	const visibleServices = getVisibleServicesData()
+	const categories = ["all", ...new Set(visibleServices.map((s) => s.category))]
 	categories.forEach((cat) => {
 		if (cat === "all") return
-		const services = servicesData.filter((s) => s.category === cat)
+		const services = visibleServices.filter((s) => s.category === cat)
 		const optgroup = document.createElement("optgroup")
 		optgroup.label =
-			categoryLabelMap[cat] || cat.charAt(0).toUpperCase() + cat.slice(1)
+			SERVICE_CATEGORY_LABEL_MAP[cat] ||
+			cat.charAt(0).toUpperCase() + cat.slice(1)
 		services.forEach((s) => {
 			const opt = document.createElement("option")
 			opt.value = s.name
@@ -6398,11 +6514,13 @@ document.querySelector(".hero-stats") &&
 // ============ SERVICES TABS ============
 document.querySelectorAll(".services-tab").forEach((tab) => {
 	tab.addEventListener("click", () => {
+		if (tab.style.display === "none") return
 		document
 			.querySelectorAll(".services-tab")
 			.forEach((t) => t.classList.remove("active"))
 		tab.classList.add("active")
-		renderServices(tab.dataset.filter)
+		activeServicesFilter = String(tab.dataset.filter || "all")
+		renderServices(activeServicesFilter)
 	})
 })
 
@@ -7036,6 +7154,7 @@ setDashboardPromptState()
 bindAuthUiEvents()
 bindSessionPresenceLifecycle()
 renderServices()
+syncServicesTabsVisibility()
 galleryData = fallbackGalleryData.map((item, i) =>
 	normalizeGalleryItem({ id: `fallback-${i}`, ...item }),
 )

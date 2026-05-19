@@ -52,8 +52,8 @@
 					<h1 class="section-title">Content, Bookings & Security Management</h1>
 					<p class="section-desc">
 						Log in with your admin account to manage Bookings, Schedules,
-						Gallery, Blogs, Reviews, Messages and Security Alerts from one
-						categorized control panel.
+						Gallery, Blogs, Reviews, Messages, Services and Security Alerts from
+						one categorized control panel.
 					</p>
 					<br />
 					<p style="margin-top: 12px">
@@ -179,6 +179,15 @@
 							aria-selected="false"
 						>
 							Messages
+						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
+							data-admin-section-tab="services"
+							role="tab"
+							aria-selected="false"
+						>
+							Services
 						</button>
 						<button
 							type="button"
@@ -798,6 +807,44 @@
 						</div>
 
 						<div class="admin-review-list" id="adminContactList"></div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="services"
+						role="tabpanel"
+					>
+						<div class="admin-section-card" style="margin-bottom: 14px">
+							<h3>Service Category Visibility</h3>
+							<p style="margin-bottom: 10px">
+								Turn categories ON/OFF based on what this salon currently
+								offers. Changes apply live on the website and booking form.
+							</p>
+							<div
+								class="form-message"
+								id="adminServicesMessage"
+								style="display: none"
+							></div>
+
+							<div
+								class="admin-service-settings-grid"
+								id="adminServiceCategoryToggles"
+							>
+								<div class="admin-empty-state">
+									Loading category controls...
+								</div>
+							</div>
+
+							<div class="admin-booking-actions" style="margin-top: 12px">
+								<button
+									type="button"
+									class="btn btn-primary"
+									id="adminSaveServiceCategoriesBtn"
+								>
+									Save Category Settings
+								</button>
+							</div>
+						</div>
 					</section>
 
 					<section

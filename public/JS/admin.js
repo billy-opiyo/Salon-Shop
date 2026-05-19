@@ -21,6 +21,7 @@ let adminAccountHistoryUnsubscribe = null
 let adminSessionsUnsubscribe = null
 let adminTimelineUnsubscribe = null
 let adminUsersUnsubscribe = null
+let adminServiceSettingsUnsubscribe = null
 let adminGalleryDocs = []
 let adminBlogDocs = []
 let adminReviewDocs = []
@@ -68,6 +69,17 @@ const defaultAdminSection = "bookings"
 const ADMIN_APP_NAME = "royalBraidsAdminApp"
 const ADMIN_SESSION_STALE_AFTER_MS = 2 * 60 * 1000
 const ADMIN_SECURITY_BLOCK_DEFAULT_MINUTES = 60
+const ADMIN_SERVICE_SETTINGS_DOC_PATH = ["siteSettings", "serviceCategories"]
+const ADMIN_SERVICE_CATEGORY_DEFINITIONS = [
+	{ key: "hair-services", label: "Hair Services" },
+	{ key: "beauty-spa-services", label: "Beauty Spa Services" },
+	{ key: "nail-services", label: "Nail Services" },
+	{ key: "makeup-services", label: "Makeup Services" },
+	{ key: "barber-services", label: "Barber Services" },
+	{ key: "massage-wellness", label: "Massage & Wellness" },
+	{ key: "eyebrow-lash-services", label: "Eyebrow & Lash Services" },
+	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
+]
 const ADMIN_REVIEW_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 }
@@ -83,6 +95,9 @@ let adminConfirmState = {
 	resolve: null,
 	isOpen: false,
 }
+let adminServiceCategoriesDraft = Object.fromEntries(
+	ADMIN_SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, true]),
+)
 
 function closeAdminConfirmModal(result = false) {
 	const modal = document.getElementById("adminConfirmModal")
@@ -787,6 +802,129 @@ function stopAdminUsersListener() {
 	}
 }
 
+function stopAdminServiceSettingsListener() {
+	if (typeof adminServiceSettingsUnsubscribe === "function") {
+		adminServiceSettingsUnsubscribe()
+		adminServiceSettingsUnsubscribe = null
+	}
+}
+
+function startAdminServiceSettingsListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminServiceSettingsListener()
+
+	adminServiceSettingsUnsubscribe = db
+		.collection(ADMIN_SERVICE_SETTINGS_DOC_PATH[0])
+		.doc(ADMIN_SERVICE_SETTINGS_DOC_PATH[1])
+		.onSnapshot(
+			(snapshot) => {
+				const data = snapshot.exists ? snapshot.data() || {} : {}
+				adminServiceCategoriesDraft = normalizeAdminServiceCategoriesState(
+					data.categories,
+				)
+				renderAdminServiceCategorySettings()
+			},
+			(error) => {
+				console.error("Admin service settings listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch service category settings in realtime: ${error.message || "unknown error"}`,
+					"adminServicesMessage",
+				)
+			},
+		)
+}
+
+function getAdminDefaultServiceCategoriesState() {
+	return Object.fromEntries(
+		ADMIN_SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, true]),
+	)
+}
+
+function normalizeAdminServiceCategoriesState(raw = {}) {
+	const defaults = getAdminDefaultServiceCategoriesState()
+	const source =
+		typeof raw === "object" && raw && !Array.isArray(raw) ? raw : defaults
+
+	ADMIN_SERVICE_CATEGORY_DEFINITIONS.forEach((item) => {
+		defaults[item.key] = source[item.key] !== false
+	})
+
+	return defaults
+}
+
+function renderAdminServiceCategorySettings() {
+	const mount = document.getElementById("adminServiceCategoryToggles")
+	if (!mount) return
+
+	mount.innerHTML = ADMIN_SERVICE_CATEGORY_DEFINITIONS.map((item) => {
+		const enabled = adminServiceCategoriesDraft[item.key] !== false
+		return `
+			<article class="admin-service-category-card">
+				<label class="admin-service-category-toggle" for="adminServiceCategory_${escapeHtml(item.key)}">
+					<span>${escapeHtml(item.label)}</span>
+					<input
+						type="checkbox"
+						id="adminServiceCategory_${escapeHtml(item.key)}"
+						data-service-category-toggle="${escapeHtml(item.key)}"
+						${enabled ? "checked" : ""}
+					/>
+				</label>
+				<div class="admin-service-category-state">
+					${enabled ? "✅ Visible on website" : "❌ Hidden on website"}
+				</div>
+			</article>
+		`
+	}).join("")
+}
+
+async function saveAdminServiceCategorySettings() {
+	if (!adminUnlocked || !db || !auth?.currentUser) return
+
+	const saveBtn = document.getElementById("adminSaveServiceCategoriesBtn")
+	const oldLabel = saveBtn?.textContent || ""
+
+	try {
+		if (saveBtn) {
+			saveBtn.disabled = true
+			saveBtn.textContent = "Saving..."
+		}
+
+		await db
+			.collection(ADMIN_SERVICE_SETTINGS_DOC_PATH[0])
+			.doc(ADMIN_SERVICE_SETTINGS_DOC_PATH[1])
+			.set(
+				{
+					categories: normalizeAdminServiceCategoriesState(
+						adminServiceCategoriesDraft,
+					),
+					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+					updatedBy: auth?.currentUser?.email || "admin",
+				},
+				{ merge: true },
+			)
+
+		setAdminMessage(
+			"success",
+			"✅ Service category settings saved and applied live.",
+			"adminServicesMessage",
+		)
+	} catch (error) {
+		console.error("Saving service category settings failed:", error)
+		setAdminMessage(
+			"error",
+			`❌ Failed to save category settings: ${error.message || "unknown error"}`,
+			"adminServicesMessage",
+		)
+	} finally {
+		if (saveBtn) {
+			saveBtn.disabled = false
+			saveBtn.textContent = oldLabel || "Save Category Settings"
+		}
+	}
+}
+
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
@@ -890,6 +1028,7 @@ function setAdminUnlockedState(value) {
 		stopAdminBlogsListener()
 		stopAdminReviewsListener()
 		stopAdminContactListener()
+		stopAdminServiceSettingsListener()
 		stopAdminSecurityListener()
 		stopAdminSecurityAlertsListener()
 		stopAdminAccountHistoryListener()
@@ -901,6 +1040,7 @@ function setAdminUnlockedState(value) {
 		setAdminMessage("", "", "adminBlogsMessage")
 		setAdminMessage("", "", "adminReviewsMessage")
 		setAdminMessage("", "", "adminContactMessage")
+		setAdminMessage("", "", "adminServicesMessage")
 		setAdminMessage("", "", "adminSecurityMessage")
 		setAdminMessage("", "", "adminSecurityEventsMessage")
 		setAdminMessage("", "", "adminScheduleMessage")
@@ -921,6 +1061,7 @@ function setAdminUnlockedState(value) {
 		startAdminBlogsListener()
 		startAdminReviewsListener()
 		startAdminContactListener()
+		startAdminServiceSettingsListener()
 		startAdminSecurityListener()
 		startAdminSecurityAlertsListener()
 		startAdminAccountHistoryListener()
@@ -1313,10 +1454,16 @@ function applyAdminSecurityAdvancedFilters(items = []) {
 			: ""
 
 		if (dateFilter && createdAtDateKey !== dateFilter) return false
-		if (dateFromFilter && (!createdAtDateKey || createdAtDateKey < dateFromFilter)) {
+		if (
+			dateFromFilter &&
+			(!createdAtDateKey || createdAtDateKey < dateFromFilter)
+		) {
 			return false
 		}
-		if (dateToFilter && (!createdAtDateKey || createdAtDateKey > dateToFilter)) {
+		if (
+			dateToFilter &&
+			(!createdAtDateKey || createdAtDateKey > dateToFilter)
+		) {
 			return false
 		}
 
@@ -1434,7 +1581,10 @@ function exportAdminSecurityLogsAsCSV() {
 			item.method || "",
 			item.deviceType || "",
 			item.browser || "",
-			String(item.locationLabel || "").split(",").pop()?.trim() || "",
+			String(item.locationLabel || "")
+				.split(",")
+				.pop()
+				?.trim() || "",
 			item.locationLabel || "",
 			item.status || "",
 			item.riskLevel || "",
@@ -1506,7 +1656,10 @@ function exportAdminSecurityLogsAsExcel() {
 				item.method || "",
 				item.deviceType || "",
 				item.browser || "",
-				String(item.locationLabel || "").split(",").pop()?.trim() || "",
+				String(item.locationLabel || "")
+					.split(",")
+					.pop()
+					?.trim() || "",
 				item.locationLabel || "",
 				item.status || "",
 				item.riskLevel || "",
@@ -4140,7 +4293,9 @@ function initializeAdminPanel() {
 	const securityStatusFilterSelect = document.getElementById(
 		"adminSecurityStatusFilterSelect",
 	)
-	const securitySearchInput = document.getElementById("adminSecuritySearchInput")
+	const securitySearchInput = document.getElementById(
+		"adminSecuritySearchInput",
+	)
 	const securityExportCsvBtn = document.getElementById(
 		"adminSecurityExportCsvBtn",
 	)
@@ -4160,6 +4315,12 @@ function initializeAdminPanel() {
 	const timelineSortSelect = document.getElementById("adminTimelineSortSelect")
 	const profanityWordsInput = document.getElementById("adminProfanityWords")
 	const saveProfanityBtn = document.getElementById("adminSaveProfanityList")
+	const serviceCategoryToggles = document.getElementById(
+		"adminServiceCategoryToggles",
+	)
+	const saveServiceCategoriesBtn = document.getElementById(
+		"adminSaveServiceCategoriesBtn",
+	)
 	const cancelEditBtn = document.getElementById("adminGalleryCancelEdit")
 	const confirmModal = document.getElementById("adminConfirmModal")
 	const confirmCancelBtn = document.getElementById("adminConfirmCancel")
@@ -4761,7 +4922,8 @@ function initializeAdminPanel() {
 			if (securityDateFromFilterInput) securityDateFromFilterInput.value = ""
 			if (securityDateToFilterInput) securityDateToFilterInput.value = ""
 			if (securityDeviceFilterSelect) securityDeviceFilterSelect.value = "all"
-			if (securityProviderFilterSelect) securityProviderFilterSelect.value = "all"
+			if (securityProviderFilterSelect)
+				securityProviderFilterSelect.value = "all"
 			if (securityUserFilterSelect) securityUserFilterSelect.value = "all"
 			if (securityCountryFilterInput) securityCountryFilterInput.value = ""
 			if (securityStatusFilterSelect) securityStatusFilterSelect.value = "all"
@@ -4844,6 +5006,28 @@ function initializeAdminPanel() {
 			} finally {
 				actionBtn.disabled = false
 			}
+		})
+	}
+
+	if (serviceCategoryToggles) {
+		serviceCategoryToggles.addEventListener("change", (event) => {
+			const toggle = event.target.closest("[data-service-category-toggle]")
+			if (!toggle) return
+
+			const key = String(toggle.dataset.serviceCategoryToggle || "").trim()
+			if (!key) return
+
+			adminServiceCategoriesDraft = {
+				...adminServiceCategoriesDraft,
+				[key]: toggle.checked === true,
+			}
+			renderAdminServiceCategorySettings()
+		})
+	}
+
+	if (saveServiceCategoriesBtn) {
+		saveServiceCategoriesBtn.addEventListener("click", () => {
+			void saveAdminServiceCategorySettings()
 		})
 	}
 
