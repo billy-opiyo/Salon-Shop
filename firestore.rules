@@ -5,10 +5,42 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function adminDocPath() {
+      return /databases/$(database)/documents/adminUsers/$(request.auth.uid);
+    }
+
+    function adminDocExists() {
+      return isSignedIn() && exists(adminDocPath());
+    }
+
+    function adminDocData() {
+      return get(adminDocPath()).data;
+    }
+
+    function isAdminRole(roleValue) {
+      return roleValue is string
+        && roleValue in ['super_admin', 'admin'];
+    }
+
     function isAdmin() {
-      return isSignedIn()
-        && request.auth.token.email != null
-        && request.auth.token.email.matches('(?i)^billyopiyo597@gmail\\.com$');
+      return adminDocExists()
+        && adminDocData().active == true
+        && isAdminRole(adminDocData().role);
+    }
+
+    function isSuperAdmin() {
+      return isAdmin() && adminDocData().role == 'super_admin';
+    }
+
+    function hasAdminPermission(permissionKey) {
+      return isSuperAdmin()
+        || (
+          isAdmin()
+          && adminDocData().permissions is map
+          && permissionKey is string
+          && permissionKey in adminDocData().permissions
+          && adminDocData().permissions[permissionKey] == true
+        );
     }
 
     function isOwnerOrAdmin(ownerUid) {
@@ -269,7 +301,7 @@ service cloud.firestore {
 
     match /siteSettings/{settingId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if hasAdminPermission('canManageContent');
     }
 
     match /galleryStyles/{styleId} {
@@ -277,7 +309,7 @@ service cloud.firestore {
       allow read: if true;
 
       // Only admin can create/update/delete gallery content.
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if hasAdminPermission('canManageContent');
     }
 
     match /blogs/{blogId} {
@@ -285,7 +317,7 @@ service cloud.firestore {
       allow read: if true;
 
       // Only admins can create/update/delete blog entries.
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if hasAdminPermission('canManageContent');
     }
 
     match /reviews/{reviewId} {
@@ -354,7 +386,7 @@ service cloud.firestore {
         && reviewRateLimitAllowsCreate();
 
       // Admins can fully moderate reviews.
-      allow update: if isAdmin()
+      allow update: if hasAdminPermission('canManageContent')
         // Owners can edit their own pending reviews (typo fixes UX).
         || (
           isSignedIn()
@@ -383,7 +415,7 @@ service cloud.firestore {
         );
 
       // Only admins may delete reviews.
-      allow delete: if isAdmin();
+      allow delete: if hasAdminPermission('canManageContent');
     }
 
     match /users/{userId} {
@@ -402,7 +434,7 @@ service cloud.firestore {
         && request.resource.data.provider is string
         && request.resource.data.phone is string;
 
-      allow read: if isAdmin() || (
+      allow read: if hasAdminPermission('canManageSecurity') || isAdmin() || (
         isSignedIn() && userId == request.auth.uid
       );
 
@@ -522,7 +554,7 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       // Admins can read all login activity; users can read only their own entries.
-      allow read: if isAdmin() || (
+      allow read: if hasAdminPermission('canManageSecurity') || (
         isSignedIn() && resource.data.uid == request.auth.uid
       );
     }
@@ -532,7 +564,7 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       // Admin security dashboard can read alerts.
-      allow read: if isAdmin();
+      allow read: if hasAdminPermission('canManageSecurity');
     }
 
     match /accountChangeHistory/{changeId} {
@@ -540,7 +572,7 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       // Admin security dashboard can read account history events.
-      allow read: if isAdmin();
+      allow read: if hasAdminPermission('canManageSecurity');
     }
 
     match /activityTimeline/{timelineId} {
@@ -548,7 +580,24 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       // Admin security dashboard can read timeline events.
-      allow read: if isAdmin();
+      allow read: if hasAdminPermission('canManageSecurity');
+    }
+
+    match /adminUsers/{userId} {
+      // Allow signed-in users to read only their own admin access record
+      // (used by frontend to determine if panel access should unlock).
+      allow read: if isSignedIn() && userId == request.auth.uid;
+
+      // Admin-role records are server-managed only via Cloud Functions/Admin SDK.
+      allow create, update, delete: if false;
+    }
+
+    match /adminAuditLogs/{logId} {
+      // Audit entries are server-generated only.
+      allow create, update, delete: if false;
+
+      // Only super admins can read full admin delegation audit trails.
+      allow read: if isSuperAdmin();
     }
   }
 }

@@ -2910,6 +2910,143 @@ h6 {
     color: var(--text-secondary);
 }
 
+.admin-admins-toolbar {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(2, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 12px 0 14px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(200, 150, 62, 0.05));
+}
+
+.admin-admins-toolbar .form-group {
+    margin: 0;
+}
+
+.admin-admins-toolbar input,
+.admin-admins-toolbar select {
+    min-height: 42px;
+}
+
+.admin-admin-inline-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.admin-role-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.admin-role-badge.super {
+    background: rgba(200, 150, 62, 0.16);
+    color: #f4cc84;
+    border-color: rgba(200, 150, 62, 0.44);
+}
+
+.admin-role-badge.standard {
+    background: rgba(66, 153, 225, 0.14);
+    color: #90cdf4;
+    border-color: rgba(66, 153, 225, 0.4);
+}
+
+.admin-managed-toggle {
+    --toggle-width: 54px;
+    --toggle-height: 30px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.02);
+    min-height: 40px;
+}
+
+.admin-managed-toggle-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.admin-managed-toggle-slider {
+    position: relative;
+    width: var(--toggle-width);
+    height: var(--toggle-height);
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: var(--transition-fast);
+    flex: 0 0 auto;
+}
+
+.admin-managed-toggle-slider::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #c8c4bd;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    transition: var(--transition-fast);
+}
+
+.admin-managed-toggle-input:checked+.admin-managed-toggle-slider {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    border-color: rgba(200, 150, 62, 0.86);
+}
+
+.admin-managed-toggle-input:checked+.admin-managed-toggle-slider::after {
+    transform: translateX(24px);
+    background: #0a0a0a;
+}
+
+.admin-managed-toggle-input:focus-visible+.admin-managed-toggle-slider {
+    box-shadow: 0 0 0 4px rgba(200, 150, 62, 0.22);
+}
+
+.admin-managed-toggle-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+
+.admin-managed-toggle.is-on .admin-managed-toggle-label {
+    color: #9ae6b4;
+}
+
+.admin-managed-toggle.is-off .admin-managed-toggle-label {
+    color: #f6adad;
+}
+
+.admin-managed-toggle-input:disabled+.admin-managed-toggle-slider {
+    opacity: 0.55;
+}
+
+.admin-managed-toggle:has(.admin-managed-toggle-input:disabled) {
+    opacity: 0.72;
+}
+
 .admin-review-text {
     color: var(--text-secondary);
     font-size: 0.92rem;
@@ -4769,6 +4906,21 @@ h6 {
 @media (max-width: 700px) {
     .admin-review-meta {
         grid-template-columns: 1fr;
+    }
+
+    .admin-admins-toolbar {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 10px;
+    }
+
+    .admin-admin-inline-badges {
+        justify-content: flex-start;
+    }
+
+    .admin-managed-toggle {
+        width: 100%;
+        justify-content: space-between;
     }
 
     .reviews-submit-form .btn {

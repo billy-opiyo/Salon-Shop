@@ -18,6 +18,7 @@
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 		<script>
 			window.APP_CONFIG = {
 				firebase: {
@@ -29,16 +30,8 @@
 					appId: "1:712913782427:web:e997553d71bd9a1f6a283e",
 					measurementId: "G-B6LVQBEN3G",
 				},
-				cloudinary: {
-					cloudName: "dil8nacay",
-					uploadPreset: "royal-braids",
-					folder: "royal-braids/gallery",
-				},
 				appCheck: {
 					siteKey: "6Lc4U9wsAAAAANRRyprzqkkNZ7iOI98qE0nb6hJO",
-				},
-				admin: {
-					allowedEmails: ["billyopiyo597@gmail.com"],
 				},
 			}
 		</script>
@@ -188,6 +181,15 @@
 							aria-selected="false"
 						>
 							Services
+						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
+							data-admin-section-tab="admins"
+							role="tab"
+							aria-selected="false"
+						>
+							Admins
 						</button>
 						<button
 							type="button"
@@ -924,6 +926,165 @@
 								>
 									Save Category Settings
 								</button>
+							</div>
+						</div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="admins"
+						role="tabpanel"
+					>
+						<div class="admin-stats">
+							<div class="admin-stat-card">
+								<div class="label">Total Admins</div>
+								<strong id="adminAdminsTotalCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Active</div>
+								<strong id="adminAdminsActiveCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Super Admin</div>
+								<strong id="adminAdminsSuperCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Standard Admin</div>
+								<strong id="adminAdminsStandardCount">0</strong>
+							</div>
+						</div>
+
+						<div
+							class="form-message"
+							id="adminAdminsMessage"
+							style="display: none"
+						></div>
+
+						<div class="admin-gallery-wrap admin-admins-wrap">
+							<form class="admin-gallery-form" id="adminAdminsForm">
+								<input type="hidden" id="adminAdminEditUid" />
+								<div class="admin-gallery-form-head">
+									<h3 id="adminAdminsFormTitle">Create Admin Access</h3>
+									<button
+										type="button"
+										class="btn btn-outline"
+										id="adminAdminsCancelEdit"
+										style="display: none"
+									>
+										Cancel Edit
+									</button>
+								</div>
+
+								<div class="admin-gallery-grid">
+									<div class="form-group full">
+										<label for="adminManageEmail">Admin Email *</label>
+										<input
+											type="email"
+											id="adminManageEmail"
+											placeholder="admin@company.com"
+											required
+										/>
+										<small class="admin-field-help"
+											>Account must already exist in Firebase
+											Authentication.</small
+										>
+									</div>
+									<div class="form-group">
+										<label for="adminManageDisplayName">Display Name</label>
+										<input
+											type="text"
+											id="adminManageDisplayName"
+											placeholder="e.g. Front Desk Manager"
+										/>
+									</div>
+									<div class="form-group">
+										<label for="adminManageRole">Role *</label>
+										<select id="adminManageRole" required>
+											<option value="admin">Admin</option>
+											<option value="super_admin">Super Admin</option>
+										</select>
+									</div>
+									<div class="form-group full admin-checkbox-group">
+										<label>
+											<input type="checkbox" id="adminManageActive" checked />
+											<span>Account Active</span>
+										</label>
+									</div>
+									<div class="form-group full">
+										<label>Permissions</label>
+										<div class="admin-checkbox-group">
+											<label>
+												<input type="checkbox" id="adminPermManageAdmins" />
+												<span>Manage Admins</span>
+											</label>
+											<label>
+												<input
+													type="checkbox"
+													id="adminPermManageBookings"
+													checked
+												/>
+												<span>Manage Bookings</span>
+											</label>
+											<label>
+												<input
+													type="checkbox"
+													id="adminPermManageContent"
+													checked
+												/>
+												<span>Manage Content</span>
+											</label>
+											<label>
+												<input type="checkbox" id="adminPermManageSecurity" />
+												<span>Manage Security</span>
+											</label>
+										</div>
+									</div>
+								</div>
+
+								<button
+									type="submit"
+									class="btn btn-primary"
+									id="adminAdminsSaveBtn"
+								>
+									Create Admin
+								</button>
+							</form>
+
+							<div class="admin-gallery-list-wrap">
+								<div class="admin-gallery-list-head">
+									<h3>Existing Admin Access Records</h3>
+								</div>
+								<div class="admin-admins-toolbar" id="adminAdminsToolbar">
+									<div class="form-group">
+										<label for="adminAdminsSearchInput">Search Admins</label>
+										<input
+											type="search"
+											id="adminAdminsSearchInput"
+											placeholder="Search by name, email, or UID"
+										/>
+									</div>
+									<div class="form-group">
+										<label for="adminAdminsRoleFilter">Role Filter</label>
+										<select id="adminAdminsRoleFilter">
+											<option value="all">All Roles</option>
+											<option value="super_admin">Super Admin</option>
+											<option value="admin">Admin</option>
+										</select>
+									</div>
+									<div class="form-group">
+										<label for="adminAdminsStatusFilter">Status Filter</label>
+										<select id="adminAdminsStatusFilter">
+											<option value="all">All Statuses</option>
+											<option value="active">Active</option>
+											<option value="inactive">Inactive</option>
+										</select>
+									</div>
+								</div>
+								<div class="admin-gallery-list" id="adminAdminsList">
+									<div class="admin-empty-state">
+										No admin records loaded yet.
+									</div>
+								</div>
 							</div>
 						</div>
 					</section>

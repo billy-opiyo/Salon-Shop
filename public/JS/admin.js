@@ -1,8 +1,6 @@
 const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
-const adminConfig = appConfig.admin || {}
 const appCheckConfig = appConfig.appCheck || {}
-const cloudinaryConfig = appConfig.cloudinary || {}
 
 let firebaseReady = false
 let db = null
@@ -52,6 +50,10 @@ let adminAccountHistoryDocs = []
 let adminTimelineDocs = []
 let adminSecurityRawDocs = []
 let adminUserDocs = []
+let adminManagedUsersDocs = []
+let adminAdminsSearchTerm = ""
+let adminAdminsRoleFilter = "all"
+let adminAdminsStatusFilter = "all"
 let adminSecurityVisibleRows = []
 let adminGalleryPreviewObjectUrl = ""
 let activeAdminGalleryServiceCategory = "hair-services"
@@ -114,6 +116,7 @@ let adminConfirmState = {
 let adminServiceCategoriesDraft = Object.fromEntries(
 	ADMIN_SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, true]),
 )
+let adminAccessProfile = null
 
 function closeAdminConfirmModal(result = false) {
 	const modal = document.getElementById("adminConfirmModal")
@@ -231,13 +234,92 @@ function getOrCreateAdminFirebaseApp() {
 	return firebase.initializeApp(firebaseConfig, ADMIN_APP_NAME)
 }
 
-function isAllowedAdminEmail(email) {
-	if (!email) return false
-	const allowed = Array.isArray(adminConfig.allowedEmails)
-		? adminConfig.allowedEmails
-		: []
-	if (!allowed.length) return true
-	return allowed.includes(String(email).toLowerCase())
+function normalizeAdminRoleValue(value = "") {
+	const role = String(value || "")
+		.trim()
+		.toLowerCase()
+	if (role === "super_admin") return "super_admin"
+	if (role === "admin") return "admin"
+	return ""
+}
+
+function normalizeAdminPermissionsValue(raw = {}) {
+	const source =
+		typeof raw === "object" && raw && !Array.isArray(raw) ? raw : {}
+	return {
+		canManageAdmins: source.canManageAdmins === true,
+		canManageBookings: source.canManageBookings !== false,
+		canManageContent: source.canManageContent !== false,
+		canManageSecurity: source.canManageSecurity === true,
+	}
+}
+
+function hasAdminAccessPermission(permissionKey = "") {
+	const key = String(permissionKey || "").trim()
+	if (!key) return false
+	if (!adminAccessProfile) return false
+	if (adminAccessProfile.role === "super_admin") return true
+	return adminAccessProfile.permissions?.[key] === true
+}
+
+function isAuthorizedAdminAccessProfile(profile = null) {
+	if (!profile || typeof profile !== "object") return false
+	if (profile.active !== true) return false
+	const role = normalizeAdminRoleValue(profile.role)
+	if (!role) return false
+	return true
+}
+
+async function fetchAdminAccessProfile(uid = "") {
+	const cleanUid = String(uid || "").trim()
+	if (!cleanUid || !db) return null
+
+	const snapshot = await db.collection("adminUsers").doc(cleanUid).get()
+	if (!snapshot.exists) return null
+
+	const source = snapshot.data() || {}
+	return {
+		uid: snapshot.id,
+		email: String(source.email || "")
+			.trim()
+			.toLowerCase(),
+		role: normalizeAdminRoleValue(source.role),
+		active: source.active === true,
+		permissions: normalizeAdminPermissionsValue(source.permissions),
+	}
+}
+
+function applyAdminSectionPermissions() {
+	const tabsBySection = {
+		bookings: hasAdminAccessPermission("canManageBookings"),
+		schedule: hasAdminAccessPermission("canManageBookings"),
+		gallery: hasAdminAccessPermission("canManageContent"),
+		blogs: hasAdminAccessPermission("canManageContent"),
+		reviews: hasAdminAccessPermission("canManageContent"),
+		messages: hasAdminAccessPermission("canManageContent"),
+		services: hasAdminAccessPermission("canManageContent"),
+		admins: hasAdminAccessPermission("canManageAdmins"),
+		security: hasAdminAccessPermission("canManageSecurity"),
+	}
+
+	Object.entries(tabsBySection).forEach(([section, allowed]) => {
+		const tab = document.querySelector(`[data-admin-section-tab="${section}"]`)
+		const panel = document.querySelector(`[data-admin-section="${section}"]`)
+		if (tab) tab.style.display = allowed ? "" : "none"
+		if (panel) panel.style.display = allowed ? "" : "none"
+	})
+
+	const visibleTabs = Array.from(
+		document.querySelectorAll("[data-admin-section-tab]"),
+	).filter((tab) => tab.style.display !== "none")
+
+	if (!visibleTabs.length) return
+	const activeVisible = visibleTabs.find((tab) =>
+		tab.classList.contains("active"),
+	)
+	if (!activeVisible) {
+		setActiveAdminSection(visibleTabs[0].dataset.adminSectionTab || "bookings")
+	}
 }
 
 function getStatusClass(status) {
@@ -1075,8 +1157,446 @@ async function callAdminRestrictUserAction(payload = {}) {
 	return response?.data || { ok: true }
 }
 
+async function callAdminCreateAdminUserAction(payload = {}) {
+	if (
+		!firebaseReady ||
+		!adminFunctionsService ||
+		typeof adminFunctionsService.httpsCallable !== "function"
+	) {
+		throw new Error("Cloud Functions service is not ready yet.")
+	}
+
+	const callable = adminFunctionsService.httpsCallable("adminCreateAdminUser")
+	const response = await callable(payload)
+	return response?.data || { ok: true }
+}
+
+async function callAdminUpdateAdminUserAction(payload = {}) {
+	if (
+		!firebaseReady ||
+		!adminFunctionsService ||
+		typeof adminFunctionsService.httpsCallable !== "function"
+	) {
+		throw new Error("Cloud Functions service is not ready yet.")
+	}
+
+	const callable = adminFunctionsService.httpsCallable("adminUpdateAdminUser")
+	const response = await callable(payload)
+	return response?.data || { ok: true }
+}
+
+async function callAdminListAdminUsersAction() {
+	if (
+		!firebaseReady ||
+		!adminFunctionsService ||
+		typeof adminFunctionsService.httpsCallable !== "function"
+	) {
+		throw new Error("Cloud Functions service is not ready yet.")
+	}
+
+	const callable = adminFunctionsService.httpsCallable("adminListAdminUsers")
+	const response = await callable({})
+	return response?.data || { ok: true, admins: [] }
+}
+
+function normalizeManagedAdminUserDoc(doc = {}) {
+	const role = normalizeAdminRoleValue(doc.role || "") || "admin"
+	const permissions = normalizeAdminPermissionsValue(doc.permissions)
+	return {
+		uid: String(doc.uid || "").trim(),
+		email: String(doc.email || "")
+			.trim()
+			.toLowerCase(),
+		displayName: String(doc.displayName || "").trim(),
+		role,
+		active: doc.active !== false,
+		permissions,
+		createdAt: doc.createdAt || null,
+		updatedAt: doc.updatedAt || null,
+	}
+}
+
+function getManagedAdminRoleLabel(role = "") {
+	return normalizeAdminRoleValue(role) === "super_admin"
+		? "Super Admin"
+		: "Admin"
+}
+
+function getManagedAdminRoleBadgeClass(role = "") {
+	return normalizeAdminRoleValue(role) === "super_admin"
+		? "admin-role-badge super"
+		: "admin-role-badge standard"
+}
+
+function getFilteredManagedAdmins(docs = []) {
+	const list = Array.isArray(docs) ? docs : []
+	const searchTerm = String(adminAdminsSearchTerm || "")
+		.trim()
+		.toLowerCase()
+	const roleFilter = String(adminAdminsRoleFilter || "all")
+		.trim()
+		.toLowerCase()
+	const statusFilter = String(adminAdminsStatusFilter || "all")
+		.trim()
+		.toLowerCase()
+
+	return list.filter((item) => {
+		const role = normalizeAdminRoleValue(item.role || "") || "admin"
+		const status = item.active === true ? "active" : "inactive"
+
+		if (roleFilter !== "all" && role !== roleFilter) return false
+		if (statusFilter !== "all" && status !== statusFilter) return false
+		if (!searchTerm) return true
+
+		const haystack = [item.displayName, item.email, item.uid]
+			.map((value) =>
+				String(value || "")
+					.trim()
+					.toLowerCase(),
+			)
+			.join(" ")
+
+		return haystack.includes(searchTerm)
+	})
+}
+
+function canCurrentAdminToggleManagedAdmin(item = {}) {
+	if (!item || typeof item !== "object") return false
+	if (!adminUnlocked || !hasAdminAccessPermission("canManageAdmins"))
+		return false
+	if (normalizeAdminRoleValue(adminAccessProfile?.role) !== "super_admin") {
+		return false
+	}
+	const targetUid = String(item.uid || "").trim()
+	if (!targetUid) return false
+	if (targetUid === auth?.currentUser?.uid) return false
+	return true
+}
+
+function getManagedAdminToggleTooltip(item = {}) {
+	if (!adminUnlocked || !hasAdminAccessPermission("canManageAdmins")) {
+		return "Admin permissions are required to manage status."
+	}
+	if (normalizeAdminRoleValue(adminAccessProfile?.role) !== "super_admin") {
+		return "Only Super Admins can enable or disable admin accounts."
+	}
+	if (String(item.uid || "").trim() === auth?.currentUser?.uid) {
+		return "You cannot disable your own account."
+	}
+	return ""
+}
+
+function getAdminManagementFormElements() {
+	return {
+		form: document.getElementById("adminAdminsForm"),
+		list: document.getElementById("adminAdminsList"),
+		message: document.getElementById("adminAdminsMessage"),
+		formTitle: document.getElementById("adminAdminsFormTitle"),
+		saveBtn: document.getElementById("adminAdminsSaveBtn"),
+		cancelEditBtn: document.getElementById("adminAdminsCancelEdit"),
+		editUid: document.getElementById("adminAdminEditUid"),
+		email: document.getElementById("adminManageEmail"),
+		displayName: document.getElementById("adminManageDisplayName"),
+		role: document.getElementById("adminManageRole"),
+		active: document.getElementById("adminManageActive"),
+		permManageAdmins: document.getElementById("adminPermManageAdmins"),
+		permManageBookings: document.getElementById("adminPermManageBookings"),
+		permManageContent: document.getElementById("adminPermManageContent"),
+		permManageSecurity: document.getElementById("adminPermManageSecurity"),
+	}
+}
+
+function getAdminManagementFormValues() {
+	const el = getAdminManagementFormElements()
+	const role = normalizeAdminRoleValue(el.role?.value || "") || "admin"
+	const payload = {
+		uid: String(el.editUid?.value || "").trim(),
+		email: String(el.email?.value || "")
+			.trim()
+			.toLowerCase(),
+		displayName: String(el.displayName?.value || "").trim(),
+		role,
+		active: el.active?.checked !== false,
+		permissions: {
+			canManageAdmins: el.permManageAdmins?.checked === true,
+			canManageBookings: el.permManageBookings?.checked !== false,
+			canManageContent: el.permManageContent?.checked !== false,
+			canManageSecurity: el.permManageSecurity?.checked === true,
+		},
+	}
+
+	if (payload.role === "super_admin") {
+		payload.permissions = {
+			canManageAdmins: true,
+			canManageBookings: true,
+			canManageContent: true,
+			canManageSecurity: true,
+		}
+	}
+
+	return payload
+}
+
+function syncAdminManagementPermissionsWithRole() {
+	const el = getAdminManagementFormElements()
+	if (!el.role) return
+
+	const role = normalizeAdminRoleValue(el.role.value || "") || "admin"
+	const lockPermissions = role === "super_admin"
+	const permissionInputs = [
+		el.permManageAdmins,
+		el.permManageBookings,
+		el.permManageContent,
+		el.permManageSecurity,
+	].filter(Boolean)
+
+	permissionInputs.forEach((input) => {
+		if (lockPermissions) input.checked = true
+		input.disabled = lockPermissions
+	})
+}
+
+function resetAdminManagementForm() {
+	const el = getAdminManagementFormElements()
+	if (!el.form) return
+
+	el.form.reset()
+	if (el.editUid) el.editUid.value = ""
+	if (el.formTitle) el.formTitle.textContent = "Create Admin Access"
+	if (el.saveBtn) el.saveBtn.textContent = "Create Admin"
+	if (el.cancelEditBtn) el.cancelEditBtn.style.display = "none"
+	if (el.role) el.role.value = "admin"
+	if (el.active) el.active.checked = true
+	if (el.permManageAdmins) el.permManageAdmins.checked = false
+	if (el.permManageBookings) el.permManageBookings.checked = true
+	if (el.permManageContent) el.permManageContent.checked = true
+	if (el.permManageSecurity) el.permManageSecurity.checked = false
+	syncAdminManagementPermissionsWithRole()
+}
+
+function loadManagedAdminUserIntoForm(uid = "") {
+	const cleanUid = String(uid || "").trim()
+	if (!cleanUid) return
+
+	const item = adminManagedUsersDocs.find((doc) => doc.uid === cleanUid)
+	if (!item) return
+
+	const el = getAdminManagementFormElements()
+	if (!el.form) return
+
+	if (el.editUid) el.editUid.value = item.uid
+	if (el.email) el.email.value = item.email || ""
+	if (el.displayName) el.displayName.value = item.displayName || ""
+	if (el.role) el.role.value = item.role || "admin"
+	if (el.active) el.active.checked = item.active === true
+	if (el.permManageAdmins)
+		el.permManageAdmins.checked = item.permissions?.canManageAdmins === true
+	if (el.permManageBookings)
+		el.permManageBookings.checked =
+			item.permissions?.canManageBookings !== false
+	if (el.permManageContent)
+		el.permManageContent.checked = item.permissions?.canManageContent !== false
+	if (el.permManageSecurity)
+		el.permManageSecurity.checked = item.permissions?.canManageSecurity === true
+
+	if (el.formTitle) el.formTitle.textContent = "Update Admin Access"
+	if (el.saveBtn) el.saveBtn.textContent = "Update Admin"
+	if (el.cancelEditBtn) el.cancelEditBtn.style.display = "inline-flex"
+	syncAdminManagementPermissionsWithRole()
+	setAdminMessage("", "", "adminAdminsMessage")
+	setActiveAdminSection("admins")
+}
+
+function renderAdminManagedUsers() {
+	const el = getAdminManagementFormElements()
+	if (!el.list) return
+
+	const docs = Array.isArray(adminManagedUsersDocs)
+		? [...adminManagedUsersDocs]
+		: []
+	const sorted = docs.sort((a, b) => {
+		if (a.role !== b.role) return a.role === "super_admin" ? -1 : 1
+		const aName = `${a.displayName || ""} ${a.email || ""}`.trim().toLowerCase()
+		const bName = `${b.displayName || ""} ${b.email || ""}`.trim().toLowerCase()
+		return aName.localeCompare(bName)
+	})
+	const filtered = getFilteredManagedAdmins(sorted)
+
+	const total = sorted.length
+	const active = sorted.filter((item) => item.active === true).length
+	const superAdmins = sorted.filter(
+		(item) => item.role === "super_admin",
+	).length
+	const standardAdmins = sorted.filter(
+		(item) => item.role !== "super_admin",
+	).length
+
+	const totalEl = document.getElementById("adminAdminsTotalCount")
+	const activeEl = document.getElementById("adminAdminsActiveCount")
+	const superEl = document.getElementById("adminAdminsSuperCount")
+	const standardEl = document.getElementById("adminAdminsStandardCount")
+
+	if (totalEl) totalEl.textContent = String(total)
+	if (activeEl) activeEl.textContent = String(active)
+	if (superEl) superEl.textContent = String(superAdmins)
+	if (standardEl) standardEl.textContent = String(standardAdmins)
+
+	if (!sorted.length) {
+		el.list.innerHTML =
+			'<div class="admin-empty-state">No admin access records found.</div>'
+		return
+	}
+
+	if (!filtered.length) {
+		el.list.innerHTML =
+			'<div class="admin-empty-state">No admins match the current search/filter.</div>'
+		return
+	}
+
+	el.list.innerHTML = filtered
+		.map((item) => {
+			const canToggle = canCurrentAdminToggleManagedAdmin(item)
+			const roleLabel = getManagedAdminRoleLabel(item.role)
+			const roleBadgeClass = getManagedAdminRoleBadgeClass(item.role)
+			const statusLabel = item.active ? "active" : "inactive"
+			const toggleTooltip = getManagedAdminToggleTooltip(item)
+			return `
+      <article class="admin-review-item">
+        <div class="admin-review-item-head">
+          <div>
+            <div class="admin-booking-name">${escapeHtml(item.displayName || item.email || item.uid)}</div>
+            <div class="admin-booking-id">UID: ${escapeHtml(item.uid)}</div>
+          </div>
+	          <div class="admin-admin-inline-badges">
+	            <span class="admin-status-badge ${item.active ? "admin-status-confirmed" : "admin-status-cancelled"}">${statusLabel}</span>
+	            <span class="${roleBadgeClass}">${escapeHtml(roleLabel)}</span>
+	          </div>
+        </div>
+        <div class="admin-review-meta">
+          <div><span>Email:</span> ${escapeHtml(item.email || "N/A")}</div>
+	          <div><span>Role:</span> ${escapeHtml(roleLabel)}</div>
+          <div><span>Manage Admins:</span> ${item.permissions?.canManageAdmins ? "Yes" : "No"}</div>
+          <div><span>Manage Bookings:</span> ${item.permissions?.canManageBookings ? "Yes" : "No"}</div>
+          <div><span>Manage Content:</span> ${item.permissions?.canManageContent ? "Yes" : "No"}</div>
+          <div><span>Manage Security:</span> ${item.permissions?.canManageSecurity ? "Yes" : "No"}</div>
+        </div>
+        <div class="admin-booking-actions">
+          <button class="admin-action-btn" data-admin-user-action="edit" data-uid="${escapeHtml(item.uid)}">Edit</button>
+	          <label class="admin-managed-toggle ${item.active ? "is-on" : "is-off"}">
+	            <input
+	              type="checkbox"
+	              class="admin-managed-toggle-input"
+	              data-admin-user-action="toggle-active"
+	              data-uid="${escapeHtml(item.uid)}"
+	              data-active="${item.active ? "true" : "false"}"
+	              ${item.active ? "checked" : ""}
+	              ${canToggle ? "" : "disabled"}
+	              ${toggleTooltip ? `title="${escapeHtml(toggleTooltip)}"` : ""}
+	            />
+	            <span class="admin-managed-toggle-slider" aria-hidden="true"></span>
+	            <span class="admin-managed-toggle-label">${item.active ? "Enabled" : "Disabled"}</span>
+	          </label>
+        </div>
+      </article>
+    `
+		})
+		.join("")
+}
+
+async function refreshAdminManagedUsers() {
+	if (!adminUnlocked || !hasAdminAccessPermission("canManageAdmins")) return
+
+	const data = await callAdminListAdminUsersAction()
+	const list = Array.isArray(data?.admins) ? data.admins : []
+	adminManagedUsersDocs = list.map(normalizeManagedAdminUserDoc)
+	renderAdminManagedUsers()
+}
+
+async function saveManagedAdminUserFromForm(event) {
+	event.preventDefault()
+	if (!adminUnlocked || !hasAdminAccessPermission("canManageAdmins")) return
+
+	const el = getAdminManagementFormElements()
+	const payload = getAdminManagementFormValues()
+	const isEdit = Boolean(payload.uid)
+
+	if (!payload.email || !payload.email.includes("@")) {
+		setAdminMessage(
+			"error",
+			"❌ Please provide a valid admin email.",
+			"adminAdminsMessage",
+		)
+		return
+	}
+
+	if (!payload.role) {
+		setAdminMessage(
+			"error",
+			"❌ Please select a valid admin role.",
+			"adminAdminsMessage",
+		)
+		return
+	}
+
+	const oldLabel = el.saveBtn?.textContent || ""
+	if (el.saveBtn) {
+		el.saveBtn.disabled = true
+		el.saveBtn.textContent = isEdit ? "Updating..." : "Creating..."
+	}
+
+	try {
+		if (isEdit) {
+			await callAdminUpdateAdminUserAction({
+				uid: payload.uid,
+				email: payload.email,
+				displayName: payload.displayName,
+				role: payload.role,
+				active: payload.active,
+				permissions: payload.permissions,
+			})
+			setAdminMessage(
+				"success",
+				"✅ Admin access updated successfully.",
+				"adminAdminsMessage",
+			)
+		} else {
+			await callAdminCreateAdminUserAction({
+				email: payload.email,
+				displayName: payload.displayName,
+				role: payload.role,
+				active: payload.active,
+				permissions: payload.permissions,
+			})
+			setAdminMessage(
+				"success",
+				"✅ Admin access created successfully.",
+				"adminAdminsMessage",
+			)
+		}
+
+		resetAdminManagementForm()
+		await refreshAdminManagedUsers()
+	} catch (error) {
+		console.error("Save admin access failed:", error)
+		setAdminMessage(
+			"error",
+			`❌ Failed to save admin access: ${error.message || "unknown error"}`,
+			"adminAdminsMessage",
+		)
+	} finally {
+		if (el.saveBtn) {
+			el.saveBtn.disabled = false
+			el.saveBtn.textContent =
+				oldLabel || (isEdit ? "Update Admin" : "Create Admin")
+		}
+	}
+}
+
 function setAdminUnlockedState(value) {
 	adminUnlocked = value
+	if (!value) {
+		adminAccessProfile = null
+	}
 
 	const panel = document.getElementById("adminPanel")
 	const loginForm = document.getElementById("adminLoginForm")
@@ -1089,9 +1609,13 @@ function setAdminUnlockedState(value) {
 	if (logoutBtn) logoutBtn.style.display = value ? "inline-flex" : "none"
 
 	if (userState) {
-		userState.textContent = value
-			? `Logged in as: ${currentUser?.email || "Admin"}`
-			: "Not logged in"
+		if (value && currentUser?.email) {
+			const roleLabel =
+				adminAccessProfile?.role === "super_admin" ? "Super Admin" : "Admin"
+			userState.textContent = `Logged in as: ${currentUser.email} (${roleLabel})`
+		} else {
+			userState.textContent = "Not logged in"
+		}
 	}
 
 	if (!value) {
@@ -1124,10 +1648,14 @@ function setAdminUnlockedState(value) {
 		adminTimelineDocs = []
 		adminSecurityRawDocs = []
 		adminUserDocs = []
+		adminManagedUsersDocs = []
 		adminScheduleSelectedBookingId = ""
 		updateAdminSecurityWidgets()
+		resetAdminManagementForm()
+		renderAdminManagedUsers()
 		renderAdminSchedule()
 	} else {
+		applyAdminSectionPermissions()
 		startAdminBookingsListener()
 		startAdminGalleryListener()
 		startAdminBlogsListener()
@@ -1140,6 +1668,16 @@ function setAdminUnlockedState(value) {
 		startAdminSessionsListener()
 		startAdminTimelineListener()
 		startAdminUsersListener()
+		if (hasAdminAccessPermission("canManageAdmins")) {
+			void refreshAdminManagedUsers().catch((error) => {
+				console.error("Loading admin management records failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to load admin access records: ${error.message || "unknown error"}`,
+					"adminAdminsMessage",
+				)
+			})
+		}
 		setAdminMessage("success", "✅ Admin login successful.", "adminAuthMessage")
 	}
 }
@@ -3034,24 +3572,36 @@ async function deleteReview(reviewId) {
 	await db.collection("reviews").doc(reviewId).delete()
 }
 
-function handleAuthStateChange(user) {
+async function handleAuthStateChange(user) {
 	if (!user) {
 		setAdminUnlockedState(false)
 		return
 	}
 
-	if (isAllowedAdminEmail(user.email)) {
-		setAdminUnlockedState(true)
-		setAdminMessage("", "", "adminAuthMessage")
-		return
-	}
+	try {
+		const profile = await fetchAdminAccessProfile(user.uid)
+		if (!isAuthorizedAdminAccessProfile(profile)) {
+			setAdminMessage(
+				"error",
+				"❌ This account is not authorized for admin access.",
+				"adminAuthMessage",
+			)
+			setAdminUnlockedState(false)
+			return
+		}
 
-	setAdminMessage(
-		"error",
-		"❌ This account is not authorized for admin access.",
-		"adminAuthMessage",
-	)
-	setAdminUnlockedState(false)
+		adminAccessProfile = profile
+		setAdminUnlockedState(true)
+		setAdminMessage("success", "✅ Logged in Successfully", "adminAuthMessage")
+	} catch (error) {
+		console.error("Failed to evaluate admin access profile:", error)
+		setAdminMessage(
+			"error",
+			`❌ Failed to verify admin permissions: ${error.message || "unknown error"}`,
+			"adminAuthMessage",
+		)
+		setAdminUnlockedState(false)
+	}
 }
 
 function renderAdminBookings(docs) {
@@ -3779,19 +4329,40 @@ function renderAdminGallery(docs) {
 
 async function uploadImageToCloudinary(file) {
 	if (!file) return ""
-	if (!cloudinaryConfig.cloudName || !cloudinaryConfig.uploadPreset) {
-		throw new Error("Cloudinary config is missing")
+	if (
+		!firebaseReady ||
+		!adminFunctionsService ||
+		typeof adminFunctionsService.httpsCallable !== "function"
+	) {
+		throw new Error("Cloud Functions service is not ready yet.")
 	}
 
-	const endpoint = `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`
+	const signUploadCallable = adminFunctionsService.httpsCallable(
+		"createCloudinarySignedUpload",
+	)
+	const signResponse = await signUploadCallable({
+		folder: "royal-braids/gallery",
+		tags: "admin_upload,gallery",
+	})
+	const signatureData = signResponse?.data || {}
+
+	if (
+		!signatureData.uploadUrl ||
+		!signatureData.apiKey ||
+		!signatureData.signature
+	) {
+		throw new Error("Failed to initialize secure Cloudinary upload")
+	}
+
 	const body = new FormData()
 	body.append("file", file)
-	body.append("upload_preset", cloudinaryConfig.uploadPreset)
-	if (cloudinaryConfig.folder) {
-		body.append("folder", cloudinaryConfig.folder)
-	}
+	body.append("api_key", signatureData.apiKey)
+	body.append("timestamp", String(signatureData.timestamp || ""))
+	body.append("signature", signatureData.signature)
+	body.append("folder", signatureData.folder || "royal-braids/gallery")
+	if (signatureData.tags) body.append("tags", signatureData.tags)
 
-	const response = await fetch(endpoint, {
+	const response = await fetch(signatureData.uploadUrl, {
 		method: "POST",
 		body,
 	})
@@ -4462,6 +5033,19 @@ function initializeAdminPanel() {
 	const reviewsList = document.getElementById("adminReviewsList")
 	const contactList = document.getElementById("adminContactList")
 	const securityList = document.getElementById("adminSecurityActivityList")
+	const adminUsersForm = document.getElementById("adminAdminsForm")
+	const adminUsersList = document.getElementById("adminAdminsList")
+	const adminUsersCancelEditBtn = document.getElementById(
+		"adminAdminsCancelEdit",
+	)
+	const adminUsersSearchInput = document.getElementById(
+		"adminAdminsSearchInput",
+	)
+	const adminUsersRoleFilter = document.getElementById("adminAdminsRoleFilter")
+	const adminUsersStatusFilter = document.getElementById(
+		"adminAdminsStatusFilter",
+	)
+	const adminUsersRoleSelect = document.getElementById("adminManageRole")
 	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
 	const messagesSortSelect = document.getElementById("adminMessagesSortSelect")
 	const securitySortSelect = document.getElementById("adminSecuritySortSelect")
@@ -5222,6 +5806,162 @@ function initializeAdminPanel() {
 		})
 	}
 
+	if (adminUsersForm) {
+		adminUsersForm.setAttribute("action", "javascript:void(0)")
+		adminUsersForm.addEventListener("submit", (event) => {
+			event.preventDefault()
+			event.stopPropagation()
+			void saveManagedAdminUserFromForm(event)
+		})
+	}
+
+	if (adminUsersCancelEditBtn) {
+		adminUsersCancelEditBtn.addEventListener("click", () => {
+			resetAdminManagementForm()
+			setAdminMessage("", "", "adminAdminsMessage")
+		})
+	}
+
+	if (adminUsersRoleSelect) {
+		adminUsersRoleSelect.addEventListener("change", () => {
+			syncAdminManagementPermissionsWithRole()
+		})
+	}
+
+	if (adminUsersSearchInput) {
+		adminUsersSearchInput.addEventListener("input", (event) => {
+			adminAdminsSearchTerm = String(event.target?.value || "")
+			renderAdminManagedUsers()
+		})
+	}
+
+	if (adminUsersRoleFilter) {
+		adminUsersRoleFilter.addEventListener("change", (event) => {
+			adminAdminsRoleFilter = String(event.target?.value || "all")
+			renderAdminManagedUsers()
+		})
+	}
+
+	if (adminUsersStatusFilter) {
+		adminUsersStatusFilter.addEventListener("change", (event) => {
+			adminAdminsStatusFilter = String(event.target?.value || "all")
+			renderAdminManagedUsers()
+		})
+	}
+
+	if (adminUsersList) {
+		const handleAdminUserToggle = async (actionTarget) => {
+			const targetUid = String(actionTarget.dataset.uid || "").trim()
+			if (!targetUid) return
+
+			const currentlyActive =
+				String(actionTarget.dataset.active || "false").trim() === "true"
+			const target = adminManagedUsersDocs.find(
+				(item) => item.uid === targetUid,
+			)
+			if (!target) return
+
+			if (!canCurrentAdminToggleManagedAdmin(target)) {
+				setAdminMessage(
+					"error",
+					"❌ Only Super Admins can enable or disable other admin accounts.",
+					"adminAdminsMessage",
+				)
+				if (actionTarget.type === "checkbox") {
+					actionTarget.checked = currentlyActive
+				}
+				return
+			}
+
+			const nextActive = !currentlyActive
+			const confirmed = await showAdminConfirmModal(
+				nextActive
+					? `Enable admin access for ${target.email || targetUid}?`
+					: `Disable admin access for ${target.email || targetUid}?`,
+				nextActive ? "Enable" : "Disable",
+			)
+			if (!confirmed) {
+				if (actionTarget.type === "checkbox") {
+					actionTarget.checked = currentlyActive
+				}
+				return
+			}
+
+			const oldLabel = actionTarget.textContent
+			actionTarget.disabled = true
+			if (actionTarget.type !== "checkbox")
+				actionTarget.textContent = "Saving..."
+
+			try {
+				await callAdminUpdateAdminUserAction({
+					uid: targetUid,
+					email: target.email,
+					active: nextActive,
+				})
+				setAdminMessage(
+					"success",
+					`✅ Admin access ${nextActive ? "enabled" : "disabled"} successfully.`,
+					"adminAdminsMessage",
+				)
+				await refreshAdminManagedUsers()
+			} catch (error) {
+				console.error("Toggle admin access status failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to update admin status: ${error.message || "unknown error"}`,
+					"adminAdminsMessage",
+				)
+				if (actionTarget.type === "checkbox") {
+					actionTarget.checked = currentlyActive
+				}
+			} finally {
+				actionTarget.disabled = false
+				if (actionTarget.type !== "checkbox") {
+					actionTarget.textContent = oldLabel
+				}
+			}
+		}
+
+		adminUsersList.addEventListener("click", async (event) => {
+			const actionBtn = event.target.closest("button[data-admin-user-action]")
+			if (
+				!actionBtn ||
+				!adminUnlocked ||
+				!hasAdminAccessPermission("canManageAdmins")
+			) {
+				return
+			}
+
+			const action = String(actionBtn.dataset.adminUserAction || "").trim()
+			const targetUid = String(actionBtn.dataset.uid || "").trim()
+			if (!action || !targetUid) return
+
+			if (action === "edit") {
+				loadManagedAdminUserIntoForm(targetUid)
+				return
+			}
+
+			if (action === "toggle-active") {
+				await handleAdminUserToggle(actionBtn)
+			}
+		})
+
+		adminUsersList.addEventListener("change", async (event) => {
+			const toggleInput = event.target.closest(
+				'input[type="checkbox"][data-admin-user-action="toggle-active"]',
+			)
+			if (
+				!toggleInput ||
+				!adminUnlocked ||
+				!hasAdminAccessPermission("canManageAdmins")
+			) {
+				return
+			}
+
+			await handleAdminUserToggle(toggleInput)
+		})
+	}
+
 	if (serviceCategoryToggles) {
 		serviceCategoryToggles.addEventListener("change", (event) => {
 			const toggle = event.target.closest("[data-service-category-toggle]")
@@ -5292,6 +6032,9 @@ function initializeAdminPanel() {
 			closeAdminConfirmModal(false)
 		}
 	})
+
+	resetAdminManagementForm()
+	renderAdminManagedUsers()
 
 	renderAdminSchedule()
 

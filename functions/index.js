@@ -9,6 +9,10 @@ const { defineSecret } = require("firebase-functions/params")
 const logger = require("firebase-functions/logger")
 const admin = require("firebase-admin")
 
+const CLOUDINARY_CLOUD_NAME = defineSecret("CLOUDINARY_CLOUD_NAME")
+const CLOUDINARY_API_KEY = defineSecret("CLOUDINARY_API_KEY")
+const CLOUDINARY_API_SECRET = defineSecret("CLOUDINARY_API_SECRET")
+
 admin.initializeApp()
 
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY")
@@ -57,7 +61,24 @@ const ACTIVITY_TIMELINE_TYPES = {
 	review_edited: "review_edited",
 	contact_submitted: "contact_submitted",
 }
-const ADMIN_ALLOWED_EMAILS = new Set(["billyopiyo597@gmail.com"])
+const ADMIN_ROLES = {
+	superAdmin: "super_admin",
+	admin: "admin",
+}
+const ADMIN_PERMISSION_KEYS = {
+	canManageAdmins: "canManageAdmins",
+	canManageBookings: "canManageBookings",
+	canManageContent: "canManageContent",
+	canManageSecurity: "canManageSecurity",
+}
+const DEFAULT_ADMIN_PERMISSIONS = {
+	[ADMIN_PERMISSION_KEYS.canManageAdmins]: false,
+	[ADMIN_PERMISSION_KEYS.canManageBookings]: true,
+	[ADMIN_PERMISSION_KEYS.canManageContent]: true,
+	[ADMIN_PERMISSION_KEYS.canManageSecurity]: false,
+}
+const ADMIN_USERS_COLLECTION = "adminUsers"
+const ADMIN_AUDIT_LOG_COLLECTION = "adminAuditLogs"
 const ADMIN_RESTRICTION_ACTIONS = new Set([
 	"temporary_block",
 	"force_logout",
@@ -113,20 +134,319 @@ function getCallerEmailFromRequest(request) {
 		.toLowerCase()
 }
 
-function assertAdminCaller(request) {
+function normalizeAdminRole(role = "") {
+	const value = String(role || "")
+		.trim()
+		.toLowerCase()
+	if (value === ADMIN_ROLES.superAdmin) return ADMIN_ROLES.superAdmin
+	if (value === ADMIN_ROLES.admin) return ADMIN_ROLES.admin
+	return ""
+}
+
+function normalizeAdminPermissions(input = {}) {
+	const source =
+		typeof input === "object" && input && !Array.isArray(input) ? input : {}
+	return {
+		[ADMIN_PERMISSION_KEYS.canManageAdmins]:
+			source[ADMIN_PERMISSION_KEYS.canManageAdmins] === true,
+		[ADMIN_PERMISSION_KEYS.canManageBookings]:
+			source[ADMIN_PERMISSION_KEYS.canManageBookings] !== false,
+		[ADMIN_PERMISSION_KEYS.canManageContent]:
+			source[ADMIN_PERMISSION_KEYS.canManageContent] !== false,
+		[ADMIN_PERMISSION_KEYS.canManageSecurity]:
+			source[ADMIN_PERMISSION_KEYS.canManageSecurity] === true,
+	}
+}
+
+async function getCallerAdminAccessContext(request) {
 	if (!request?.auth?.uid) {
 		throw new HttpsError("unauthenticated", "Admin authentication required")
 	}
 
-	const callerEmail = getCallerEmailFromRequest(request)
-	if (!callerEmail || !ADMIN_ALLOWED_EMAILS.has(callerEmail)) {
+	const uid = String(request.auth.uid || "").trim()
+	const email = getCallerEmailFromRequest(request)
+	const docRef = admin.firestore().collection(ADMIN_USERS_COLLECTION).doc(uid)
+	const snapshot = await docRef.get()
+	if (!snapshot.exists) {
+		throw new HttpsError("permission-denied", "Admin access record not found")
+	}
+
+	const data = snapshot.data() || {}
+	if (data.active !== true) {
+		throw new HttpsError("permission-denied", "Admin account is inactive")
+	}
+
+	const role = normalizeAdminRole(data.role)
+	if (!role) {
 		throw new HttpsError(
 			"permission-denied",
-			"Only authorized admins can perform this action",
+			"Invalid admin role configuration",
 		)
 	}
 
-	return callerEmail
+	const permissions = normalizeAdminPermissions(data.permissions)
+	return {
+		uid,
+		email,
+		role,
+		permissions,
+		isSuperAdmin: role === ADMIN_ROLES.superAdmin,
+		hasPermission(permissionKey = "") {
+			if (role === ADMIN_ROLES.superAdmin) return true
+			return permissions[String(permissionKey || "")] === true
+		},
+	}
+}
+
+async function assertCanManageAdmins(request) {
+	const context = await getCallerAdminAccessContext(request)
+	if (!context.hasPermission(ADMIN_PERMISSION_KEYS.canManageAdmins)) {
+		throw new HttpsError(
+			"permission-denied",
+			"You do not have permission to manage admins",
+		)
+	}
+	return context
+}
+
+async function createAdminAuditLogEntry({
+	action = "",
+	actorUid = "",
+	actorEmail = "",
+	targetUid = "",
+	targetEmail = "",
+	before = null,
+	after = null,
+	metadata = {},
+} = {}) {
+	const safeAction = normalizeShortText(action || "admin_action", 100)
+	const safeActorUid = String(actorUid || "").trim()
+	const safeActorEmail = String(actorEmail || "")
+		.trim()
+		.toLowerCase()
+	const safeTargetUid = String(targetUid || "").trim()
+	const safeTargetEmail = String(targetEmail || "")
+		.trim()
+		.toLowerCase()
+	const safeMetadata =
+		typeof metadata === "object" && metadata && !Array.isArray(metadata)
+			? metadata
+			: {}
+
+	await admin.firestore().collection(ADMIN_AUDIT_LOG_COLLECTION).add({
+		action: safeAction,
+		actorUid: safeActorUid,
+		actorEmail: safeActorEmail,
+		targetUid: safeTargetUid,
+		targetEmail: safeTargetEmail,
+		before,
+		after,
+		metadata: safeMetadata,
+		createdAt: admin.firestore.FieldValue.serverTimestamp(),
+	})
+}
+
+function cloudinarySignParams(params = {}, apiSecret = "") {
+	const serialized = Object.keys(params)
+		.sort()
+		.map((key) => `${key}=${params[key]}`)
+		.join("&")
+	return require("crypto")
+		.createHash("sha1")
+		.update(`${serialized}${apiSecret}`)
+		.digest("hex")
+}
+
+function sanitizeAdminUserDocForResponse(uid = "", data = {}) {
+	const safeUid = String(uid || "").trim()
+	const source =
+		typeof data === "object" && data && !Array.isArray(data) ? data : {}
+	const role = normalizeAdminRole(source.role) || ADMIN_ROLES.admin
+	const permissions = normalizeAdminPermissions(source.permissions)
+	return {
+		uid: safeUid,
+		email: String(source.email || "")
+			.trim()
+			.toLowerCase(),
+		displayName: normalizeShortText(source.displayName || "", 160),
+		role,
+		permissions,
+		active: source.active === true,
+		createdBy: String(source.createdBy || "")
+			.trim()
+			.toLowerCase(),
+		updatedBy: String(source.updatedBy || "")
+			.trim()
+			.toLowerCase(),
+		createdAt: source.createdAt || null,
+		updatedAt: source.updatedAt || null,
+	}
+}
+
+async function resolveUidFromUserIdentity({ uid = "", email = "" } = {}) {
+	const cleanUid = String(uid || "").trim()
+	if (cleanUid) return cleanUid
+
+	const cleanEmail = String(email || "")
+		.trim()
+		.toLowerCase()
+	if (!cleanEmail) {
+		throw new HttpsError(
+			"invalid-argument",
+			"Provide a target admin uid or email",
+		)
+	}
+
+	try {
+		const userRecord = await admin.auth().getUserByEmail(cleanEmail)
+		return String(userRecord.uid || "").trim()
+	} catch (_error) {
+		throw new HttpsError("not-found", "Target admin user account not found")
+	}
+}
+
+function normalizeAdminCreatePayload(data = {}) {
+	const source =
+		typeof data === "object" && data && !Array.isArray(data) ? data : {}
+	const email = String(source.email || "")
+		.trim()
+		.toLowerCase()
+	const displayName = normalizeShortText(source.displayName || "", 160)
+	const role = normalizeAdminRole(source.role) || ADMIN_ROLES.admin
+	const permissions = normalizeAdminPermissions({
+		...DEFAULT_ADMIN_PERMISSIONS,
+		...(source.permissions || {}),
+	})
+	const active = source.active !== false
+
+	if (!email || !email.includes("@")) {
+		throw new HttpsError("invalid-argument", "Valid admin email is required")
+	}
+
+	if (role === ADMIN_ROLES.admin) {
+		permissions[ADMIN_PERMISSION_KEYS.canManageAdmins] =
+			source.permissions?.[ADMIN_PERMISSION_KEYS.canManageAdmins] === true
+	}
+
+	return {
+		email,
+		displayName,
+		role,
+		permissions,
+		active,
+	}
+}
+
+function normalizeAdminUpdatePayload(data = {}) {
+	const source =
+		typeof data === "object" && data && !Array.isArray(data) ? data : {}
+	const patch = {}
+
+	if (Object.prototype.hasOwnProperty.call(source, "displayName")) {
+		patch.displayName = normalizeShortText(source.displayName || "", 160)
+	}
+
+	if (Object.prototype.hasOwnProperty.call(source, "role")) {
+		const role = normalizeAdminRole(source.role)
+		if (!role) {
+			throw new HttpsError("invalid-argument", "Invalid admin role")
+		}
+		patch.role = role
+	}
+
+	if (Object.prototype.hasOwnProperty.call(source, "permissions")) {
+		patch.permissions = normalizeAdminPermissions({
+			...DEFAULT_ADMIN_PERMISSIONS,
+			...(source.permissions || {}),
+		})
+	}
+
+	if (Object.prototype.hasOwnProperty.call(source, "active")) {
+		patch.active = source.active === true
+	}
+
+	if (!Object.keys(patch).length) {
+		throw new HttpsError(
+			"invalid-argument",
+			"At least one admin field must be provided to update",
+		)
+	}
+
+	return patch
+}
+
+async function createCloudinarySignedUpload({
+	folder = "royal-braids/uploads",
+	tags = "",
+} = {}) {
+	const cloudName = String(CLOUDINARY_CLOUD_NAME.value() || "").trim()
+	const apiKey = String(CLOUDINARY_API_KEY.value() || "").trim()
+	const apiSecret = String(CLOUDINARY_API_SECRET.value() || "").trim()
+
+	if (!cloudName || !apiKey || !apiSecret) {
+		throw new HttpsError(
+			"failed-precondition",
+			"Cloudinary secrets are not configured",
+		)
+	}
+
+	const timestamp = Math.floor(Date.now() / 1000)
+	const safeFolder = normalizeShortText(folder || "royal-braids/uploads", 200)
+	const safeTags = normalizeShortText(tags || "", 200)
+
+	const signingParams = {
+		folder: safeFolder,
+		timestamp,
+	}
+	if (safeTags) {
+		signingParams.tags = safeTags
+	}
+
+	const signature = cloudinarySignParams(signingParams, apiSecret)
+
+	return {
+		cloudName,
+		apiKey,
+		timestamp,
+		folder: safeFolder,
+		tags: safeTags,
+		signature,
+		uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+	}
+}
+
+exports.createCloudinarySignedUpload = onCall(
+	{
+		region: "us-central1",
+		secrets: [CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET],
+	},
+	async (request) => {
+		if (!request.auth?.uid) {
+			throw new HttpsError("unauthenticated", "Sign in required")
+		}
+
+		const data = request.data || {}
+		const folder = normalizeShortText(
+			data.folder || "royal-braids/uploads",
+			200,
+		)
+		const tags = normalizeShortText(data.tags || "", 200)
+
+		const upload = await createCloudinarySignedUpload({
+			folder,
+			tags,
+		})
+
+		return {
+			ok: true,
+			...upload,
+		}
+	},
+)
+
+async function assertAdminCaller(request) {
+	const context = await getCallerAdminAccessContext(request)
+	return context.email || context.uid
 }
 
 async function resolveTargetUserRecord({ uid = "", email = "" } = {}) {
@@ -945,7 +1265,7 @@ exports.adminRestrictUserAccount = onCall(
 		region: "us-central1",
 	},
 	async (request) => {
-		const adminEmail = assertAdminCaller(request)
+		const adminEmail = await assertAdminCaller(request)
 		const data = request.data || {}
 		const action = String(data.action || "")
 			.trim()
@@ -1069,6 +1389,184 @@ exports.adminRestrictUserAccount = onCall(
 			blockedUntilMs,
 			forceLogoutAtMs,
 			passwordResetRequired,
+		}
+	},
+)
+
+exports.adminCreateAdminUser = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const actor = await assertCanManageAdmins(request)
+		const payload = normalizeAdminCreatePayload(request.data || {})
+
+		const targetAuthUser = await resolveTargetUserRecord({
+			email: payload.email,
+		})
+		const targetUid = String(targetAuthUser.uid || "").trim()
+		if (!targetUid) {
+			throw new HttpsError("not-found", "Target user account not found")
+		}
+
+		const adminDocRef = admin
+			.firestore()
+			.collection(ADMIN_USERS_COLLECTION)
+			.doc(targetUid)
+		const existing = await adminDocRef.get()
+		if (existing.exists) {
+			throw new HttpsError(
+				"already-exists",
+				"This user already has an admin access record",
+			)
+		}
+
+		const nowTs = admin.firestore.FieldValue.serverTimestamp()
+		const docPayload = {
+			email: payload.email,
+			displayName: payload.displayName,
+			role: payload.role,
+			permissions: payload.permissions,
+			active: payload.active,
+			createdBy: actor.email,
+			updatedBy: actor.email,
+			createdAt: nowTs,
+			updatedAt: nowTs,
+		}
+
+		await adminDocRef.set(docPayload)
+
+		await createAdminAuditLogEntry({
+			action: "admin_user_created",
+			actorUid: actor.uid,
+			actorEmail: actor.email,
+			targetUid,
+			targetEmail: payload.email,
+			after: {
+				role: payload.role,
+				permissions: payload.permissions,
+				active: payload.active,
+			},
+		})
+
+		return {
+			ok: true,
+			admin: sanitizeAdminUserDocForResponse(targetUid, docPayload),
+		}
+	},
+)
+
+exports.adminUpdateAdminUser = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const actor = await assertCanManageAdmins(request)
+		const data = request.data || {}
+		const targetUid = await resolveUidFromUserIdentity({
+			uid: data.uid,
+			email: data.email,
+		})
+		if (!targetUid) {
+			throw new HttpsError("invalid-argument", "Target admin uid is required")
+		}
+
+		if (targetUid === actor.uid) {
+			throw new HttpsError(
+				"failed-precondition",
+				"Use a separate self-service flow to edit your own admin access",
+			)
+		}
+
+		const patch = normalizeAdminUpdatePayload(data)
+		const adminDocRef = admin
+			.firestore()
+			.collection(ADMIN_USERS_COLLECTION)
+			.doc(targetUid)
+		const beforeSnap = await adminDocRef.get()
+		if (!beforeSnap.exists) {
+			throw new HttpsError("not-found", "Admin access record not found")
+		}
+
+		const before = beforeSnap.data() || {}
+		if (before.role === ADMIN_ROLES.superAdmin && actor.isSuperAdmin !== true) {
+			throw new HttpsError(
+				"permission-denied",
+				"Only super admins can modify another super admin",
+			)
+		}
+
+		if (patch.role === ADMIN_ROLES.superAdmin && actor.isSuperAdmin !== true) {
+			throw new HttpsError(
+				"permission-denied",
+				"Only super admins can assign super admin role",
+			)
+		}
+
+		if (
+			before.role === ADMIN_ROLES.superAdmin &&
+			patch.active === false &&
+			actor.isSuperAdmin !== true
+		) {
+			throw new HttpsError(
+				"permission-denied",
+				"Only super admins can deactivate a super admin",
+			)
+		}
+
+		const updatedPayload = {
+			...patch,
+			updatedBy: actor.email,
+			updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+		}
+
+		await adminDocRef.set(updatedPayload, { merge: true })
+		const afterSnap = await adminDocRef.get()
+		const after = afterSnap.data() || {}
+
+		await createAdminAuditLogEntry({
+			action: "admin_user_updated",
+			actorUid: actor.uid,
+			actorEmail: actor.email,
+			targetUid,
+			targetEmail: String(after.email || before.email || "")
+				.trim()
+				.toLowerCase(),
+			before: sanitizeAdminUserDocForResponse(targetUid, before),
+			after: sanitizeAdminUserDocForResponse(targetUid, after),
+			metadata: {
+				updatedFields: Object.keys(patch),
+			},
+		})
+
+		return {
+			ok: true,
+			admin: sanitizeAdminUserDocForResponse(targetUid, after),
+		}
+	},
+)
+
+exports.adminListAdminUsers = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		await assertCanManageAdmins(request)
+
+		const snapshot = await admin
+			.firestore()
+			.collection(ADMIN_USERS_COLLECTION)
+			.orderBy("createdAt", "desc")
+			.limit(300)
+			.get()
+
+		const admins = snapshot.docs.map((doc) =>
+			sanitizeAdminUserDocForResponse(doc.id, doc.data() || {}),
+		)
+
+		return {
+			ok: true,
+			admins,
 		}
 	},
 )

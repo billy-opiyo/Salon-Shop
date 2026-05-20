@@ -1134,7 +1134,6 @@ const SERVICE_CATEGORY_LABEL_MAP = Object.fromEntries(
 // ============ FIREBASE + CLOUDINARY CONFIG ============
 const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
-const cloudinaryConfig = appConfig.cloudinary || {}
 const appCheckConfig = appConfig.appCheck || {}
 
 let firebaseReady = false
@@ -4875,19 +4874,40 @@ async function joinWaitlistForUnavailableSlot({
 
 async function uploadImageToCloudinary(file) {
 	if (!file) return ""
-	if (!cloudinaryConfig.cloudName || !cloudinaryConfig.uploadPreset) {
-		throw new Error("Cloudinary config is missing")
+	if (
+		!firebaseReady ||
+		!functionsService ||
+		typeof functionsService.httpsCallable !== "function"
+	) {
+		throw new Error("Cloud Functions service is not ready yet.")
 	}
 
-	const endpoint = `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`
+	const signUploadCallable = functionsService.httpsCallable(
+		"createCloudinarySignedUpload",
+	)
+	const signResponse = await signUploadCallable({
+		folder: "royal-braids/bookings",
+		tags: "public_upload,booking",
+	})
+	const signatureData = signResponse?.data || {}
+
+	if (
+		!signatureData.uploadUrl ||
+		!signatureData.apiKey ||
+		!signatureData.signature
+	) {
+		throw new Error("Failed to initialize secure Cloudinary upload")
+	}
+
 	const body = new FormData()
 	body.append("file", file)
-	body.append("upload_preset", cloudinaryConfig.uploadPreset)
-	if (cloudinaryConfig.folder) {
-		body.append("folder", cloudinaryConfig.folder)
-	}
+	body.append("api_key", signatureData.apiKey)
+	body.append("timestamp", String(signatureData.timestamp || ""))
+	body.append("signature", signatureData.signature)
+	body.append("folder", signatureData.folder || "royal-braids/bookings")
+	if (signatureData.tags) body.append("tags", signatureData.tags)
 
-	const response = await fetch(endpoint, {
+	const response = await fetch(signatureData.uploadUrl, {
 		method: "POST",
 		body,
 	})
