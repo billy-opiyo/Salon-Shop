@@ -73,6 +73,11 @@ This project is built to:
 - Added **Client Security History in Dashboard**:
   - Client dashboard now renders per-user login activity history
   - Backed by callable security logging and `loginActivities` read access scoped to owner/admin
+- Added **Role-based Admin Access + Delegation**:
+  - Admin access is now driven by `adminUsers/{uid}` records (role + active state + permissions)
+  - Super-admin-only management flows for creating/updating/listing admin users
+  - Scoped admin UI rendering by permission (`canManageBookings`, `canManageContent`, `canManageSecurity`)
+  - Added admin delegation/audit support with server-written `adminAuditLogs`
 
 ---
 
@@ -223,8 +228,18 @@ This project is built to:
 
 - Firebase admin login + allowed email guard
 - Password visibility toggle
-- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages, Services, Security**
+- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages, Services, Security, Admins**
 - Confirmation modal for destructive actions
+
+### Admins (Role + Permission Management)
+
+- Dedicated **Admins** section for super-admin-managed delegation
+- Manage per-admin:
+  - Role (`super_admin` / `admin`)
+  - Active/inactive access state
+  - Permission flags (`canManageAdmins`, `canManageBookings`, `canManageContent`, `canManageSecurity`)
+- Client writes to `adminUsers` are blocked; mutations are server-managed through callable functions
+- Delegation mutations are recorded to `adminAuditLogs` for accountability
 
 ### Bookings + Schedule
 
@@ -312,6 +327,13 @@ Main collections used:
 - `users/{userId}/favorites/{favoriteId}`
 - `contactMessages/{messageId}`
 - `rateLimits/{uid}` (function-managed internal cooldown docs)
+- `adminUsers/{uid}`
+- `adminAuditLogs/{logId}`
+- `adminSecurityActions/{actionId}`
+- `loginActivities/{activityId}`
+- `securityAlerts/{alertId}`
+- `accountChangeHistory/{eventId}`
+- `activityTimeline/{eventId}`
 
 ---
 
@@ -325,6 +347,11 @@ Core behavior:
 - Public reads only where intended (`galleryStyles`, `blogs`, approved reviews, slot availability)
 - Waitlist create/read/update constraints added
 - Internal `rateLimits` collection is not client-readable/writeable
+- `adminUsers` access model:
+  - Signed-in users can read only their own admin-access document
+  - Super admins can read all admin-access documents
+  - Direct client create/update/delete is blocked
+- `adminAuditLogs` read scope is super-admin only (client writes blocked)
 - Security collections are server-written only (no direct client create/update/delete):
   - `loginActivities`
   - `securityAlerts`
@@ -344,14 +371,24 @@ File: `functions/index.js`
 - `sendUpcomingBookingWhatsAppReminders` (scheduled every 15 minutes)
 - `initializeBookingSystemFields` (booking defaults patch)
 - `updateReviewRateLimit` (on review create)
+- `trackReviewEdited` (on review update)
 - `updateContactRateLimit` (on contact create)
+- `trackBookingCreated` (on booking create timeline/audit)
+- `trackBookingCanceled` (on booking update timeline/audit)
 - `notifyWaitlistOnSlotOpen` (on booking slot deletion)
+- `createCloudinarySignedUpload` (callable signed-upload helper)
 - `logLoginActivity` (callable login telemetry + risk/scoring + alert triggers)
 - `logAccountSecurityChange` (callable account security-change audit + optional alert)
 - `adminRestrictUserAccount` (callable admin security actions: block/logout/reset/clear)
+- `adminCreateAdminUser` (callable super-admin admin-user creation)
+- `adminUpdateAdminUser` (callable super-admin admin-user updates)
+- `adminListAdminUsers` (callable admin-access directory listing)
 
 Required function secrets include:
 
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
 - `WHATSAPP_CLOUD_ACCESS_TOKEN`
@@ -390,6 +427,9 @@ firebase deploy --only firestore:rules
 4. Set function secrets:
 
 ```bash
+firebase functions:secrets:set CLOUDINARY_CLOUD_NAME
+firebase functions:secrets:set CLOUDINARY_API_KEY
+firebase functions:secrets:set CLOUDINARY_API_SECRET
 firebase functions:secrets:set RESEND_API_KEY
 firebase functions:secrets:set RESEND_FROM_EMAIL
 firebase functions:secrets:set WHATSAPP_CLOUD_ACCESS_TOKEN
@@ -701,6 +741,29 @@ Use this to validate the user-facing **Security & Privacy** block in dashboard.
 6. Permission check:
    - Use a different non-admin account and confirm it cannot read another user’s entries.
    - Admin account can still review activity from Security tab.
+
+### L) Admin role/permission delegation testing (new feature)
+
+Use this to validate the **Admins** section and scoped access controls end-to-end.
+
+1. Prepare at least two admin identities:
+   - One `super_admin`
+   - One standard `admin`
+2. Sign in as super admin and open **Admins** tab.
+3. Create or update a managed admin record with explicit permissions.
+4. Verify Firestore changes:
+   - `adminUsers/{uid}` reflects role, active status, permissions, and updated metadata
+   - New entry appears in `adminAuditLogs` for create/update actions
+5. Sign in as the standard admin and confirm scoped UI behavior:
+   - Tabs requiring missing permissions are hidden/blocked
+   - Permitted sections remain accessible and functional
+6. Disable the managed admin (`active: false`) and test login again.
+7. Expected:
+   - Inactive admin is denied panel access
+   - Error state reflects permission/inactive gating
+8. Regression check:
+   - Attempt direct client write to `adminUsers` from browser console/client SDK
+   - Expected: write is rejected by Firestore rules
 
 ---
 
