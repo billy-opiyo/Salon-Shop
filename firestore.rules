@@ -199,10 +199,10 @@ service cloud.firestore {
           && resource.data.email != ''
           && resource.data.email == request.auth.token.email
         ) ||
-        isAdmin()
+        hasAdminPermission('canManageBookings')
       );
 
-      allow update: if (isAdmin() && adminBookingUpdateIsValid()) || bookingOwnerUpdateIsValid();
+      allow update: if (hasAdminPermission('canManageBookings') && adminBookingUpdateIsValid()) || bookingOwnerUpdateIsValid();
 
       allow delete: if false;
     }
@@ -233,7 +233,7 @@ service cloud.firestore {
 
       // Prevent users from editing slot locks directly.
       allow update: if false;
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow delete: if hasAdminPermission('canManageBookings') || (isSignedIn() && resource.data.uid == request.auth.uid);
     }
 
     match /waitlist/{waitlistId} {
@@ -278,10 +278,10 @@ service cloud.firestore {
 
       allow read: if isSignedIn() && (
         resource.data.uid == request.auth.uid ||
-        isAdmin()
+        hasAdminPermission('canManageBookings')
       );
 
-      allow update: if isAdmin() || (
+      allow update: if hasAdminPermission('canManageBookings') || (
         isSignedIn()
         && resource.data.uid == request.auth.uid
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
@@ -434,7 +434,7 @@ service cloud.firestore {
         && request.resource.data.provider is string
         && request.resource.data.phone is string;
 
-      allow read: if hasAdminPermission('canManageSecurity') || isAdmin() || (
+      allow read: if hasAdminPermission('canManageSecurity') || (
         isSignedIn() && userId == request.auth.uid
       );
 
@@ -505,7 +505,7 @@ service cloud.firestore {
     // Explicit collection-group support for admin session monitoring query:
     // db.collectionGroup("sessions")
     match /{document=**}/sessions/{sessionId} {
-      allow read: if isAdmin();
+      allow read: if hasAdminPermission('canManageSecurity');
       allow create, update, delete: if false;
     }
 
@@ -539,9 +539,9 @@ service cloud.firestore {
         && contactRateLimitAllowsCreate();
 
       // Admin only read/update/delete for contact inbox management.
-      allow read, delete: if isAdmin();
+      allow read, delete: if hasAdminPermission('canManageContent');
 
-      allow update: if isAdmin()
+      allow update: if hasAdminPermission('canManageContent')
         && request.resource.data.diff(resource.data).changedKeys().hasOnly([
           'status',
           'updatedAt'

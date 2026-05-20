@@ -1669,6 +1669,10 @@ h6 {
     align-items: start;
 }
 
+.admin-admins-wrap {
+    align-items: start;
+}
+
 .admin-gallery-form,
 .admin-gallery-list-wrap {
     background: var(--bg-secondary);
@@ -1687,6 +1691,13 @@ h6 {
     align-self: start;
 }
 
+.admin-admins-wrap .admin-gallery-form,
+.admin-admins-wrap .admin-gallery-list-wrap {
+    height: auto;
+    min-height: 0;
+    align-self: start;
+}
+
 .admin-blogs-wrap .admin-gallery-form {
     align-content: start;
 }
@@ -1694,6 +1705,10 @@ h6 {
 .admin-gallery-form {
     align-content: start;
     min-height: calc((var(--admin-gallery-card-height) * var(--admin-gallery-visible-cards)) + (var(--admin-gallery-list-gap) * (var(--admin-gallery-visible-cards) - 1)) + 36px);
+}
+
+.admin-admins-wrap .admin-gallery-form {
+    min-height: 0;
 }
 
 .admin-gallery-form--focus-flash {
