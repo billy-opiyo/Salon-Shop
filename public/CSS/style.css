@@ -1538,7 +1538,7 @@ h6 {
 
 /* ============ ADMIN BOOKINGS ============ */
 .admin-bookings {
-    padding: var(--section-padding) 0;
+    padding: var(--section-padding) 0 0;
     background: var(--bg-primary);
 }
 
@@ -2945,9 +2945,9 @@ h6 {
     min-height: 42px;
 }
 
-/* Admins tab: show 3 admin records by default with gold scrollbars */
+/* Admins tab: show 2 admin records by default with gold scrollbars */
 #adminAdminsList {
-    --admin-admins-visible-cards: 3;
+    --admin-admins-visible-cards: 2;
     --admin-admin-card-height: 210px;
     max-height: calc((var(--admin-admin-card-height) * var(--admin-admins-visible-cards)) + (12px * (var(--admin-admins-visible-cards) - 1)));
     overflow-y: auto;
@@ -3762,6 +3762,13 @@ h6 {
 }
 
 @media (max-width: 900px) {
+
+    .admin-gallery-form,
+    .admin-gallery-list-wrap {
+        min-height: 0;
+        height: auto;
+    }
+
     .admin-gallery-wrap {
         --admin-gallery-card-height: 260px;
     }
@@ -3842,10 +3849,27 @@ h6 {
 }
 
 @media (max-width: 600px) {
+
+    .admin-gallery-form,
+    .admin-gallery-list-wrap {
+        min-height: 0;
+        height: auto;
+    }
+
     .admin-gallery-wrap {
         --admin-gallery-visible-cards: 3;
         --admin-gallery-card-height: 420px;
         --admin-gallery-list-gap: 14px;
+    }
+
+    .admin-bookings-list {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+    }
+
+    .admin-booking-item {
+        min-height: 0;
     }
 
     .admin-gallery-list {
@@ -4989,9 +5013,86 @@ h6 {
         justify-content: space-between;
     }
 
+    /* Admins tab mobile fit: prevent badge/action clipping on narrow screens */
+    .admin-management-section[data-admin-section="admins"] #adminAdminsList {
+        padding-right: 10px;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-review-item {
+        min-width: 0;
+        overflow: visible;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-review-item-head {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-admin-inline-badges {
+        display: flex;
+        width: 100%;
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-admin-inline-badges .admin-status-badge,
+    .admin-management-section[data-admin-section="admins"] .admin-admin-inline-badges .admin-role-badge {
+        max-width: 100%;
+        white-space: normal;
+        text-align: center;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-booking-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        overflow: visible;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-booking-actions .admin-action-btn,
+    .admin-management-section[data-admin-section="admins"] .admin-booking-actions .admin-managed-toggle {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-gallery-list-wrap {
+        min-height: 0;
+        height: auto;
+        padding-bottom: 0;
+    }
+
+    .admin-management-section[data-admin-section="admins"] #adminAdminsList {
+        max-height: none;
+        overflow: visible;
+        padding-right: 0;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-review-item {
+        min-height: 0;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-booking-actions .admin-action-btn {
+        justify-content: center;
+        white-space: normal;
+        line-height: 1.25;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-managed-toggle {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+
     .reviews-submit-form .btn {
         width: 100%;
         justify-content: center;
+    }
+}
+
+@media (max-width: 490px) {
+    .admin-management-section[data-admin-section="admins"] #adminAdminsList {
+        padding-right: 8px;
     }
 }
 

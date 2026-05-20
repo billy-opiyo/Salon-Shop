@@ -1372,6 +1372,40 @@ function resetAdminManagementForm() {
 	syncAdminManagementPermissionsWithRole()
 }
 
+function focusAdminManagementForm(targetInput = null) {
+	const el = getAdminManagementFormElements()
+	if (!el.form) return
+
+	setActiveAdminSection("admins")
+
+	try {
+		el.form.scrollIntoView({ behavior: "smooth", block: "start" })
+	} catch (_) {
+		el.form.scrollIntoView()
+	}
+
+	el.form.classList.remove("admin-gallery-form--focus-flash")
+	void el.form.offsetWidth
+	el.form.classList.add("admin-gallery-form--focus-flash")
+	setTimeout(() => {
+		el.form.classList.remove("admin-gallery-form--focus-flash")
+	}, 1600)
+
+	const focusTarget =
+		targetInput || el.email || el.displayName || el.role || el.form
+	setTimeout(() => {
+		if (focusTarget && typeof focusTarget.focus === "function") {
+			focusTarget.focus({ preventScroll: true })
+			if (
+				focusTarget.tagName === "INPUT" &&
+				typeof focusTarget.select === "function"
+			) {
+				focusTarget.select()
+			}
+		}
+	}, 260)
+}
+
 function loadManagedAdminUserIntoForm(uid = "") {
 	const cleanUid = String(uid || "").trim()
 	if (!cleanUid) return
@@ -1402,7 +1436,7 @@ function loadManagedAdminUserIntoForm(uid = "") {
 	if (el.cancelEditBtn) el.cancelEditBtn.style.display = "inline-flex"
 	syncAdminManagementPermissionsWithRole()
 	setAdminMessage("", "", "adminAdminsMessage")
-	setActiveAdminSection("admins")
+	focusAdminManagementForm(el.email || el.displayName)
 }
 
 function renderAdminManagedUsers() {
