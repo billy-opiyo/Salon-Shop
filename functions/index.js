@@ -200,10 +200,10 @@ async function getCallerAdminAccessContext(request) {
 
 async function assertCanManageAdmins(request) {
 	const context = await getCallerAdminAccessContext(request)
-	if (!context.hasPermission(ADMIN_PERMISSION_KEYS.canManageAdmins)) {
+	if (context.isSuperAdmin !== true) {
 		throw new HttpsError(
 			"permission-denied",
-			"You do not have permission to manage admins",
+			"Only super admins can manage admin users",
 		)
 	}
 	return context
@@ -1556,13 +1556,14 @@ exports.adminListAdminUsers = onCall(
 		const snapshot = await admin
 			.firestore()
 			.collection(ADMIN_USERS_COLLECTION)
-			.orderBy("createdAt", "desc")
 			.limit(300)
 			.get()
 
-		const admins = snapshot.docs.map((doc) =>
+		const admins = snapshot.docs
+			.map((doc) =>
 			sanitizeAdminUserDocForResponse(doc.id, doc.data() || {}),
-		)
+			)
+			.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
 
 		return {
 			ok: true,

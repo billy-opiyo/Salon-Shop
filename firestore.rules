@@ -586,9 +586,11 @@ service cloud.firestore {
     match /adminUsers/{userId} {
       // Allow signed-in users to read only their own admin access record
       // (used by frontend to determine if panel access should unlock).
-      allow read: if isSignedIn() && userId == request.auth.uid;
+      // Super admins may also read all admin access records for oversight.
+      allow read: if (isSignedIn() && userId == request.auth.uid) || isSuperAdmin();
 
       // Admin-role records are server-managed only via Cloud Functions/Admin SDK.
+      // Client SDK writes are fully blocked (including super admins).
       allow create, update, delete: if false;
     }
 

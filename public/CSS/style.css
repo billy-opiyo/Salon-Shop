@@ -2930,6 +2930,57 @@ h6 {
     min-height: 42px;
 }
 
+/* Admins tab: show 3 admin records by default with gold scrollbars */
+#adminAdminsList {
+    --admin-admins-visible-cards: 3;
+    --admin-admin-card-height: 210px;
+    max-height: calc((var(--admin-admin-card-height) * var(--admin-admins-visible-cards)) + (12px * (var(--admin-admins-visible-cards) - 1)));
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #e0ac4f #1b1712;
+}
+
+#adminAdminsList::-webkit-scrollbar {
+    width: 10px;
+}
+
+#adminAdminsList::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #17120d, #20180f);
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.18);
+}
+
+#adminAdminsList::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #ffe1a3, #e0ac4f, #b6802d);
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.58);
+}
+
+#adminAdminsList::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #ffedbf, #efbf62, #c9923a);
+}
+
+/* Desktop spacing fix above "Existing Admin Access Records" */
+@media (min-width: 901px) {
+    .admin-management-section[data-admin-section="admins"] .admin-gallery-list-wrap {
+        align-content: start;
+        padding-top: 10px;
+    }
+
+    .admin-management-section[data-admin-section="admins"] .admin-gallery-list-head {
+        margin-top: 0;
+    }
+}
+
+@media (max-width: 490px) {
+    #adminAdminsList {
+        --admin-admins-visible-cards: 2;
+    }
+}
+
 .admin-admin-inline-badges {
     display: inline-flex;
     align-items: center;

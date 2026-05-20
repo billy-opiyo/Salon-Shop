@@ -262,6 +262,10 @@ function hasAdminAccessPermission(permissionKey = "") {
 	return adminAccessProfile.permissions?.[key] === true
 }
 
+function isCurrentSuperAdmin() {
+	return normalizeAdminRoleValue(adminAccessProfile?.role) === "super_admin"
+}
+
 function isAuthorizedAdminAccessProfile(profile = null) {
 	if (!profile || typeof profile !== "object") return false
 	if (profile.active !== true) return false
@@ -298,7 +302,7 @@ function applyAdminSectionPermissions() {
 		reviews: hasAdminAccessPermission("canManageContent"),
 		messages: hasAdminAccessPermission("canManageContent"),
 		services: hasAdminAccessPermission("canManageContent"),
-		admins: hasAdminAccessPermission("canManageAdmins"),
+		admins: isCurrentSuperAdmin(),
 		security: hasAdminAccessPermission("canManageSecurity"),
 	}
 
@@ -1262,11 +1266,8 @@ function getFilteredManagedAdmins(docs = []) {
 
 function canCurrentAdminToggleManagedAdmin(item = {}) {
 	if (!item || typeof item !== "object") return false
-	if (!adminUnlocked || !hasAdminAccessPermission("canManageAdmins"))
+	if (!adminUnlocked || !isCurrentSuperAdmin())
 		return false
-	if (normalizeAdminRoleValue(adminAccessProfile?.role) !== "super_admin") {
-		return false
-	}
 	const targetUid = String(item.uid || "").trim()
 	if (!targetUid) return false
 	if (targetUid === auth?.currentUser?.uid) return false
@@ -1274,11 +1275,8 @@ function canCurrentAdminToggleManagedAdmin(item = {}) {
 }
 
 function getManagedAdminToggleTooltip(item = {}) {
-	if (!adminUnlocked || !hasAdminAccessPermission("canManageAdmins")) {
-		return "Admin permissions are required to manage status."
-	}
-	if (normalizeAdminRoleValue(adminAccessProfile?.role) !== "super_admin") {
-		return "Only Super Admins can enable or disable admin accounts."
+	if (!adminUnlocked || !isCurrentSuperAdmin()) {
+		return "Only Super Admins can manage admin accounts."
 	}
 	if (String(item.uid || "").trim() === auth?.currentUser?.uid) {
 		return "You cannot disable your own account."
@@ -1504,7 +1502,7 @@ function renderAdminManagedUsers() {
 }
 
 async function refreshAdminManagedUsers() {
-	if (!adminUnlocked || !hasAdminAccessPermission("canManageAdmins")) return
+	if (!adminUnlocked || !isCurrentSuperAdmin()) return
 
 	const data = await callAdminListAdminUsersAction()
 	const list = Array.isArray(data?.admins) ? data.admins : []
@@ -1514,7 +1512,7 @@ async function refreshAdminManagedUsers() {
 
 async function saveManagedAdminUserFromForm(event) {
 	event.preventDefault()
-	if (!adminUnlocked || !hasAdminAccessPermission("canManageAdmins")) return
+	if (!adminUnlocked || !isCurrentSuperAdmin()) return
 
 	const el = getAdminManagementFormElements()
 	const payload = getAdminManagementFormValues()
@@ -1668,7 +1666,7 @@ function setAdminUnlockedState(value) {
 		startAdminSessionsListener()
 		startAdminTimelineListener()
 		startAdminUsersListener()
-		if (hasAdminAccessPermission("canManageAdmins")) {
+		if (isCurrentSuperAdmin()) {
 			void refreshAdminManagedUsers().catch((error) => {
 				console.error("Loading admin management records failed:", error)
 				setAdminMessage(
@@ -5927,7 +5925,7 @@ function initializeAdminPanel() {
 			if (
 				!actionBtn ||
 				!adminUnlocked ||
-				!hasAdminAccessPermission("canManageAdmins")
+				!isCurrentSuperAdmin()
 			) {
 				return
 			}
@@ -5953,7 +5951,7 @@ function initializeAdminPanel() {
 			if (
 				!toggleInput ||
 				!adminUnlocked ||
-				!hasAdminAccessPermission("canManageAdmins")
+				!isCurrentSuperAdmin()
 			) {
 				return
 			}
