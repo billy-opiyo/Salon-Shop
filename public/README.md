@@ -61,7 +61,7 @@ This project is built to:
 - Expanded **Cloud Functions automation**:
   - Email booking confirmation via Resend
   - WhatsApp booking confirmation on create
-  - Scheduled WhatsApp reminders (24h window)
+  - Scheduled WhatsApp reminders for confirmed bookings about 2 hours before appointment time
   - Booking system field initialization + per-user review/contact rate-limit updates
 - Expanded **Admin operations**:
   - Schedule tab with day/week calendar view and quick booking actions
@@ -78,6 +78,13 @@ This project is built to:
   - Super-admin-only management flows for creating/updating/listing admin users
   - Scoped admin UI rendering by permission (`canManageBookings`, `canManageContent`, `canManageSecurity`)
   - Added admin delegation/audit support with server-written `adminAuditLogs`
+- Updated **WhatsApp reminder timing**:
+  - Reminder scheduler still runs every 15 minutes, but now targets confirmed bookings roughly 2 hours away
+  - Reminder copy, logging, and status handling now match the 2-hour reminder timing
+- Added **braids-first service/gallery refinements**:
+  - Public Services includes a dedicated **Braids Services** category tab
+  - Public Gallery includes service-category filtering alongside existing sort/filter controls
+  - Braids-specific gallery labels/actions now surface “Most Booked Braids” and “View All Braids” where relevant
 
 ---
 
@@ -156,7 +163,7 @@ This project is built to:
 
 - Functions trigger on booking creation and slot release events.
 - Email + WhatsApp booking notifications.
-- Scheduled WhatsApp reminders.
+- Scheduled WhatsApp reminders about 2 hours before confirmed appointments.
 - Waitlist notification dispatch for newly opened slots.
 
 ---
@@ -165,13 +172,13 @@ This project is built to:
 
 ### Services
 
-- JS-driven service catalog + category tabs
+- JS-driven service catalog + category tabs, including dedicated Braids Services
 - “Book This Service” quick-fill action
 
 ### Gallery
 
 - Realtime Firestore gallery with fallback dataset
-- Filters (length/size/style type), sorting, featured rails
+- Service-category filters plus length/size/style-type filters, sorting, and featured rails
 - Before/after lightbox support
 - Save-style to favorites
 
@@ -368,7 +375,7 @@ File: `functions/index.js`
 
 - `sendBookingConfirmationEmail` (on booking create)
 - `sendBookingConfirmationWhatsApp` (on booking create)
-- `sendUpcomingBookingWhatsAppReminders` (scheduled every 15 minutes)
+- `sendUpcomingBookingWhatsAppReminders` (scheduled every 15 minutes; sends around 2 hours before confirmed appointments)
 - `initializeBookingSystemFields` (booking defaults patch)
 - `updateReviewRateLimit` (on review create)
 - `trackReviewEdited` (on review update)
@@ -544,7 +551,7 @@ Use this as a practical checklist to confirm all major features are working.
 
 ### H) Backend automation verification
 
-After creating test bookings, verify on booking docs:
+After creating confirmed test bookings, including one roughly 2 hours away, verify on booking docs:
 
 - `emailStatus` updates (`sent`/`failed`)
 - `whatsappStatus` updates (`confirmation_sent`, `reminder_sent`, etc.)
