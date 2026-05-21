@@ -31,6 +31,8 @@ const LOGIN_FAILED_WINDOW_MS = 5 * 60 * 1000
 const LOGIN_LOCK_THRESHOLD = 5
 const LOGIN_REPEAT_FAILURE_THRESHOLD = 3
 const LOGIN_LOCK_DURATION_MS = 30 * 60 * 1000
+const WHATSAPP_REMINDER_LEAD_TIME_HOURS = 2
+const WHATSAPP_REMINDER_WINDOW_MINUTES = 15
 const SECURITY_ALERT_SEVERITY = {
 	multiple_failed_login_attempts: "high",
 	new_device_detected: "medium",
@@ -1745,8 +1747,11 @@ exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 	},
 	async () => {
 		const nowMs = Date.now()
-		const minDiffMs = 23 * 60 * 60 * 1000
-		const maxDiffMs = 25 * 60 * 60 * 1000
+		const reminderLeadTimeMs =
+			WHATSAPP_REMINDER_LEAD_TIME_HOURS * 60 * 60 * 1000
+		const reminderWindowMs = WHATSAPP_REMINDER_WINDOW_MINUTES * 60 * 1000
+		const minDiffMs = reminderLeadTimeMs - reminderWindowMs
+		const maxDiffMs = reminderLeadTimeMs + reminderWindowMs
 
 		const bookingsSnap = await admin
 			.firestore()
@@ -1795,7 +1800,7 @@ exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 			const { dateLabel, timeLabel } = formatBookingDateTimeForMessage(booking)
 			const messageBody = [
 				`Hi ${customerName}, reminder from Royal Braids ⏰`,
-				"Your appointment is in about 24 hours.",
+				"Your appointment is in about 2 hours.",
 				`Service: ${booking?.service || "N/A"}`,
 				`Stylist: ${booking?.stylist || "Any Available"}`,
 				`Date: ${dateLabel}`,
@@ -1819,7 +1824,7 @@ exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 				)
 			} catch (error) {
 				failedCount += 1
-				logger.error("Failed to send 24h WhatsApp reminder", {
+				logger.error("Failed to send 2h WhatsApp reminder", {
 					bookingId: doc.id,
 					errorMessage: error?.message || "Unknown error",
 				})
