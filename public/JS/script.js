@@ -2,15 +2,15 @@
 
 // ============ DATA ============
 const servicesData = [
-	// Hair Services
+	// Braids Services
 	{
 		name: "Hair Braiding",
 		desc: "Professional protective braiding tailored to your preferred look.",
 		price: "From KSh 3,000",
 		duration: "2-5 hrs",
 		icon: "scissors",
-		category: "hair-services",
-		categoryLabel: "Hair Services",
+		category: "braids-services",
+		categoryLabel: "Braids Services",
 	},
 	{
 		name: "Box Braids",
@@ -18,8 +18,8 @@ const servicesData = [
 		price: "From KSh 3,500",
 		duration: "3-5 hrs",
 		icon: "scissors",
-		category: "hair-services",
-		categoryLabel: "Hair Services",
+		category: "braids-services",
+		categoryLabel: "Braids Services",
 	},
 	{
 		name: "Knotless Braids",
@@ -27,8 +27,8 @@ const servicesData = [
 		price: "From KSh 4,500",
 		duration: "4-6 hrs",
 		icon: "scissors",
-		category: "hair-services",
-		categoryLabel: "Hair Services",
+		category: "braids-services",
+		categoryLabel: "Braids Services",
 	},
 	{
 		name: "Cornrows",
@@ -36,8 +36,8 @@ const servicesData = [
 		price: "From KSh 1,500",
 		duration: "1-3 hrs",
 		icon: "heart",
-		category: "hair-services",
-		categoryLabel: "Hair Services",
+		category: "braids-services",
+		categoryLabel: "Braids Services",
 	},
 	{
 		name: "Fulani Braids",
@@ -45,8 +45,8 @@ const servicesData = [
 		price: "From KSh 4,000",
 		duration: "3-5 hrs",
 		icon: "crown",
-		category: "hair-services",
-		categoryLabel: "Hair Services",
+		category: "braids-services",
+		categoryLabel: "Braids Services",
 	},
 	{
 		name: "Stitch Braids",
@@ -54,8 +54,8 @@ const servicesData = [
 		price: "From KSh 2,500",
 		duration: "2-4 hrs",
 		icon: "heart",
-		category: "hair-services",
-		categoryLabel: "Hair Services",
+		category: "braids-services",
+		categoryLabel: "Braids Services",
 	},
 	{
 		name: "Faux Locs",
@@ -63,9 +63,11 @@ const servicesData = [
 		price: "From KSh 4,500",
 		duration: "4-6 hrs",
 		icon: "feather",
-		category: "hair-services",
-		categoryLabel: "Hair Services",
+		category: "braids-services",
+		categoryLabel: "Braids Services",
 	},
+
+	// Hair Services
 	{
 		name: "Hair Styling",
 		desc: "Finish and style your hair for daily elegance or special events.",
@@ -645,7 +647,8 @@ const galleryFiltersState = {
 
 const GALLERY_SERVICE_FILTER_DEFINITIONS = [
 	{ key: "all", label: "All" },
-	{ key: "hair-services", label: "Braids" },
+	{ key: "braids-services", label: "Braids" },
+	{ key: "hair-services", label: "Hair" },
 	{ key: "beauty-spa-services", label: "Beauty Spa" },
 	{ key: "nail-services", label: "Nails" },
 	{ key: "makeup-services", label: "Makeup" },
@@ -656,7 +659,8 @@ const GALLERY_SERVICE_FILTER_DEFINITIONS = [
 
 const GALLERY_SERVICE_DISPLAY_LABELS = {
 	all: "All",
-	"hair-services": "Braids",
+	"braids-services": "Braids",
+	"hair-services": "Hair",
 	"beauty-spa-services": "Beauty Spa",
 	"nail-services": "Nails",
 	"makeup-services": "Makeup",
@@ -675,14 +679,21 @@ function getGalleryFeaturedCategoryLabel(categoryKey = "all") {
 
 const GALLERY_SERVICE_KEYWORDS = {
 	"hair-services": [
-		"braid",
-		"twist",
-		"cornrow",
-		"knotless",
-		"fulani",
-		"loc",
-		"hair",
+		"hair styling",
+		"hair cutting",
+		"hair coloring",
+		"hair relaxing",
+		"hair treatment",
+		"wig",
+		"weaving",
+		"extension",
+		"blow dry",
+		"blow-dry",
+		"hair washing",
+		"silk press",
+		"retouch",
 	],
+	"braids-services": ["braid", "twist", "cornrow", "knotless", "fulani", "loc"],
 	"beauty-spa-services": [
 		"facial",
 		"body",
@@ -703,14 +714,44 @@ function inferGalleryServiceCategory(item = {}) {
 	const existingCategory = String(item.serviceCategory || item.category || "")
 		.trim()
 		.toLowerCase()
-	if (existingCategory && existingCategory !== "all") {
-		return existingCategory
-	}
 
 	const bag = [item.styleName, item.styleType, item.serviceName]
 		.filter(Boolean)
 		.join(" ")
 		.toLowerCase()
+	const hairKeywords = GALLERY_SERVICE_KEYWORDS["hair-services"] || []
+	const braidsKeywords = GALLERY_SERVICE_KEYWORDS["braids-services"] || []
+	const hasHairKeyword = hairKeywords.some((keyword) => bag.includes(keyword))
+	const hasBraidsKeyword = braidsKeywords.some((keyword) =>
+		bag.includes(keyword),
+	)
+
+	if (existingCategory && existingCategory !== "all") {
+		if (existingCategory === "hair") {
+			return "hair-services"
+		}
+		if (existingCategory === "braids") {
+			return "braids-services"
+		}
+		if (existingCategory === "braids-services") {
+			return "braids-services"
+		}
+		if (
+			existingCategory === "hair-services" &&
+			hasHairKeyword &&
+			!hasBraidsKeyword
+		) {
+			return "hair-services"
+		}
+		if (existingCategory === "hair-services") {
+			return "braids-services"
+		}
+		return existingCategory
+	}
+
+	if (hasHairKeyword && !hasBraidsKeyword) {
+		return "hair-services"
+	}
 
 	for (const [categoryKey, keywords] of Object.entries(
 		GALLERY_SERVICE_KEYWORDS,
@@ -720,7 +761,7 @@ function inferGalleryServiceCategory(item = {}) {
 		}
 	}
 
-	return "hair-services"
+	return "braids-services"
 }
 
 function getGalleryServiceLabel(categoryKey = "") {
@@ -731,6 +772,14 @@ function getGalleryServiceLabel(categoryKey = "") {
 		GALLERY_SERVICE_DISPLAY_LABELS[normalized] ||
 		GALLERY_SERVICE_DISPLAY_LABELS.all
 	)
+}
+
+function getGalleryViewNounForService(categoryKey = "all") {
+	const normalized = String(categoryKey || "all")
+		.trim()
+		.toLowerCase()
+	if (normalized === "all") return "Gallery"
+	return getGalleryServiceLabel(normalized)
 }
 const preloadedBeforeImageUrls = new Set()
 
@@ -1118,6 +1167,7 @@ const timeSlots = [
 const CUSTOM_SERVICE_OPTION_VALUE = "__custom_service__"
 const SERVICE_SETTINGS_DOC_PATH = ["siteSettings", "serviceCategories"]
 const SERVICE_CATEGORY_DEFINITIONS = [
+	{ key: "braids-services", label: "Braids Services" },
 	{ key: "hair-services", label: "Hair Services" },
 	{ key: "beauty-spa-services", label: "Beauty Spa Services" },
 	{ key: "nail-services", label: "Nail Services" },
@@ -1130,6 +1180,21 @@ const SERVICE_CATEGORY_DEFINITIONS = [
 const SERVICE_CATEGORY_LABEL_MAP = Object.fromEntries(
 	SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, item.label]),
 )
+const MAIN_HAIR_SERVICE_NAME_KEYWORDS = [
+	"hair styling",
+	"hair cutting",
+	"hair coloring",
+	"hair relaxing",
+	"hair treatment",
+	"wig",
+	"weaving",
+	"extension",
+	"blow dry",
+	"blow-dry",
+	"hair washing",
+	"silk press",
+	"retouch",
+]
 
 // ============ FIREBASE + CLOUDINARY CONFIG ============
 const appConfig = window.APP_CONFIG || {}
@@ -1894,10 +1959,43 @@ function normalizeEnabledServiceCategoriesState(raw = {}) {
 	return defaults
 }
 
-function getVisibleServicesData() {
-	return servicesData.filter(
-		(service) => enabledServiceCategories[service.category] !== false,
+function inferPrimaryServiceCategory(service = {}) {
+	const rawCategory = String(service.category || "")
+		.trim()
+		.toLowerCase()
+
+	if (rawCategory === "braids-services") return "braids-services"
+	if (rawCategory === "hair") return "hair-services"
+
+	const bag = [service.name, service.desc]
+		.filter(Boolean)
+		.join(" ")
+		.toLowerCase()
+	const isHairService = MAIN_HAIR_SERVICE_NAME_KEYWORDS.some((keyword) =>
+		bag.includes(keyword),
 	)
+
+	if (rawCategory === "hair-services") {
+		return isHairService ? "hair-services" : "braids-services"
+	}
+
+	return rawCategory || "braids-services"
+}
+
+function normalizeServiceRecord(service = {}) {
+	const category = inferPrimaryServiceCategory(service)
+	return {
+		...service,
+		category,
+		categoryLabel:
+			SERVICE_CATEGORY_LABEL_MAP[category] || service.categoryLabel || "",
+	}
+}
+
+function getVisibleServicesData() {
+	return servicesData
+		.map((service) => normalizeServiceRecord(service))
+		.filter((service) => enabledServiceCategories[service.category] !== false)
 }
 
 function isServiceCategoryEnabled(categoryKey = "") {
@@ -5225,7 +5323,7 @@ function renderGalleryFilters() {
 			.join("")
 	}
 
-	const braidsOnly = galleryFiltersState.service === "hair-services"
+	const braidsOnly = galleryFiltersState.service === "braids-services"
 	const note = document.getElementById("galleryBraidsOnlyNote")
 	if (note) {
 		note.style.display = braidsOnly ? "block" : "none"
@@ -5263,7 +5361,7 @@ function applyGalleryFilters() {
 			return false
 		}
 
-		const isBraidsMode = galleryFiltersState.service === "hair-services"
+		const isBraidsMode = galleryFiltersState.service === "braids-services"
 		if (!isBraidsMode) {
 			return true
 		}
@@ -5383,10 +5481,8 @@ function setGallerySort(sortValue = "recommended") {
 	showAllGallery = false
 	const button = document.getElementById("viewAllGallery")
 	if (button) {
-		button.textContent =
-			galleryFiltersState.service === "hair-services"
-				? "View All Braids"
-				: "View All Gallery"
+		const noun = getGalleryViewNounForService(galleryFiltersState.service)
+		button.textContent = `View All ${noun}`
 	}
 	renderGallery()
 }
@@ -5528,8 +5624,7 @@ function toggleGalleryView() {
 	renderGallery()
 	const button = document.getElementById("viewAllGallery")
 	if (button) {
-		const noun =
-			galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
+		const noun = getGalleryViewNounForService(galleryFiltersState.service)
 		button.textContent = showAllGallery
 			? `View Less ${noun}`
 			: `View All ${noun}`
@@ -5539,7 +5634,7 @@ function toggleGalleryView() {
 function setGalleryFilter(group, value) {
 	galleryFiltersState[group] = value
 
-	if (group === "service" && value !== "hair-services") {
+	if (group === "service" && value !== "braids-services") {
 		galleryFiltersState.length = "all"
 		galleryFiltersState.size = "all"
 		galleryFiltersState.styleType = "all"
@@ -5548,8 +5643,7 @@ function setGalleryFilter(group, value) {
 	showAllGallery = false
 	const button = document.getElementById("viewAllGallery")
 	if (button) {
-		const noun =
-			galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
+		const noun = getGalleryViewNounForService(galleryFiltersState.service)
 		button.textContent = `View All ${noun}`
 	}
 	renderGalleryFilters()
@@ -5588,8 +5682,7 @@ function openGalleryItemByIdOrName(idOrName) {
 		renderGallery()
 		const button = document.getElementById("viewAllGallery")
 		if (button) {
-			const noun =
-				galleryFiltersState.service === "hair-services" ? "Braids" : "Gallery"
+			const noun = getGalleryViewNounForService(galleryFiltersState.service)
 			button.textContent = `View Less ${noun}`
 		}
 

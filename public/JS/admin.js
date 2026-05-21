@@ -56,7 +56,7 @@ let adminAdminsRoleFilter = "all"
 let adminAdminsStatusFilter = "all"
 let adminSecurityVisibleRows = []
 let adminGalleryPreviewObjectUrl = ""
-let activeAdminGalleryServiceCategory = "hair-services"
+let activeAdminGalleryServiceCategory = "braids-services"
 const ADMIN_SCHEDULE_VIEWS = {
 	day: "day",
 	week: "week",
@@ -74,6 +74,7 @@ const ADMIN_SESSION_STALE_AFTER_MS = 2 * 60 * 1000
 const ADMIN_SECURITY_BLOCK_DEFAULT_MINUTES = 60
 const ADMIN_SERVICE_SETTINGS_DOC_PATH = ["siteSettings", "serviceCategories"]
 const ADMIN_SERVICE_CATEGORY_DEFINITIONS = [
+	{ key: "braids-services", label: "Braids Services" },
 	{ key: "hair-services", label: "Hair Services" },
 	{ key: "beauty-spa-services", label: "Beauty Spa Services" },
 	{ key: "nail-services", label: "Nail Services" },
@@ -84,7 +85,8 @@ const ADMIN_SERVICE_CATEGORY_DEFINITIONS = [
 	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
 ]
 const ADMIN_GALLERY_SERVICE_FILTER_DEFINITIONS = [
-	{ key: "hair-services", label: "Braids" },
+	{ key: "braids-services", label: "Braids" },
+	{ key: "hair-services", label: "Hair" },
 	{ key: "beauty-spa-services", label: "Beauty Spa" },
 	{ key: "nail-services", label: "Nails" },
 	{ key: "makeup-services", label: "Makeup" },
@@ -98,6 +100,24 @@ const ADMIN_GALLERY_SERVICE_LABEL_MAP = Object.fromEntries(
 		item.label,
 	]),
 )
+const ADMIN_GALLERY_CATEGORY_KEYWORDS = {
+	"hair-services": [
+		"hair styling",
+		"hair cutting",
+		"hair coloring",
+		"hair relaxing",
+		"hair treatment",
+		"wig",
+		"weaving",
+		"extension",
+		"blow dry",
+		"blow-dry",
+		"hair washing",
+		"silk press",
+		"retouch",
+	],
+	"braids-services": ["braid", "twist", "cornrow", "knotless", "fulani", "loc"],
+}
 const ADMIN_REVIEW_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 }
@@ -3737,19 +3757,22 @@ function renderAdminBookings(docs) {
 }
 
 function galleryDocToViewModel(doc) {
+	const inferredCategory = inferAdminGalleryServiceCategory(doc)
 	return {
 		id: doc.id,
 		styleName: doc.styleName || "Untitled Style",
 		serviceName: doc.serviceName || doc.styleName || "",
-		serviceCategory: normalizeAdminGalleryServiceCategory(
-			doc.serviceCategory || "hair-services",
-		),
+		serviceCategory: inferredCategory,
 		styleType: doc.styleType || "N/A",
 		length: doc.length || "N/A",
 		size: doc.size || "N/A",
 		timeTaken: doc.timeTaken || "N/A",
 		priceRange: doc.priceRange || "",
 		hairType: doc.hairType || "N/A",
+		hairServiceType: doc.hairServiceType || "",
+		hairTechnique: doc.hairTechnique || "",
+		hairLengthDensity: doc.hairLengthDensity || "",
+		hairProductsUsed: doc.hairProductsUsed || "",
 		stylistName: doc.stylistName || "N/A",
 		imageUrl: doc.imageUrl || "",
 		beforeImageUrl: doc.beforeImageUrl || "",
@@ -3984,10 +4007,55 @@ function setAdminButtonLoadingState(button, isLoading, options = {}) {
 	}
 }
 
+function inferAdminGalleryServiceCategory(item = {}) {
+	const explicitCategory = normalizeAdminGalleryServiceCategory(
+		item.serviceCategory || item.category || "",
+	)
+
+	if (
+		explicitCategory !== "braids-services" &&
+		explicitCategory !== "hair-services"
+	) {
+		return explicitCategory
+	}
+
+	const bag = [
+		item.styleName,
+		item.styleType,
+		item.serviceName,
+		item.hairServiceType,
+	]
+		.filter(Boolean)
+		.join(" ")
+		.toLowerCase()
+
+	if (!bag) return explicitCategory
+
+	const hairKeywords = ADMIN_GALLERY_CATEGORY_KEYWORDS["hair-services"] || []
+	const braidsKeywords =
+		ADMIN_GALLERY_CATEGORY_KEYWORDS["braids-services"] || []
+	const hasHairKeyword = hairKeywords.some((keyword) => bag.includes(keyword))
+	const hasBraidsKeyword = braidsKeywords.some((keyword) =>
+		bag.includes(keyword),
+	)
+
+	if (hasHairKeyword && !hasBraidsKeyword) {
+		return "hair-services"
+	}
+
+	if (hasBraidsKeyword && !hasHairKeyword) {
+		return "braids-services"
+	}
+
+	return explicitCategory
+}
+
 function normalizeAdminGalleryServiceCategory(value = "") {
 	const normalized = String(value || "")
 		.trim()
 		.toLowerCase()
+	if (normalized === "hair") return "hair-services"
+	if (normalized === "braids") return "braids-services"
 	if (
 		ADMIN_GALLERY_SERVICE_FILTER_DEFINITIONS.some(
 			(item) => item.key === normalized,
@@ -3995,7 +4063,7 @@ function normalizeAdminGalleryServiceCategory(value = "") {
 	) {
 		return normalized
 	}
-	return "hair-services"
+	return "braids-services"
 }
 
 function getAdminGalleryServiceLabel(categoryKey = "") {
@@ -4003,7 +4071,90 @@ function getAdminGalleryServiceLabel(categoryKey = "") {
 	return ADMIN_GALLERY_SERVICE_LABEL_MAP[normalized] || "Braids"
 }
 
-function updateAdminGalleryFeaturedLabels(categoryKey = "hair-services") {
+function normalizeAdminHairServiceType(value = "") {
+	return String(value || "")
+		.trim()
+		.toLowerCase()
+}
+
+function getAdminHairServiceFieldRules(hairServiceType = "") {
+	const normalizedType = normalizeAdminHairServiceType(hairServiceType)
+	const defaultRules = {
+		showTechnique: true,
+		requireTechnique: true,
+		showLengthDensity: true,
+		showProductsUsed: true,
+		requireProductsUsed: false,
+	}
+
+	if (normalizedType === "hair cutting") {
+		return {
+			...defaultRules,
+			showProductsUsed: false,
+		}
+	}
+
+	if (
+		normalizedType === "hair coloring" ||
+		normalizedType === "hair relaxing" ||
+		normalizedType === "hair treatment"
+	) {
+		return {
+			...defaultRules,
+			requireProductsUsed: true,
+		}
+	}
+
+	return defaultRules
+}
+
+function applyAdminHairServiceTypeToForm(hairServiceType = "") {
+	const serviceCategory = normalizeAdminGalleryServiceCategory(
+		document.getElementById("galleryServiceCategory")?.value ||
+			activeAdminGalleryServiceCategory,
+	)
+	const isHairCategory = serviceCategory === "hair-services"
+	const rules = getAdminHairServiceFieldRules(hairServiceType)
+
+	const toggleHairField = (fieldId, isVisible, isRequired = false) => {
+		const control = document.getElementById(fieldId)
+		const fieldWrap = control?.closest(".admin-hair-field")
+		if (!control || !fieldWrap) return
+
+		const shouldShow = isHairCategory && isVisible
+		fieldWrap.style.display = shouldShow ? "" : "none"
+
+		if (shouldShow && isRequired) {
+			control.setAttribute("required", "required")
+		} else {
+			control.removeAttribute("required")
+		}
+
+		if (!shouldShow) {
+			if (control.type === "checkbox") {
+				control.checked = false
+			} else if (control.tagName === "SELECT") {
+				control.value = ""
+			} else if (control.type !== "file") {
+				control.value = ""
+			}
+		}
+	}
+
+	toggleHairField(
+		"galleryHairTechnique",
+		rules.showTechnique,
+		rules.requireTechnique,
+	)
+	toggleHairField("galleryHairLengthDensity", rules.showLengthDensity, false)
+	toggleHairField(
+		"galleryHairProductsUsed",
+		rules.showProductsUsed,
+		rules.requireProductsUsed,
+	)
+}
+
+function updateAdminGalleryFeaturedLabels(categoryKey = "braids-services") {
 	const normalizedCategory = normalizeAdminGalleryServiceCategory(categoryKey)
 	const label = getAdminGalleryServiceLabel(normalizedCategory)
 	const trendingLabel = document.getElementById("galleryFeaturedTrendingLabel")
@@ -4019,7 +4170,9 @@ function updateAdminGalleryFeaturedLabels(categoryKey = "hair-services") {
 	}
 }
 
-function applyAdminGalleryServiceCategoryToForm(categoryKey = "hair-services") {
+function applyAdminGalleryServiceCategoryToForm(
+	categoryKey = "braids-services",
+) {
 	const normalizedCategory = normalizeAdminGalleryServiceCategory(categoryKey)
 	activeAdminGalleryServiceCategory = normalizedCategory
 
@@ -4045,7 +4198,8 @@ function applyAdminGalleryServiceCategoryToForm(categoryKey = "hair-services") {
 		button.classList.toggle("active", buttonKey === normalizedCategory)
 	})
 
-	const isBraids = normalizedCategory === "hair-services"
+	const isBraids = normalizedCategory === "braids-services"
+	const isHair = normalizedCategory === "hair-services"
 	const braidsOnlyFields = document.querySelectorAll(
 		"[data-braids-only='true']",
 	)
@@ -4073,6 +4227,36 @@ function applyAdminGalleryServiceCategoryToForm(categoryKey = "hair-services") {
 			}
 		})
 	})
+
+	const hairOnlyFields = document.querySelectorAll("[data-hair-only='true']")
+	hairOnlyFields.forEach((field) => {
+		field.style.display = isHair ? "" : "none"
+		const controls = field.querySelectorAll("input, select, textarea")
+		controls.forEach((control) => {
+			const requiresForHair = control.hasAttribute("required")
+			if (requiresForHair) {
+				control.dataset.requiredWhenHair = "true"
+			}
+			if (isHair) {
+				if (control.dataset.requiredWhenHair === "true") {
+					control.setAttribute("required", "required")
+				}
+			} else {
+				control.removeAttribute("required")
+				if (control.type === "checkbox") {
+					control.checked = false
+				} else if (control.tagName === "SELECT") {
+					control.value = ""
+				} else if (control.type !== "file") {
+					control.value = ""
+				}
+			}
+		})
+	})
+
+	const selectedHairServiceType =
+		document.getElementById("galleryHairServiceType")?.value || ""
+	applyAdminHairServiceTypeToForm(selectedHairServiceType)
 
 	updateGalleryPreview()
 }
@@ -4148,6 +4332,10 @@ function updateGalleryPreview() {
 		document.getElementById("galleryTimeTaken")?.value?.trim() || ""
 	const priceRange =
 		document.getElementById("galleryPriceRange")?.value?.trim() || ""
+	const hairServiceType =
+		document.getElementById("galleryHairServiceType")?.value?.trim() || ""
+	const hairTechnique =
+		document.getElementById("galleryHairTechnique")?.value?.trim() || ""
 	const stylistName =
 		document.getElementById("galleryStylistName")?.value?.trim() || ""
 	const hasTrending =
@@ -4174,6 +4362,8 @@ function updateGalleryPreview() {
 			serviceName || getAdminGalleryServiceLabel(serviceCategory)
 		if (serviceCategory === "hair-services") {
 			previewMeta.textContent = `${serviceLabel} • ${styleType || "Type"} • ${length || "Length"} • ${size || "Size"}`
+		} else if (serviceCategory === "hair-services") {
+			previewMeta.textContent = `${serviceLabel} • ${hairServiceType || "Service"} • ${hairTechnique || "Technique"}`
 		} else {
 			previewMeta.textContent = `${serviceLabel} • ${styleType || "Type"}`
 		}
@@ -4251,6 +4441,10 @@ function bindGalleryPreviewEvents() {
 		"gallerySize",
 		"galleryTimeTaken",
 		"galleryPriceRange",
+		"galleryHairServiceType",
+		"galleryHairTechnique",
+		"galleryHairLengthDensity",
+		"galleryHairProductsUsed",
 		"galleryStylistName",
 		"galleryFeaturedTrending",
 		"galleryFeaturedMostBooked",
@@ -4269,6 +4463,16 @@ function bindGalleryPreviewEvents() {
 		mainImageInput.addEventListener("change", syncGalleryPreviewImageFromFile)
 	}
 
+	const hairServiceTypeSelect = document.getElementById(
+		"galleryHairServiceType",
+	)
+	if (hairServiceTypeSelect) {
+		hairServiceTypeSelect.addEventListener("change", (event) => {
+			applyAdminHairServiceTypeToForm(event.target.value || "")
+			updateGalleryPreview()
+		})
+	}
+
 	updateGalleryPreview()
 }
 
@@ -4279,7 +4483,7 @@ function resetGalleryForm() {
 	form.reset()
 	document.getElementById("galleryEditId").value = ""
 	document.getElementById("galleryServiceName").value = ""
-	applyAdminGalleryServiceCategoryToForm("hair-services")
+	applyAdminGalleryServiceCategoryToForm("braids-services")
 	document.getElementById("adminGalleryFormTitle").textContent =
 		"Add New Gallery Style"
 	document.getElementById("adminGallerySaveBtn").textContent =
@@ -4304,7 +4508,7 @@ function loadGalleryItemForEditing(id) {
 	document.getElementById("galleryServiceName").value =
 		item.serviceName || item.styleName || ""
 	const serviceCategory = normalizeAdminGalleryServiceCategory(
-		item.serviceCategory || "hair-services",
+		item.serviceCategory || "braids-services",
 	)
 	applyAdminGalleryServiceCategoryToForm(serviceCategory)
 	document.getElementById("galleryLength").value = item.length || ""
@@ -4312,6 +4516,15 @@ function loadGalleryItemForEditing(id) {
 	document.getElementById("galleryTimeTaken").value = item.timeTaken || ""
 	document.getElementById("galleryPriceRange").value = item.priceRange || ""
 	document.getElementById("galleryHairType").value = item.hairType || ""
+	document.getElementById("galleryHairServiceType").value =
+		item.hairServiceType || ""
+	document.getElementById("galleryHairTechnique").value =
+		item.hairTechnique || ""
+	document.getElementById("galleryHairLengthDensity").value =
+		item.hairLengthDensity || ""
+	document.getElementById("galleryHairProductsUsed").value =
+		item.hairProductsUsed || ""
+	applyAdminHairServiceTypeToForm(item.hairServiceType || "")
 	document.getElementById("galleryStylistName").value = item.stylistName || ""
 	document.getElementById("galleryFeaturedTrending").checked =
 		item.featuredTrending === true
@@ -4381,7 +4594,7 @@ function renderAdminGallery(docs) {
         </div>
         <div class="admin-gallery-content">
           <h4>${item.styleName}</h4>
-          <p>${getAdminGalleryServiceLabel(item.serviceCategory)} • ${item.styleType}${item.serviceCategory === "hair-services" ? ` • ${item.length} • ${item.size}` : ""}</p>
+	          <p>${getAdminGalleryServiceLabel(item.serviceCategory)} • ${item.styleType}${item.serviceCategory === "braids-services" ? ` • ${item.length} • ${item.size}` : item.serviceCategory === "hair-services" ? ` • ${item.hairServiceType || "Service"} • ${item.hairTechnique || "Technique"}` : ""}</p>
           <p>Stylist: ${item.stylistName} • Time: ${item.timeTaken}</p>
           <div class="admin-gallery-tags">
             ${item.featuredTrending ? "<span>Trending</span>" : ""}
@@ -4465,6 +4678,18 @@ async function saveGalleryItem(event) {
 	const timeTaken = document.getElementById("galleryTimeTaken").value.trim()
 	const priceRange = document.getElementById("galleryPriceRange").value.trim()
 	const hairType = document.getElementById("galleryHairType").value.trim()
+	const hairServiceType = document
+		.getElementById("galleryHairServiceType")
+		.value.trim()
+	const hairTechnique = document
+		.getElementById("galleryHairTechnique")
+		.value.trim()
+	const hairLengthDensity = document
+		.getElementById("galleryHairLengthDensity")
+		.value.trim()
+	const hairProductsUsed = document
+		.getElementById("galleryHairProductsUsed")
+		.value.trim()
 	const stylistName = document.getElementById("galleryStylistName").value.trim()
 	const featuredTrending = document.getElementById(
 		"galleryFeaturedTrending",
@@ -4477,7 +4702,9 @@ async function saveGalleryItem(event) {
 	const beforeImageFile =
 		document.getElementById("galleryBeforeImage").files?.[0]
 
-	const isBraidsCategory = serviceCategory === "hair-services"
+	const isBraidsCategory = serviceCategory === "braids-services"
+	const isHairCategory = serviceCategory === "hair-services"
+	const hairServiceRules = getAdminHairServiceFieldRules(hairServiceType)
 	if (!styleName || !serviceName || !styleType || !timeTaken || !stylistName) {
 		setAdminMessage(
 			"error",
@@ -4491,6 +4718,28 @@ async function saveGalleryItem(event) {
 		setAdminMessage(
 			"error",
 			"❌ Braids entries require length, size, and hair type.",
+			"adminGalleryMessage",
+		)
+		return
+	}
+
+	if (isHairCategory && (!hairServiceType || !hairTechnique)) {
+		setAdminMessage(
+			"error",
+			"❌ Hair entries require hair service type and technique/finish.",
+			"adminGalleryMessage",
+		)
+		return
+	}
+
+	if (
+		isHairCategory &&
+		hairServiceRules.requireProductsUsed &&
+		!hairProductsUsed
+	) {
+		setAdminMessage(
+			"error",
+			"❌ This hair service type requires products/color mix used.",
 			"adminGalleryMessage",
 		)
 		return
@@ -4532,6 +4781,17 @@ async function saveGalleryItem(event) {
 			timeTaken,
 			priceRange,
 			hairType: isBraidsCategory ? hairType : "",
+			hairServiceType: isHairCategory ? hairServiceType : "",
+			hairTechnique:
+				isHairCategory && hairServiceRules.showTechnique ? hairTechnique : "",
+			hairLengthDensity:
+				isHairCategory && hairServiceRules.showLengthDensity
+					? hairLengthDensity
+					: "",
+			hairProductsUsed:
+				isHairCategory && hairServiceRules.showProductsUsed
+					? hairProductsUsed
+					: "",
 			stylistName,
 			imageUrl,
 			beforeImageUrl,

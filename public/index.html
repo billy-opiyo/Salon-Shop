@@ -288,9 +288,16 @@
 							<button
 								class="gallery-filter-chip"
 								data-filter-group="service"
-								data-filter-value="hair-services"
+								data-filter-value="braids-services"
 							>
 								Braids
+							</button>
+							<button
+								class="gallery-filter-chip"
+								data-filter-group="service"
+								data-filter-value="hair-services"
+							>
+								Hair
 							</button>
 							<button
 								class="gallery-filter-chip"
@@ -335,20 +342,26 @@
 								Bridal / Event Packages
 							</button>
 						</div>
-						<label class="gallery-sort-label" for="gallerySortSelect"
-							>Sort By:</label
-						>
-						<select id="gallerySortSelect" class="gallery-sort-select">
-							<option value="recommended">Recommended</option>
-							<option value="name-asc">Name A-Z</option>
-							<option value="name-desc">Name Z-A</option>
-							<option value="date-modified-desc">Date Modified (Newest)</option>
-							<option value="date-modified-asc">Date Modified (Oldest)</option>
-							<option value="date-created-desc">Date Created (Newest)</option>
-							<option value="date-created-asc">Date Created (Oldest)</option>
-							<option value="new">New</option>
-							<option value="old">Old</option>
-						</select>
+						<div class="gallery-sort-control">
+							<label class="gallery-sort-label" for="gallerySortSelect"
+								>Sort By:</label
+							>
+							<select id="gallerySortSelect" class="gallery-sort-select">
+								<option value="recommended">Recommended</option>
+								<option value="name-asc">Name A-Z</option>
+								<option value="name-desc">Name Z-A</option>
+								<option value="date-modified-desc">
+									Date Modified (Newest)
+								</option>
+								<option value="date-modified-asc">
+									Date Modified (Oldest)
+								</option>
+								<option value="date-created-desc">Date Created (Newest)</option>
+								<option value="date-created-asc">Date Created (Oldest)</option>
+								<option value="new">New</option>
+								<option value="old">Old</option>
+							</select>
+						</div>
 					</div>
 
 					<div class="gallery-filter-group" id="galleryLengthFilters">
@@ -423,6 +436,9 @@
 				<div class="services-tabs animate-on-scroll delay-1">
 					<button class="services-tab active" data-filter="all">
 						All Services
+					</button>
+					<button class="services-tab" data-filter="braids-services">
+						Braids Services
 					</button>
 					<button class="services-tab" data-filter="hair-services">
 						Hair Services

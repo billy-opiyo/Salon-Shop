@@ -463,9 +463,16 @@
 									<button
 										type="button"
 										class="gallery-filter-chip active"
-										data-admin-gallery-service="hair-services"
+										data-admin-gallery-service="braids-services"
 									>
 										Braids
+									</button>
+									<button
+										type="button"
+										class="gallery-filter-chip"
+										data-admin-gallery-service="hair-services"
+									>
+										Hair
 									</button>
 									<button
 										type="button"
@@ -513,7 +520,7 @@
 								<input
 									type="hidden"
 									id="galleryServiceCategory"
-									value="hair-services"
+									value="braids-services"
 								/>
 								<div class="admin-gallery-form-head">
 									<h3 id="adminGalleryFormTitle">Add New Gallery Style</h3>
@@ -605,6 +612,73 @@
 											id="galleryHairType"
 											placeholder="e.g. 20-inch human blend"
 											required
+										/>
+									</div>
+									<div
+										class="form-group admin-hair-field"
+										data-hair-only="true"
+										style="display: none"
+									>
+										<label for="galleryHairServiceType"
+											>Hair Service Type *</label
+										>
+										<select id="galleryHairServiceType">
+											<option value="">Select hair service</option>
+											<option value="Hair Styling">Hair Styling</option>
+											<option value="Hair Cutting">Hair Cutting</option>
+											<option value="Hair Coloring">Hair Coloring</option>
+											<option value="Hair Relaxing">Hair Relaxing</option>
+											<option value="Hair Treatment">Hair Treatment</option>
+											<option value="Wig Installation">Wig Installation</option>
+											<option value="Weaving/Extensions">
+												Weaving/Extensions
+											</option>
+											<option value="Hair Washing & Blow Dry">
+												Hair Washing & Blow Dry
+											</option>
+										</select>
+									</div>
+									<div
+										class="form-group admin-hair-field"
+										data-hair-only="true"
+										style="display: none"
+									>
+										<label for="galleryHairTechnique"
+											>Technique / Finish *</label
+										>
+										<input
+											type="text"
+											id="galleryHairTechnique"
+											placeholder="e.g. Silk press finish"
+											required
+										/>
+									</div>
+									<div
+										class="form-group admin-hair-field"
+										data-hair-only="true"
+										style="display: none"
+									>
+										<label for="galleryHairLengthDensity"
+											>Client Hair Length/Volume</label
+										>
+										<input
+											type="text"
+											id="galleryHairLengthDensity"
+											placeholder="e.g. Shoulder length, thick density"
+										/>
+									</div>
+									<div
+										class="form-group full admin-hair-field"
+										data-hair-only="true"
+										style="display: none"
+									>
+										<label for="galleryHairProductsUsed"
+											>Products / Color Mix Used</label
+										>
+										<input
+											type="text"
+											id="galleryHairProductsUsed"
+											placeholder="e.g. Ammonia-free color + keratin serum"
 										/>
 									</div>
 									<div class="form-group">
