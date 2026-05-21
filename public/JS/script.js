@@ -640,9 +640,11 @@ let gallerySlideshowTimers = []
 let gallerySortBy = "recommended"
 const galleryFiltersState = {
 	service: "all",
+	subService: "all",
 	length: "all",
 	size: "all",
 	styleType: "all",
+	technique: "all",
 }
 
 const GALLERY_SERVICE_FILTER_DEFINITIONS = [
@@ -715,7 +717,13 @@ function inferGalleryServiceCategory(item = {}) {
 		.trim()
 		.toLowerCase()
 
-	const bag = [item.styleName, item.styleType, item.serviceName]
+	const bag = [
+		item.styleName,
+		item.styleType,
+		item.serviceName,
+		item.hairServiceType,
+		item.hairTechnique,
+	]
 		.filter(Boolean)
 		.join(" ")
 		.toLowerCase()
@@ -733,18 +741,12 @@ function inferGalleryServiceCategory(item = {}) {
 		if (existingCategory === "braids") {
 			return "braids-services"
 		}
-		if (existingCategory === "braids-services") {
-			return "braids-services"
-		}
 		if (
-			existingCategory === "hair-services" &&
-			hasHairKeyword &&
-			!hasBraidsKeyword
+			GALLERY_SERVICE_FILTER_DEFINITIONS.some(
+				(definition) => definition.key === existingCategory,
+			)
 		) {
-			return "hair-services"
-		}
-		if (existingCategory === "hair-services") {
-			return "braids-services"
+			return existingCategory
 		}
 		return existingCategory
 	}
@@ -781,6 +783,15 @@ function getGalleryViewNounForService(categoryKey = "all") {
 	if (normalized === "all") return "Gallery"
 	return getGalleryServiceLabel(normalized)
 }
+
+function resetGallerySubFilters() {
+	galleryFiltersState.subService = "all"
+	galleryFiltersState.length = "all"
+	galleryFiltersState.size = "all"
+	galleryFiltersState.styleType = "all"
+	galleryFiltersState.technique = "all"
+}
+
 const preloadedBeforeImageUrls = new Set()
 
 function preloadGalleryBeforeImages(items = []) {
@@ -2049,9 +2060,7 @@ function applyServiceCategorySettings(rawCategories = {}) {
 
 	if (!isServiceCategoryEnabled(galleryFiltersState.service)) {
 		galleryFiltersState.service = "all"
-		galleryFiltersState.length = "all"
-		galleryFiltersState.size = "all"
-		galleryFiltersState.styleType = "all"
+		resetGallerySubFilters()
 		showAllGallery = false
 	}
 
@@ -5250,6 +5259,15 @@ function normalizeGalleryItem(item = {}) {
 	const stylistName = item.stylistName || item.stylist || "Royal Braids Team"
 	const serviceName = item.serviceName || styleName
 	const serviceCategory = inferGalleryServiceCategory(item)
+	const hairServiceType = String(item.hairServiceType || "").trim()
+	const hairTechnique = String(item.hairTechnique || "").trim()
+	const subService =
+		String(
+			item.subService ||
+				(serviceCategory === "hair-services" ? hairServiceType : "") ||
+				serviceName ||
+				styleType,
+		).trim() || styleType
 	const imageUrl = item.imageUrl || item.img || ""
 	const beforeImageUrl = item.beforeImageUrl || ""
 	const hasBeforeAfter =
@@ -5261,6 +5279,7 @@ function normalizeGalleryItem(item = {}) {
 		id: item.id || "",
 		styleName,
 		styleType,
+		subService,
 		serviceName,
 		serviceCategory,
 		serviceLabel: getGalleryServiceLabel(serviceCategory),
@@ -5270,6 +5289,10 @@ function normalizeGalleryItem(item = {}) {
 		timeTaken: item.timeTaken || "N/A",
 		priceRange: item.priceRange || "On request",
 		hairType: item.hairType || "N/A",
+		hairServiceType,
+		hairTechnique,
+		hairLengthDensity: String(item.hairLengthDensity || "").trim(),
+		hairProductsUsed: String(item.hairProductsUsed || "").trim(),
 		imageUrl,
 		beforeImageUrl,
 		hasBeforeAfter,
@@ -5280,34 +5303,119 @@ function normalizeGalleryItem(item = {}) {
 	}
 }
 
-function getUniqueGalleryValues(key) {
-	const values = galleryData
-		.map((item) => item[key])
-		.filter((value) => Boolean(value && String(value).trim()))
-	return [...new Set(values)]
+function getGalleryItemsForFilterScope(categoryKey = galleryFiltersState.service) {
+	const normalizedCategory = String(categoryKey || "all")
+		.trim()
+		.toLowerCase()
+	return galleryData.filter((item) => {
+		if (!isServiceCategoryEnabled(item.serviceCategory)) return false
+		return (
+			normalizedCategory === "all" || item.serviceCategory === normalizedCategory
+		)
+	})
 }
 
-function renderGalleryFilterGroup(groupKey, mountId, prefixLabel) {
+function getUniqueGalleryValues(key, sourceItems = galleryData) {
+	const values = sourceItems
+		.map((item) => item[key])
+		.map((value) => String(value || "").trim())
+		.filter(Boolean)
+	return [...new Set(values)].sort((a, b) =>
+		a.localeCompare(b, undefined, { sensitivity: "base" }),
+	)
+}
+
+function getGallerySubFilterConfigs(categoryKey = galleryFiltersState.service) {
+	const normalizedCategory = String(categoryKey || "all")
+		.trim()
+		.toLowerCase()
+	if (normalizedCategory === "all") return []
+
+	if (normalizedCategory === "braids-services") {
+		return [
+			{ key: "length", mountId: "galleryLengthFilters", label: "Lengths" },
+			{ key: "size", mountId: "gallerySizeFilters", label: "Sizes" },
+			{
+				key: "styleType",
+				mountId: "galleryStyleTypeFilters",
+				label: "Style Types",
+			},
+		]
+	}
+
+	if (normalizedCategory === "hair-services") {
+		return [
+			{
+				key: "subService",
+				mountId: "galleryLengthFilters",
+				label: "Hair Services",
+			},
+			{
+				key: "technique",
+				valueKey: "hairTechnique",
+				mountId: "gallerySizeFilters",
+				label: "Techniques / Finishes",
+			},
+			{
+				key: "styleType",
+				mountId: "galleryStyleTypeFilters",
+				label: "Style Types",
+			},
+		]
+	}
+
+	return [
+		{
+			key: "subService",
+			mountId: "galleryLengthFilters",
+			label: `${getGalleryServiceLabel(normalizedCategory)} Services`,
+		},
+		{
+			key: "styleType",
+			mountId: "galleryStyleTypeFilters",
+			label: "Style Types",
+		},
+	]
+}
+
+function renderGalleryFilterGroup(config, sourceItems = galleryData) {
+	const groupKey = config?.key || ""
+	const valueKey = config?.valueKey || groupKey
+	const mountId = config?.mountId || ""
+	const prefixLabel = config?.label || "Filters"
 	const mount = document.getElementById(mountId)
-	if (!mount) return
+	if (!mount || !groupKey) return false
 
 	const activeValue = galleryFiltersState[groupKey] || "all"
-	const values = getUniqueGalleryValues(groupKey)
+	const values = getUniqueGalleryValues(valueKey, sourceItems)
+	if (!values.length) {
+		galleryFiltersState[groupKey] = "all"
+		mount.innerHTML = ""
+		mount.style.display = "none"
+		return false
+	}
+
+	if (activeValue !== "all" && !values.includes(activeValue)) {
+		galleryFiltersState[groupKey] = "all"
+	}
+	const safeActiveValue = galleryFiltersState[groupKey] || "all"
+	mount.style.display = "flex"
 
 	mount.innerHTML = `
-    <button class="gallery-filter-chip ${activeValue === "all" ? "active" : ""}" data-filter-group="${groupKey}" data-filter-value="all">
-      All ${prefixLabel}
-    </button>
-    ${values
+		<button class="gallery-filter-chip ${safeActiveValue === "all" ? "active" : ""}" data-filter-group="${groupKey}" data-filter-value="all">
+			All ${escapeHtml(prefixLabel)}
+		</button>
+		${values
 			.map(
 				(value) => `
-      <button class="gallery-filter-chip ${activeValue === value ? "active" : ""}" data-filter-group="${groupKey}" data-filter-value="${value}">
-        ${value}
-      </button>
-    `,
+					<button class="gallery-filter-chip ${safeActiveValue === value ? "active" : ""}" data-filter-group="${groupKey}" data-filter-value="${escapeHtml(value)}">
+						${escapeHtml(value)}
+					</button>
+				`,
 			)
 			.join("")}
-  `
+	`
+	return true
 }
 
 function renderGalleryFilters() {
@@ -5323,32 +5431,40 @@ function renderGalleryFilters() {
 			.join("")
 	}
 
-	const braidsOnly = galleryFiltersState.service === "braids-services"
+	const selectedService = galleryFiltersState.service || "all"
+	const subFilterConfigs = getGallerySubFilterConfigs(selectedService)
+	const scopedItems = getGalleryItemsForFilterScope(selectedService)
 	const note = document.getElementById("galleryBraidsOnlyNote")
-	if (note) {
-		note.style.display = braidsOnly ? "block" : "none"
-	}
-
-	const braidsFilterGroups = [
+	const filterGroupMounts = [
 		document.getElementById("galleryLengthFilters"),
 		document.getElementById("gallerySizeFilters"),
 		document.getElementById("galleryStyleTypeFilters"),
 	]
-	braidsFilterGroups.forEach((group) => {
+	filterGroupMounts.forEach((group) => {
 		if (!group) return
-		group.style.display = braidsOnly ? "flex" : "none"
+		group.style.display = "none"
+		group.innerHTML = ""
 	})
 
-	renderGalleryFilterGroup("length", "galleryLengthFilters", "Lengths")
-	renderGalleryFilterGroup("size", "gallerySizeFilters", "Sizes")
-	renderGalleryFilterGroup(
-		"styleType",
-		"galleryStyleTypeFilters",
-		"Style Types",
-	)
+	let renderedGroupCount = 0
+	subFilterConfigs.forEach((config) => {
+		if (renderGalleryFilterGroup(config, scopedItems)) renderedGroupCount += 1
+	})
+
+	if (note) {
+		note.style.display = renderedGroupCount ? "block" : "none"
+		if (renderedGroupCount) {
+			const serviceLabel = getGalleryServiceLabel(selectedService)
+			note.textContent = `${serviceLabel} filters update automatically from added gallery sub-services.`
+		}
+	}
 }
 
 function applyGalleryFilters() {
+	const activeSubFilterConfigs = getGallerySubFilterConfigs(
+		galleryFiltersState.service,
+	)
+
 	filteredGalleryData = galleryData.filter((item) => {
 		if (!isServiceCategoryEnabled(item.serviceCategory)) {
 			return false
@@ -5361,28 +5477,14 @@ function applyGalleryFilters() {
 			return false
 		}
 
-		const isBraidsMode = galleryFiltersState.service === "braids-services"
-		if (!isBraidsMode) {
-			return true
-		}
-
-		if (
-			galleryFiltersState.length !== "all" &&
-			item.length !== galleryFiltersState.length
-		) {
-			return false
-		}
-		if (
-			galleryFiltersState.size !== "all" &&
-			item.size !== galleryFiltersState.size
-		) {
-			return false
-		}
-		if (
-			galleryFiltersState.styleType !== "all" &&
-			item.styleType !== galleryFiltersState.styleType
-		) {
-			return false
+		for (const config of activeSubFilterConfigs) {
+			const groupKey = config.key
+			const valueKey = config.valueKey || groupKey
+			const activeValue = galleryFiltersState[groupKey] || "all"
+			if (activeValue === "all") continue
+			if (String(item[valueKey] || "").trim() !== activeValue) {
+				return false
+			}
 		}
 		return true
 	})
@@ -5634,10 +5736,8 @@ function toggleGalleryView() {
 function setGalleryFilter(group, value) {
 	galleryFiltersState[group] = value
 
-	if (group === "service" && value !== "braids-services") {
-		galleryFiltersState.length = "all"
-		galleryFiltersState.size = "all"
-		galleryFiltersState.styleType = "all"
+	if (group === "service") {
+		resetGallerySubFilters()
 	}
 
 	showAllGallery = false
@@ -5661,9 +5761,7 @@ function isMatchingGalleryItem(item, idOrName) {
 
 function resetGalleryFiltersState() {
 	galleryFiltersState.service = "all"
-	galleryFiltersState.length = "all"
-	galleryFiltersState.size = "all"
-	galleryFiltersState.styleType = "all"
+	resetGallerySubFilters()
 }
 
 function openGalleryItemByIdOrName(idOrName) {
