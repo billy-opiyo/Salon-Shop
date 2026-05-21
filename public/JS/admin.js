@@ -1041,13 +1041,11 @@ async function saveAdminServiceCategorySettings() {
 	if (!adminUnlocked || !db || !auth?.currentUser) return
 
 	const saveBtn = document.getElementById("adminSaveServiceCategoriesBtn")
-	const oldLabel = saveBtn?.textContent || ""
 
 	try {
-		if (saveBtn) {
-			saveBtn.disabled = true
-			saveBtn.textContent = "Saving..."
-		}
+		setAdminButtonLoadingState(saveBtn, true, {
+			loadingText: "Saving...",
+		})
 
 		await db
 			.collection(ADMIN_SERVICE_SETTINGS_DOC_PATH[0])
@@ -1076,10 +1074,9 @@ async function saveAdminServiceCategorySettings() {
 			"adminServicesMessage",
 		)
 	} finally {
-		if (saveBtn) {
-			saveBtn.disabled = false
-			saveBtn.textContent = oldLabel || "Save Category Settings"
-		}
+		setAdminButtonLoadingState(saveBtn, false, {
+			resetText: "Save Category Settings",
+		})
 	}
 }
 
@@ -1266,8 +1263,7 @@ function getFilteredManagedAdmins(docs = []) {
 
 function canCurrentAdminToggleManagedAdmin(item = {}) {
 	if (!item || typeof item !== "object") return false
-	if (!adminUnlocked || !isCurrentSuperAdmin())
-		return false
+	if (!adminUnlocked || !isCurrentSuperAdmin()) return false
 	const targetUid = String(item.uid || "").trim()
 	if (!targetUid) return false
 	if (targetUid === auth?.currentUser?.uid) return false
@@ -1570,11 +1566,9 @@ async function saveManagedAdminUserFromForm(event) {
 		return
 	}
 
-	const oldLabel = el.saveBtn?.textContent || ""
-	if (el.saveBtn) {
-		el.saveBtn.disabled = true
-		el.saveBtn.textContent = isEdit ? "Updating..." : "Creating..."
-	}
+	setAdminButtonLoadingState(el.saveBtn, true, {
+		loadingText: isEdit ? "Updating..." : "Creating...",
+	})
 
 	try {
 		if (isEdit) {
@@ -1616,11 +1610,9 @@ async function saveManagedAdminUserFromForm(event) {
 			"adminAdminsMessage",
 		)
 	} finally {
-		if (el.saveBtn) {
-			el.saveBtn.disabled = false
-			el.saveBtn.textContent =
-				oldLabel || (isEdit ? "Update Admin" : "Create Admin")
-		}
+		setAdminButtonLoadingState(el.saveBtn, false, {
+			resetText: isEdit ? "Update Admin" : "Create Admin",
+		})
 	}
 }
 
@@ -3944,6 +3936,54 @@ function escapeHtml(value) {
 		.replace(/'/g, "&#39;")
 }
 
+function setAdminButtonLoadingState(button, isLoading, options = {}) {
+	if (!button) return
+
+	const {
+		loadingText = "Loading...",
+		resetText = null,
+		skipTextForCheckbox = true,
+	} = options
+
+	const isCheckbox = button.type === "checkbox"
+
+	if (isLoading) {
+		if (button.dataset.originalLabel === undefined) {
+			button.dataset.originalLabel = button.textContent || ""
+		}
+
+		button.disabled = true
+		button.classList.add("btn-loading")
+		button.setAttribute("aria-busy", "true")
+
+		if (
+			!(skipTextForCheckbox && isCheckbox) &&
+			typeof loadingText === "string"
+		) {
+			button.textContent = loadingText
+		}
+		return
+	}
+
+	button.disabled = false
+	button.classList.remove("btn-loading")
+	button.removeAttribute("aria-busy")
+
+	if (!(skipTextForCheckbox && isCheckbox)) {
+		const fallbackText = button.dataset.originalLabel || ""
+		const nextText = typeof resetText === "string" ? resetText : fallbackText
+		if (nextText) {
+			button.textContent = nextText
+		}
+	}
+
+	if (typeof resetText === "string") {
+		button.dataset.originalLabel = resetText
+	} else if (button.dataset.originalLabel !== undefined) {
+		button.dataset.originalLabel = button.textContent || ""
+	}
+}
+
 function normalizeAdminGalleryServiceCategory(value = "") {
 	const normalized = String(value || "")
 		.trim()
@@ -4468,10 +4508,9 @@ async function saveGalleryItem(event) {
 	const currentItem = adminGalleryDocs.find((g) => g.id === editId)
 
 	try {
-		if (saveBtn) {
-			saveBtn.disabled = true
-			saveBtn.textContent = editId ? "Updating..." : "Saving..."
-		}
+		setAdminButtonLoadingState(saveBtn, true, {
+			loadingText: editId ? "Updating..." : "Saving...",
+		})
 
 		let imageUrl = currentItem?.imageUrl || ""
 		let beforeImageUrl = currentItem?.beforeImageUrl || ""
@@ -4533,12 +4572,11 @@ async function saveGalleryItem(event) {
 			"adminGalleryMessage",
 		)
 	} finally {
-		if (saveBtn) {
-			saveBtn.disabled = false
-			saveBtn.textContent = document.getElementById("galleryEditId").value
+		setAdminButtonLoadingState(saveBtn, false, {
+			resetText: document.getElementById("galleryEditId").value
 				? "Update Gallery Style"
-				: "Save Gallery Style"
-		}
+				: "Save Gallery Style",
+		})
 	}
 }
 
@@ -4604,10 +4642,9 @@ async function saveBlogItem(event) {
 	}
 
 	try {
-		if (saveBtn) {
-			saveBtn.disabled = true
-			saveBtn.textContent = editId ? "Updating..." : "Saving..."
-		}
+		setAdminButtonLoadingState(saveBtn, true, {
+			loadingText: editId ? "Updating..." : "Saving...",
+		})
 
 		let imageUrl = currentItem?.imageUrl || ""
 		if (imageFile) {
@@ -4652,12 +4689,11 @@ async function saveBlogItem(event) {
 			"adminBlogsMessage",
 		)
 	} finally {
-		if (saveBtn) {
-			saveBtn.disabled = false
-			saveBtn.textContent = document.getElementById("blogEditId").value
+		setAdminButtonLoadingState(saveBtn, false, {
+			resetText: document.getElementById("blogEditId").value
 				? "Update Blog"
-				: "Save Blog"
-		}
+				: "Save Blog",
+		})
 	}
 }
 
@@ -5180,10 +5216,9 @@ function initializeAdminPanel() {
 			return
 		}
 
-		if (loginBtn) {
-			loginBtn.disabled = true
-			loginBtn.textContent = "Signing In..."
-		}
+		setAdminButtonLoadingState(loginBtn, true, {
+			loadingText: "Signing In...",
+		})
 
 		try {
 			await auth.signInWithEmailAndPassword(email, password)
@@ -5199,10 +5234,9 @@ function initializeAdminPanel() {
 				"adminAuthMessage",
 			)
 		} finally {
-			if (loginBtn) {
-				loginBtn.disabled = false
-				loginBtn.textContent = "Log In"
-			}
+			setAdminButtonLoadingState(loginBtn, false, {
+				resetText: "Log In",
+			})
 		}
 	})
 
@@ -5233,7 +5267,9 @@ function initializeAdminPanel() {
 		const bookingId = button.dataset.id
 		if (!action || !bookingId) return
 
-		button.disabled = true
+		setAdminButtonLoadingState(button, true, {
+			loadingText: "Applying...",
+		})
 		try {
 			if (action === "cancel-release") {
 				await cancelBookingAndReleaseSlot(bookingId)
@@ -5258,7 +5294,7 @@ function initializeAdminPanel() {
 				"adminActionMessage",
 			)
 		} finally {
-			button.disabled = false
+			setAdminButtonLoadingState(button, false)
 		}
 	})
 
@@ -5324,9 +5360,9 @@ function initializeAdminPanel() {
 		const confirmed = await showAdminConfirmModal(confirmMessage, "Confirm")
 		if (!confirmed) return
 
-		const oldLabel = actionBtn.textContent
-		actionBtn.disabled = true
-		actionBtn.textContent = "Applying..."
+		setAdminButtonLoadingState(actionBtn, true, {
+			loadingText: "Applying...",
+		})
 
 		try {
 			await callAdminRestrictUserAction({
@@ -5345,8 +5381,7 @@ function initializeAdminPanel() {
 				"adminSecurityEventsMessage",
 			)
 		} finally {
-			actionBtn.disabled = false
-			actionBtn.textContent = oldLabel
+			setAdminButtonLoadingState(actionBtn, false)
 		}
 	})
 
@@ -5421,7 +5456,9 @@ function initializeAdminPanel() {
 			const bookingId = button.dataset.id
 			if (!action || !bookingId) return
 
-			button.disabled = true
+			setAdminButtonLoadingState(button, true, {
+				loadingText: "Applying...",
+			})
 			try {
 				if (action === "cancel-release") {
 					await cancelBookingAndReleaseSlot(bookingId)
@@ -5446,7 +5483,7 @@ function initializeAdminPanel() {
 					"adminScheduleMessage",
 				)
 			} finally {
-				button.disabled = false
+				setAdminButtonLoadingState(button, false)
 			}
 		})
 	}
@@ -5556,7 +5593,9 @@ function initializeAdminPanel() {
 			const reviewId = actionBtn.dataset.id
 			if (!action || !reviewId) return
 
-			actionBtn.disabled = true
+			setAdminButtonLoadingState(actionBtn, true, {
+				loadingText: "Applying...",
+			})
 			try {
 				if (action === "save-edit") {
 					const textInput = reviewsList.querySelector(
@@ -5612,7 +5651,7 @@ function initializeAdminPanel() {
 					"adminReviewsMessage",
 				)
 			} finally {
-				actionBtn.disabled = false
+				setAdminButtonLoadingState(actionBtn, false)
 			}
 		})
 	}
@@ -5808,7 +5847,9 @@ function initializeAdminPanel() {
 			const messageId = actionBtn.dataset.id
 			if (!action || !messageId) return
 
-			actionBtn.disabled = true
+			setAdminButtonLoadingState(actionBtn, true, {
+				loadingText: "Applying...",
+			})
 			try {
 				if (action === "delete") {
 					await deleteContactMessage(messageId)
@@ -5833,7 +5874,7 @@ function initializeAdminPanel() {
 					"adminContactMessage",
 				)
 			} finally {
-				actionBtn.disabled = false
+				setAdminButtonLoadingState(actionBtn, false)
 			}
 		})
 	}
@@ -5919,10 +5960,10 @@ function initializeAdminPanel() {
 				return
 			}
 
-			const oldLabel = actionTarget.textContent
-			actionTarget.disabled = true
-			if (actionTarget.type !== "checkbox")
-				actionTarget.textContent = "Saving..."
+			setAdminButtonLoadingState(actionTarget, true, {
+				loadingText: "Saving...",
+				skipTextForCheckbox: true,
+			})
 
 			try {
 				await callAdminUpdateAdminUserAction({
@@ -5947,20 +5988,15 @@ function initializeAdminPanel() {
 					actionTarget.checked = currentlyActive
 				}
 			} finally {
-				actionTarget.disabled = false
-				if (actionTarget.type !== "checkbox") {
-					actionTarget.textContent = oldLabel
-				}
+				setAdminButtonLoadingState(actionTarget, false, {
+					skipTextForCheckbox: true,
+				})
 			}
 		}
 
 		adminUsersList.addEventListener("click", async (event) => {
 			const actionBtn = event.target.closest("button[data-admin-user-action]")
-			if (
-				!actionBtn ||
-				!adminUnlocked ||
-				!isCurrentSuperAdmin()
-			) {
+			if (!actionBtn || !adminUnlocked || !isCurrentSuperAdmin()) {
 				return
 			}
 
@@ -5982,11 +6018,7 @@ function initializeAdminPanel() {
 			const toggleInput = event.target.closest(
 				'input[type="checkbox"][data-admin-user-action="toggle-active"]',
 			)
-			if (
-				!toggleInput ||
-				!adminUnlocked ||
-				!isCurrentSuperAdmin()
-			) {
+			if (!toggleInput || !adminUnlocked || !isCurrentSuperAdmin()) {
 				return
 			}
 

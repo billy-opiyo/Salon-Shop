@@ -1311,16 +1311,64 @@ function getFriendlyAuthError(error) {
 function setGoogleAuthButtonsBusy(isBusy) {
 	const busy = isBusy === true
 	if (authUi.googleBtn) {
-		authUi.googleBtn.disabled = busy
-		authUi.googleBtn.textContent = busy
-			? "Signing in..."
-			: "Continue with Google"
+		setButtonLoadingState(authUi.googleBtn, busy, {
+			loadingText: "Signing in...",
+			resetText: "Continue with Google",
+		})
 	}
 	if (authUi.postBookingGoogleBtn) {
-		authUi.postBookingGoogleBtn.disabled = busy
-		authUi.postBookingGoogleBtn.textContent = busy
-			? "Signing in..."
-			: "Log In Now"
+		setButtonLoadingState(authUi.postBookingGoogleBtn, busy, {
+			loadingText: "Signing in...",
+			resetText: "Log In Now",
+		})
+	}
+}
+
+function setButtonLoadingState(button, isLoading, options = {}) {
+	if (!button) return
+
+	const {
+		loadingText = "Loading...",
+		resetText = null,
+		skipTextForCheckbox = true,
+	} = options
+
+	const isCheckbox = button.type === "checkbox"
+
+	if (isLoading === true) {
+		if (button.dataset.originalLabel === undefined) {
+			button.dataset.originalLabel = button.textContent || ""
+		}
+
+		button.disabled = true
+		button.classList.add("btn-loading")
+		button.setAttribute("aria-busy", "true")
+
+		if (
+			!(skipTextForCheckbox && isCheckbox) &&
+			typeof loadingText === "string"
+		) {
+			button.textContent = loadingText
+		}
+		return
+	}
+
+	button.disabled = false
+	button.classList.remove("btn-loading")
+	button.removeAttribute("aria-busy")
+
+	if (!(skipTextForCheckbox && isCheckbox)) {
+		const fallbackText = button.dataset.originalLabel || ""
+		const nextText = typeof resetText === "string" ? resetText : fallbackText
+		if (nextText) {
+			button.textContent = nextText
+		}
+	}
+
+	if (typeof resetText === "string") {
+		button.dataset.originalLabel = resetText
+	} else if (button.dataset.originalLabel !== undefined) {
+		button.dataset.originalLabel = button.textContent || ""
 	}
 }
 
@@ -2465,8 +2513,9 @@ async function handleManageAccountSaveProfile() {
 
 	const btn = authUi.manageAccountSaveProfileBtn
 	if (btn) {
-		btn.disabled = true
-		btn.textContent = "Saving..."
+		setButtonLoadingState(btn, true, {
+			loadingText: "Saving...",
+		})
 	}
 
 	try {
@@ -2551,8 +2600,9 @@ async function handleManageAccountSaveProfile() {
 		)
 	} finally {
 		if (btn) {
-			btn.disabled = false
-			btn.textContent = "Save Profile"
+			setButtonLoadingState(btn, false, {
+				resetText: "Save Profile",
+			})
 		}
 	}
 }
@@ -2575,8 +2625,9 @@ async function handleManageAccountChangePassword() {
 
 	const btn = authUi.manageAccountChangePasswordBtn
 	if (btn) {
-		btn.disabled = true
-		btn.textContent = "Updating..."
+		setButtonLoadingState(btn, true, {
+			loadingText: "Updating...",
+		})
 	}
 
 	try {
@@ -2611,8 +2662,9 @@ async function handleManageAccountChangePassword() {
 		)
 	} finally {
 		if (btn) {
-			btn.disabled = false
-			btn.textContent = "Change Password"
+			setButtonLoadingState(btn, false, {
+				resetText: "Change Password",
+			})
 		}
 	}
 }
@@ -3470,8 +3522,9 @@ async function saveDashboardRescheduleChanges() {
 
 	const saveBtn = authUi.dashboardRescheduleSaveBtn
 	if (saveBtn) {
-		saveBtn.disabled = true
-		saveBtn.textContent = "Saving..."
+		setButtonLoadingState(saveBtn, true, {
+			loadingText: "Saving...",
+		})
 	}
 
 	try {
@@ -3549,8 +3602,9 @@ async function saveDashboardRescheduleChanges() {
 		)
 	} finally {
 		if (saveBtn) {
-			saveBtn.disabled = false
-			saveBtn.textContent = "Save Changes"
+			setButtonLoadingState(saveBtn, false, {
+				resetText: "Save Changes",
+			})
 		}
 	}
 }
@@ -3676,7 +3730,11 @@ async function toggleFavoriteStyle(style = {}, sourceButton = null) {
 	const styleId = String(style.id || "").trim()
 	if (!styleId) return
 
-	if (sourceButton) sourceButton.disabled = true
+	if (sourceButton) {
+		setButtonLoadingState(sourceButton, true, {
+			loadingText: "Saving...",
+		})
+	}
 	const favoriteRef = db
 		.collection("users")
 		.doc(user.uid)
@@ -3706,7 +3764,9 @@ async function toggleFavoriteStyle(style = {}, sourceButton = null) {
 			"⚠️ Could not update favorites right now.",
 		)
 	} finally {
-		if (sourceButton) sourceButton.disabled = false
+		if (sourceButton) {
+			setButtonLoadingState(sourceButton, false)
+		}
 	}
 }
 
@@ -4062,9 +4122,10 @@ async function handleEmailAuthSubmit(event) {
 	}
 
 	if (authUi.submitBtn) {
-		authUi.submitBtn.disabled = true
-		authUi.submitBtn.textContent =
-			authMode === "signup" ? "Creating Account..." : "Signing In..."
+		setButtonLoadingState(authUi.submitBtn, true, {
+			loadingText:
+				authMode === "signup" ? "Creating Account..." : "Signing In...",
+		})
 	}
 	setAuthSwitchingState(true)
 
@@ -4224,15 +4285,16 @@ async function handleEmailAuthSubmit(event) {
 	} finally {
 		setAuthSwitchingState(false)
 		if (authUi.submitBtn) {
-			authUi.submitBtn.disabled = false
-			authUi.submitBtn.textContent =
-				authMode === "signup" ? "Create Account" : "Log In"
+			setButtonLoadingState(authUi.submitBtn, false, {
+				resetText: authMode === "signup" ? "Create Account" : "Log In",
+			})
 		}
 	}
 }
 
 async function handleForgotPassword() {
 	if (!firebaseReady || !auth) return
+	const forgotBtn = authUi.forgotPasswordBtn
 	const email = authUi.emailInput?.value?.trim() || ""
 	if (!email) {
 		if (authUi.message) {
@@ -4242,6 +4304,12 @@ async function handleForgotPassword() {
 			)
 		}
 		return
+	}
+
+	if (forgotBtn) {
+		setButtonLoadingState(forgotBtn, true, {
+			loadingText: "Sending...",
+		})
 	}
 
 	try {
@@ -4256,11 +4324,23 @@ async function handleForgotPassword() {
 		if (authUi.message) {
 			showTimedAuthMessage("error", `❌ ${getFriendlyAuthError(error)}`)
 		}
+	} finally {
+		if (forgotBtn) {
+			setButtonLoadingState(forgotBtn, false, {
+				resetText: "Forgot Password",
+			})
+		}
 	}
 }
 
 async function handleLogout() {
 	if (!firebaseReady || !auth) return
+	const logoutBtn = authUi.logoutBtn
+	if (logoutBtn) {
+		setButtonLoadingState(logoutBtn, true, {
+			loadingText: "Logging out...",
+		})
+	}
 	try {
 		await markCurrentSessionOffline()
 		stopSessionHeartbeat()
@@ -4271,14 +4351,21 @@ async function handleLogout() {
 		showFavoritesToast("You're now continuing as guest")
 	} catch (error) {
 		console.error("Logout failed:", error)
+	} finally {
+		if (logoutBtn) {
+			setButtonLoadingState(logoutBtn, false, {
+				resetText: "Log Out",
+			})
+		}
 	}
 }
 
 async function handleContinueAsGuest() {
 	const guestBtn = authUi.continueAsGuestBtn
 	if (guestBtn) {
-		guestBtn.disabled = true
-		guestBtn.textContent = "Continuing..."
+		setButtonLoadingState(guestBtn, true, {
+			loadingText: "Continuing...",
+		})
 	}
 
 	try {
@@ -4301,7 +4388,7 @@ async function handleContinueAsGuest() {
 			status: "success",
 			context: { source: "continue-as-guest" },
 		})
-		document.getElementById("booking")?.scrollIntoView({
+		document.getElementById("home")?.scrollIntoView({
 			behavior: "smooth",
 			block: "start",
 		})
@@ -4318,8 +4405,9 @@ async function handleContinueAsGuest() {
 		}
 	} finally {
 		if (guestBtn) {
-			guestBtn.disabled = false
-			guestBtn.textContent = "Continue as Guest"
+			setButtonLoadingState(guestBtn, false, {
+				resetText: "Continue as Guest",
+			})
 		}
 	}
 }
@@ -4345,8 +4433,9 @@ async function handleDeleteAccount() {
 	const deleteBtn =
 		authUi.manageAccountDeleteBtn || authUi.dashboardDeleteAccountBtn
 	if (deleteBtn) {
-		deleteBtn.disabled = true
-		deleteBtn.textContent = "Deleting..."
+		setButtonLoadingState(deleteBtn, true, {
+			loadingText: "Deleting...",
+		})
 	}
 
 	try {
@@ -4380,8 +4469,9 @@ async function handleDeleteAccount() {
 		}
 	} finally {
 		if (deleteBtn) {
-			deleteBtn.disabled = false
-			deleteBtn.textContent = "Delete Account"
+			setButtonLoadingState(deleteBtn, false, {
+				resetText: "Delete Account",
+			})
 		}
 	}
 }
@@ -4697,7 +4787,9 @@ function bindAuthUiEvents() {
 			}
 
 			if (action === "cancel") {
-				actionBtn.disabled = true
+				setButtonLoadingState(actionBtn, true, {
+					loadingText: "Cancelling...",
+				})
 				void cancelDashboardBooking(bookingId)
 					.then(async () => {
 						await loadUserDashboardData(auth.currentUser)
@@ -4714,7 +4806,7 @@ function bindAuthUiEvents() {
 						)
 					})
 					.finally(() => {
-						actionBtn.disabled = false
+						setButtonLoadingState(actionBtn, false)
 					})
 			}
 		})
@@ -6276,8 +6368,9 @@ async function submitReview(event) {
 		return
 	}
 
-	submitBtn.disabled = true
-	submitBtn.textContent = "Submitting..."
+	setButtonLoadingState(submitBtn, true, {
+		loadingText: "Submitting...",
+	})
 
 	try {
 		const activeUid = auth.currentUser?.uid || null
@@ -6389,8 +6482,9 @@ async function submitReview(event) {
 				: error.message || "Failed to submit review. Please try again."
 		showTimedFormMessage(msg, "error", `❌ ${friendlyError}`)
 	} finally {
-		submitBtn.disabled = false
-		submitBtn.textContent = "Submit Review"
+		setButtonLoadingState(submitBtn, false, {
+			resetText: "Submit Review",
+		})
 	}
 }
 
@@ -6852,9 +6946,9 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 		return
 	}
 
-	btn.classList.add("loading")
-	btn.disabled = true
-	btn.textContent = "Processing..."
+	setButtonLoadingState(btn, true, {
+		loadingText: "Processing...",
+	})
 	;(async () => {
 		try {
 			const signedInUser = auth.currentUser && !auth.currentUser.isAnonymous
@@ -6994,9 +7088,9 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 				`❌ ${error.message || "Booking failed. Please try again."}`,
 			)
 		} finally {
-			btn.classList.remove("loading")
-			btn.disabled = false
-			btn.textContent = "Confirm Booking"
+			setButtonLoadingState(btn, false, {
+				resetText: "Confirm Booking",
+			})
 		}
 	})()
 })
@@ -7179,8 +7273,9 @@ document
 		const msg = document.getElementById("contactFormMessage")
 
 		if (submitBtn) {
-			submitBtn.disabled = true
-			submitBtn.textContent = "Sending..."
+			setButtonLoadingState(submitBtn, true, {
+				loadingText: "Sending...",
+			})
 		}
 
 		if (msg) clearFormMessage(msg)
@@ -7254,8 +7349,9 @@ document
 			}
 		} finally {
 			if (submitBtn) {
-				submitBtn.disabled = false
-				submitBtn.textContent = "Send Message"
+				setButtonLoadingState(submitBtn, false, {
+					resetText: "Send Message",
+				})
 			}
 		}
 	})
