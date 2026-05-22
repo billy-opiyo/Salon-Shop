@@ -25,7 +25,7 @@ Production-ready Firebase salon platform for **Royal Braids** with:
 11. [Cloud Functions](#11-cloud-functions)
 12. [Local Setup](#12-local-setup)
 13. [Deployment](#13-deployment)
-14. [Feature Testing Sample (End-to-End QA)](#14-feature-testing-sample-end-to-end-qa)
+14. [Testing & QA Guide](#14-testing--qa-guide)
 15. [Important Notes](#15-important-notes)
 16. [Troubleshooting](#16-troubleshooting)
 
@@ -473,9 +473,44 @@ Deploy specific components:
 
 ---
 
-## 14. Feature Testing Sample (End-to-End QA)
+## 14. Testing & QA Guide
 
-Use this as a practical checklist to confirm all major features are working.
+Use this section as the project QA checklist for releases, Firebase deployments, and feature regressions.
+
+> **Current status:** this project currently relies on manual end-to-end QA, Firebase Console checks, browser-console review, and Cloud Functions logs. The `functions/package.json` `npm test` script is still a placeholder, so do **not** treat `npm test` as an automated test suite until real tests are added.
+
+### Testing environments
+
+- **Local/static preview:** open `public/index.html` and `public/admin.html` directly, or serve the `public/` folder with a local static server.
+- **Firebase Hosting / deployed site:** recommended for realistic Firebase Auth, Firestore, App Check, Cloud Functions, Cloudinary upload, email, and WhatsApp verification.
+- **Firebase Console:** keep Firestore open during QA to verify document writes, status changes, and security-rule behavior.
+
+### Pre-test checklist
+
+- [ ] Firebase Authentication providers are enabled: Email/Password and Anonymous.
+- [ ] Firestore rules in `firestore.rules` are deployed.
+- [ ] Cloud Functions in `functions/index.js` are deployed with the Node.js 22 runtime.
+- [ ] Required function secrets are set for Cloudinary, Resend, and WhatsApp Cloud API.
+- [ ] At least one `super_admin` document exists in `adminUsers/{uid}`.
+- [ ] Test accounts are available for guest, client, admin, and super-admin flows.
+- [ ] Browser DevTools and Cloud Functions logs are available for troubleshooting.
+
+Deploy rules/functions before full QA:
+
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only functions
+```
+
+Deploy hosting for production-style UI verification:
+
+```bash
+firebase deploy --only hosting:main-site
+```
+
+### End-to-end QA checklist
+
+Use the following scenarios to confirm all major features are working.
 
 ### A) Public website smoke test
 
