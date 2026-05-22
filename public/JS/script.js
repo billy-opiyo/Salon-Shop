@@ -5007,28 +5007,36 @@ const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
 const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
 
 function getRateLimitDocId(kind = "", uid = "") {
-	const safeKind = String(kind || "")
-		.trim()
-		.toLowerCase()
 	const safeUid = String(uid || "").trim()
-	if (!safeKind || !safeUid) return ""
-	return `${safeKind}_${safeUid}`
+	if (!safeUid) return ""
+	return safeUid
 }
 
 function buildRateLimitPayload(kind = "", uid = "", cooldownMs = 0) {
 	const nowMs = Date.now()
 	const safeCooldown = Math.max(0, Number(cooldownMs || 0))
-	return {
+	const safeKind = String(kind || "")
+		.trim()
+		.toLowerCase()
+	const payload = {
 		kind: String(kind || "")
 			.trim()
 			.toLowerCase(),
 		uid: String(uid || "").trim(),
 		lastSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
-		cooldownUntil: firebase.firestore.Timestamp.fromMillis(
-			nowMs + safeCooldown,
-		),
 		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
 	}
+
+	const cooldownUntil = firebase.firestore.Timestamp.fromMillis(
+		nowMs + safeCooldown,
+	)
+	if (safeKind === "review") {
+		payload.reviewCooldownUntil = cooldownUntil
+	} else if (safeKind === "contact") {
+		payload.contactCooldownUntil = cooldownUntil
+	}
+
+	return payload
 }
 
 async function joinWaitlistForUnavailableSlot({
@@ -7545,12 +7553,12 @@ document
 			}
 		} catch (error) {
 			console.error("Contact form submit failed:", error)
+			const friendlyMessage =
+				error?.code === "permission-denied"
+					? "Please wait a minute before sending another message."
+					: error.message || "Failed to send message. Please try again."
 			if (msg) {
-				showTimedFormMessage(
-					msg,
-					"error",
-					`❌ ${error.message || "Failed to send message. Please try again."}`,
-				)
+				showTimedFormMessage(msg, "error", `❌ ${friendlyMessage}`)
 			}
 		} finally {
 			if (submitBtn) {
