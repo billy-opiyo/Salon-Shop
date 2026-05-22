@@ -110,7 +110,7 @@ service cloud.firestore {
         && request.resource.data.time != ''
         && request.resource.data.slotId != ''
         && request.resource.data.status in ['pending', 'confirmed']
-        && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.uid is string;
     }
 
     function bookingOwnerUpdateHasAllowedKeys() {
@@ -189,7 +189,7 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      allow create: if isSignedIn() && bookingCreateIsValid();
+      allow create: if bookingCreateIsValid();
       allow read: if isSignedIn() && (
         resource.data.uid == request.auth.uid ||
         (
@@ -208,8 +208,7 @@ service cloud.firestore {
     }
  
     match /bookingSlots/{slotId} {
-      allow create: if isSignedIn()
-        && request.resource.data.keys().hasOnly([
+      allow create: if request.resource.data.keys().hasOnly([
           'taken',
           'date',
           'time',
@@ -223,10 +222,10 @@ service cloud.firestore {
         && request.resource.data.date is string
         && request.resource.data.time is string
         && request.resource.data.bookingId is string
+        && request.resource.data.uid is string
         && request.resource.data.date != ''
         && request.resource.data.time != ''
-        && request.resource.data.bookingId != ''
-        && request.resource.data.uid == request.auth.uid;
+        && request.resource.data.bookingId != '';
 
       // Needed for realtime availability query in the public booking form.
       allow read: if true;
@@ -237,8 +236,7 @@ service cloud.firestore {
     }
 
     match /waitlist/{waitlistId} {
-      allow create: if isSignedIn()
-        && request.resource.data.keys().hasOnly([
+      allow create: if request.resource.data.keys().hasOnly([
           'firstName',
           'lastName',
           'email',
@@ -271,7 +269,7 @@ service cloud.firestore {
         && request.resource.data.inspirationImageUrl is string
         && request.resource.data.status == 'waiting'
         && request.resource.data.notifiedAt == null
-        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.uid is string
         && request.resource.data.preferredDate != ''
         && request.resource.data.preferredTime != ''
         && request.resource.data.preferredSlotId != '';
@@ -510,9 +508,8 @@ service cloud.firestore {
     }
 
     match /contactMessages/{messageId} {
-      // Anyone signed in (anonymous auth included) can submit contact messages.
-      allow create: if isSignedIn()
-        && request.resource.data.keys().hasOnly([
+      // Public contact submissions are allowed (no sign-in required).
+      allow create: if request.resource.data.keys().hasOnly([
           'name',
           'email',
           'subject',
@@ -527,7 +524,7 @@ service cloud.firestore {
         && request.resource.data.subject is string
         && request.resource.data.message is string
         && request.resource.data.status == 'new'
-        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.uid is string
         && request.resource.data.name.size() >= 2
         && request.resource.data.name.size() <= 120
         && request.resource.data.email.size() >= 5
@@ -535,8 +532,7 @@ service cloud.firestore {
         && request.resource.data.subject.size() >= 2
         && request.resource.data.subject.size() <= 200
         && request.resource.data.message.size() >= 5
-        && request.resource.data.message.size() <= 3000
-        && contactRateLimitAllowsCreate();
+        && request.resource.data.message.size() <= 3000;
 
       // Admin only read/update/delete for contact inbox management.
       allow read, delete: if hasAdminPermission('canManageContent');

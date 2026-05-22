@@ -1,6 +1,5 @@
 const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
-const appCheckConfig = appConfig.appCheck || {}
 
 let firebaseReady = false
 let db = null
@@ -6376,14 +6375,6 @@ async function initializeFirebaseServices() {
 	}
 
 	adminFirebaseApp = getOrCreateAdminFirebaseApp()
-
-	if (typeof firebase.appCheck === "function" && appCheckConfig.siteKey) {
-		try {
-			firebase.appCheck(adminFirebaseApp).activate(appCheckConfig.siteKey, true)
-		} catch (appCheckError) {
-			console.warn("Admin App Check activation failed:", appCheckError)
-		}
-	}
 
 	auth = firebase.auth(adminFirebaseApp)
 	db = firebase.firestore(adminFirebaseApp)

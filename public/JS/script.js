@@ -1210,7 +1210,6 @@ const MAIN_HAIR_SERVICE_NAME_KEYWORDS = [
 // ============ FIREBASE + CLOUDINARY CONFIG ============
 const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
-const appCheckConfig = appConfig.appCheck || {}
 
 let firebaseReady = false
 let db = null
@@ -2117,10 +2116,6 @@ async function initializeFirebaseServices() {
 
 	if (!firebase.apps.length) {
 		firebase.initializeApp(firebaseConfig)
-	}
-
-	if (typeof firebase.appCheck === "function" && appCheckConfig.siteKey) {
-		firebase.appCheck().activate(appCheckConfig.siteKey, true)
 	}
 
 	auth = firebase.auth()
@@ -5303,14 +5298,17 @@ function normalizeGalleryItem(item = {}) {
 	}
 }
 
-function getGalleryItemsForFilterScope(categoryKey = galleryFiltersState.service) {
+function getGalleryItemsForFilterScope(
+	categoryKey = galleryFiltersState.service,
+) {
 	const normalizedCategory = String(categoryKey || "all")
 		.trim()
 		.toLowerCase()
 	return galleryData.filter((item) => {
 		if (!isServiceCategoryEnabled(item.serviceCategory)) return false
 		return (
-			normalizedCategory === "all" || item.serviceCategory === normalizedCategory
+			normalizedCategory === "all" ||
+			item.serviceCategory === normalizedCategory
 		)
 	})
 }
@@ -7223,7 +7221,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 			bookingSuccess.scrollIntoView({ behavior: "smooth", block: "center" })
 			bookingSuccess.focus({ preventScroll: true })
 
-			setPostBookingPromptVisible(Boolean(auth.currentUser?.isAnonymous))
+			setPostBookingPromptVisible(!signedInUser)
 			if (signedInUser && activeUid) {
 				await upsertUserProfile(auth.currentUser, {
 					phone: data.phone || "",
@@ -7522,9 +7520,13 @@ document
 				throw new Error("Please fill in all contact fields before sending.")
 			}
 
-			const formSubmitEndpoint = String(form.getAttribute("action") || "").trim()
+			const formSubmitEndpoint = String(
+				form.getAttribute("action") || "",
+			).trim()
 			if (!formSubmitEndpoint) {
-				throw new Error("Contact email endpoint is missing. Please contact support.")
+				throw new Error(
+					"Contact email endpoint is missing. Please contact support.",
+				)
 			}
 
 			const formSubmitPayload = new FormData(form)

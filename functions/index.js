@@ -423,10 +423,6 @@ exports.createCloudinarySignedUpload = onCall(
 		secrets: [CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET],
 	},
 	async (request) => {
-		if (!request.auth?.uid) {
-			throw new HttpsError("unauthenticated", "Sign in required")
-		}
-
 		const data = request.data || {}
 		const folder = normalizeShortText(
 			data.folder || "royal-braids/uploads",
@@ -1562,9 +1558,7 @@ exports.adminListAdminUsers = onCall(
 			.get()
 
 		const admins = snapshot.docs
-			.map((doc) =>
-			sanitizeAdminUserDocForResponse(doc.id, doc.data() || {}),
-			)
+			.map((doc) => sanitizeAdminUserDocForResponse(doc.id, doc.data() || {}))
 			.sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt))
 
 		return {
