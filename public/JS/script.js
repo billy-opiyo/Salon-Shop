@@ -935,6 +935,8 @@ let showAllReviews = false
 let reviewsSortMode = "featured"
 let reviewMessageTimer = null
 let reviewsToggleAnimationTimer = null
+const recentlyReportedReviewIds = new Set()
+const reviewReportResetTimers = new Map()
 let favoritesToastTimer = null
 let dashboardFavoritesMessageTimer = null
 let authMessageTimer = null
@@ -6319,6 +6321,27 @@ function renderReviewsSummary() {
 	summary.textContent = `★ ${average.toFixed(1)} average from ${total} review${total === 1 ? "" : "s"}`
 }
 
+function markReviewReportedTemporarily(reviewId = "", duration = 2500) {
+	const safeReviewId = String(reviewId || "").trim()
+	if (!safeReviewId) return
+
+	recentlyReportedReviewIds.add(safeReviewId)
+
+	const activeTimer = reviewReportResetTimers.get(safeReviewId)
+	if (activeTimer) {
+		clearTimeout(activeTimer)
+	}
+
+	renderTestimonials(testimonialsData)
+
+	const timerId = setTimeout(() => {
+		recentlyReportedReviewIds.delete(safeReviewId)
+		reviewReportResetTimers.delete(safeReviewId)
+		renderTestimonials(testimonialsData)
+	}, duration)
+	reviewReportResetTimers.set(safeReviewId, timerId)
+}
+
 function renderTestimonials(list = testimonialsData) {
 	const grid = document.getElementById("testimonialsGrid")
 	const viewAllBtn = document.getElementById("viewAllReviewsBtn")
@@ -6388,7 +6411,7 @@ function renderTestimonials(list = testimonialsData) {
 	      ${
 					canReportAbuse
 						? `<div class="admin-booking-actions" style="margin-top:10px">
-	        <button class="admin-action-btn review-report-btn" data-review-ui-action="report" data-review-id="${escapeHtml(t.id)}">Report Abuse</button>
+	        <button class="admin-action-btn review-report-btn" data-review-ui-action="report" data-review-id="${escapeHtml(t.id)}">${recentlyReportedReviewIds.has(String(t.id || "").trim()) ? "Reported" : "Report Abuse"}</button>
 	      </div>`
 						: ""
 				}
@@ -6733,9 +6756,6 @@ function bindReviewForm() {
 					return
 				}
 
-				const originalReportLabel =
-					actionBtn.dataset.originalLabel || actionBtn.textContent || "Report Abuse"
-
 				try {
 					await db
 						.collection("reviews")
@@ -6747,12 +6767,7 @@ function bindReviewForm() {
 							},
 							{ merge: true },
 						)
-					actionBtn.textContent = "Reported"
-					setTimeout(() => {
-						if (actionBtn.isConnected) {
-							actionBtn.textContent = originalReportLabel
-						}
-					}, 2500)
+					markReviewReportedTemporarily(reviewId)
 					showTimedReviewMessage("success", "✅ Abuse report submitted.")
 				} catch (error) {
 					console.error("Report abuse failed:", error)
