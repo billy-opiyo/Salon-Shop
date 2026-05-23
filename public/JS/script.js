@@ -6733,6 +6733,9 @@ function bindReviewForm() {
 					return
 				}
 
+				const originalReportLabel =
+					actionBtn.dataset.originalLabel || actionBtn.textContent || "Report Abuse"
+
 				try {
 					await db
 						.collection("reviews")
@@ -6744,6 +6747,12 @@ function bindReviewForm() {
 							},
 							{ merge: true },
 						)
+					actionBtn.textContent = "Reported"
+					setTimeout(() => {
+						if (actionBtn.isConnected) {
+							actionBtn.textContent = originalReportLabel
+						}
+					}, 2500)
 					showTimedReviewMessage("success", "✅ Abuse report submitted.")
 				} catch (error) {
 					console.error("Report abuse failed:", error)
