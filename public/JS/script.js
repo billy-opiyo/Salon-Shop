@@ -6342,6 +6342,19 @@ function markReviewReportedTemporarily(reviewId = "", duration = 2500) {
 	reviewReportResetTimers.set(safeReviewId, timerId)
 }
 
+function clearTemporaryReportedReview(reviewId = "") {
+	const safeReviewId = String(reviewId || "").trim()
+	if (!safeReviewId) return
+
+	const activeTimer = reviewReportResetTimers.get(safeReviewId)
+	if (activeTimer) {
+		clearTimeout(activeTimer)
+	}
+	recentlyReportedReviewIds.delete(safeReviewId)
+	reviewReportResetTimers.delete(safeReviewId)
+	renderTestimonials(testimonialsData)
+}
+
 function renderTestimonials(list = testimonialsData) {
 	const grid = document.getElementById("testimonialsGrid")
 	const viewAllBtn = document.getElementById("viewAllReviewsBtn")
@@ -6756,6 +6769,9 @@ function bindReviewForm() {
 					return
 				}
 
+				markReviewReportedTemporarily(reviewId)
+				actionBtn.textContent = "Reported"
+
 				try {
 					await db
 						.collection("reviews")
@@ -6767,9 +6783,9 @@ function bindReviewForm() {
 							},
 							{ merge: true },
 						)
-					markReviewReportedTemporarily(reviewId)
 					showTimedReviewMessage("success", "✅ Abuse report submitted.")
 				} catch (error) {
+					clearTemporaryReportedReview(reviewId)
 					console.error("Report abuse failed:", error)
 					showTimedReviewMessage(
 						"error",
