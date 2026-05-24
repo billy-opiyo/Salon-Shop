@@ -12,6 +12,7 @@ let adminGalleryUnsubscribe = null
 let adminBlogsUnsubscribe = null
 let adminReviewsUnsubscribe = null
 let adminContactUnsubscribe = null
+let adminWaitlistUnsubscribe = null
 let adminSecurityUnsubscribe = null
 let adminSecurityAlertsUnsubscribe = null
 let adminAccountHistoryUnsubscribe = null
@@ -24,9 +25,11 @@ let adminBlogDocs = []
 let adminReviewDocs = []
 let adminReviewRawDocs = []
 let adminContactDocs = []
+let adminWaitlistDocs = []
 let adminBookingDocs = []
 let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
+let adminWaitlistSortMode = "newest"
 let adminSecuritySortMode = "newest"
 let adminSecurityRiskFilter = "all"
 let adminSecurityDateFilter = ""
@@ -320,6 +323,7 @@ function applyAdminSectionPermissions() {
 		blogs: hasAdminAccessPermission("canManageContent"),
 		reviews: hasAdminAccessPermission("canManageContent"),
 		messages: hasAdminAccessPermission("canManageContent"),
+		waitlist: hasAdminAccessPermission("canManageBookings"),
 		services: hasAdminAccessPermission("canManageContent"),
 		admins: isCurrentSuperAdmin(),
 		security: hasAdminAccessPermission("canManageSecurity"),
@@ -878,6 +882,13 @@ function stopAdminContactListener() {
 	if (typeof adminContactUnsubscribe === "function") {
 		adminContactUnsubscribe()
 		adminContactUnsubscribe = null
+	}
+}
+
+function stopAdminWaitlistListener() {
+	if (typeof adminWaitlistUnsubscribe === "function") {
+		adminWaitlistUnsubscribe()
+		adminWaitlistUnsubscribe = null
 	}
 }
 
@@ -1667,6 +1678,7 @@ function setAdminUnlockedState(value) {
 		stopAdminBlogsListener()
 		stopAdminReviewsListener()
 		stopAdminContactListener()
+		stopAdminWaitlistListener()
 		stopAdminServiceSettingsListener()
 		stopAdminSecurityListener()
 		stopAdminSecurityAlertsListener()
@@ -1679,11 +1691,13 @@ function setAdminUnlockedState(value) {
 		setAdminMessage("", "", "adminBlogsMessage")
 		setAdminMessage("", "", "adminReviewsMessage")
 		setAdminMessage("", "", "adminContactMessage")
+		setAdminMessage("", "", "adminWaitlistMessage")
 		setAdminMessage("", "", "adminServicesMessage")
 		setAdminMessage("", "", "adminSecurityMessage")
 		setAdminMessage("", "", "adminSecurityEventsMessage")
 		setAdminMessage("", "", "adminScheduleMessage")
 		adminBookingDocs = []
+		adminWaitlistDocs = []
 		adminSecurityDocs = []
 		adminSessionsDocs = []
 		adminSecurityAlertsDocs = []
@@ -1704,6 +1718,7 @@ function setAdminUnlockedState(value) {
 		startAdminBlogsListener()
 		startAdminReviewsListener()
 		startAdminContactListener()
+		startAdminWaitlistListener()
 		startAdminServiceSettingsListener()
 		startAdminSecurityListener()
 		startAdminSecurityAlertsListener()
@@ -1742,6 +1757,47 @@ function getContactStatusClass(status) {
 		default:
 			return "admin-status-pending"
 	}
+}
+
+function normalizeWaitlistStatus(status) {
+	const raw = String(status || "waiting")
+		.trim()
+		.toLowerCase()
+	if (raw === "canceled") return "cancelled"
+	if (
+		[
+			"waiting",
+			"contacted",
+			"notified",
+			"booked",
+			"cancelled",
+			"notification_failed",
+		].includes(raw)
+	) {
+		return raw
+	}
+	return "waiting"
+}
+
+function getWaitlistStatusClass(status) {
+	switch (normalizeWaitlistStatus(status)) {
+		case "booked":
+			return "admin-status-completed"
+		case "contacted":
+		case "notified":
+			return "admin-status-confirmed"
+		case "cancelled":
+		case "notification_failed":
+			return "admin-status-cancelled"
+		default:
+			return "admin-status-pending"
+	}
+}
+
+function getWaitlistStatusLabel(status) {
+	const normalized = normalizeWaitlistStatus(status)
+	if (normalized === "notification_failed") return "notification failed"
+	return normalized
 }
 
 function normalizeSecurityStatus(status = "") {
@@ -3345,6 +3401,228 @@ async function deleteContactMessage(messageId) {
 	)
 	if (!confirmed) return
 	await db.collection("contactMessages").doc(messageId).delete()
+}
+
+function getAdminWaitlistCustomerName(item = {}) {
+	return (
+		`${item.firstName || ""} ${item.lastName || ""}`.trim() ||
+		String(item.name || "").trim() ||
+		"Unknown Client"
+	)
+}
+
+function normalizeWaitlistDoc(doc = {}) {
+	return {
+		id: String(doc.id || ""),
+		firstName: String(doc.firstName || "").trim(),
+		lastName: String(doc.lastName || "").trim(),
+		name: String(doc.name || "").trim(),
+		email: String(doc.email || "").trim(),
+		phone: String(doc.phone || "").trim(),
+		service: String(doc.service || "").trim(),
+		stylist: String(doc.stylist || "").trim(),
+		stylistKey: String(doc.stylistKey || "").trim(),
+		preferredDate: String(doc.preferredDate || doc.date || "").trim(),
+		preferredTime: String(doc.preferredTime || doc.time || "").trim(),
+		preferredSlotId: String(doc.preferredSlotId || doc.slotId || "").trim(),
+		notes: String(doc.notes || doc.specialRequest || "").trim(),
+		inspirationImageUrl: String(
+			doc.inspirationImageUrl ||
+				doc.inspirationImage ||
+				doc.referenceImageUrl ||
+				"",
+		).trim(),
+		status: normalizeWaitlistStatus(doc.status),
+		notificationChannel: String(doc.notificationChannel || "").trim(),
+		uid: String(doc.uid || "").trim(),
+		createdAt: doc.createdAt || null,
+		updatedAt: doc.updatedAt || null,
+		notifiedAt: doc.notifiedAt || null,
+		contactedAt: doc.contactedAt || null,
+		bookedAt: doc.bookedAt || null,
+		cancelledAt: doc.cancelledAt || null,
+	}
+}
+
+function getAdminWaitlistAppointmentMs(item = {}) {
+	const date = parseAdminBookingDate(item.preferredDate)
+	if (!date) return 0
+	const minutes = parseAdminBookingTimeToMinutes(item.preferredTime)
+	date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
+	return date.getTime()
+}
+
+function sortAdminWaitlistEntries(items = [], mode = adminWaitlistSortMode) {
+	const data = [...items]
+
+	if (mode === "oldest") {
+		return data.sort((a, b) => {
+			const createdDiff =
+				toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt)
+			if (createdDiff !== 0) return createdDiff
+			return String(a.id || "").localeCompare(String(b.id || ""))
+		})
+	}
+
+	if (mode === "date-time") {
+		return data.sort((a, b) => {
+			const aAppointment =
+				getAdminWaitlistAppointmentMs(a) || Number.MAX_SAFE_INTEGER
+			const bAppointment =
+				getAdminWaitlistAppointmentMs(b) || Number.MAX_SAFE_INTEGER
+			if (aAppointment !== bAppointment) return aAppointment - bAppointment
+			return toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt)
+		})
+	}
+
+	if (mode === "status-waiting-first") {
+		const priority = {
+			waiting: 0,
+			notification_failed: 1,
+			notified: 2,
+			contacted: 2,
+			booked: 3,
+			cancelled: 4,
+		}
+		return data.sort((a, b) => {
+			const pDiff =
+				(priority[normalizeWaitlistStatus(a.status)] ?? 9) -
+				(priority[normalizeWaitlistStatus(b.status)] ?? 9)
+			if (pDiff !== 0) return pDiff
+			return toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt)
+		})
+	}
+
+	if (mode === "name-az") {
+		return data.sort((a, b) => {
+			const nameDiff = getAdminWaitlistCustomerName(a).localeCompare(
+				getAdminWaitlistCustomerName(b),
+				undefined,
+				{ sensitivity: "base" },
+			)
+			if (nameDiff !== 0) return nameDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+	}
+
+	return data.sort((a, b) => {
+		const updatedDiff = toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
+		if (updatedDiff !== 0) return updatedDiff
+		return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+	})
+}
+
+function renderAdminWaitlist(docs = []) {
+	const list = document.getElementById("adminWaitlistList")
+	if (!list) return
+
+	const normalizedItems = docs.map(normalizeWaitlistDoc)
+	adminWaitlistDocs = normalizedItems
+	const items = sortAdminWaitlistEntries(normalizedItems)
+
+	const total = items.length
+	const waiting = items.filter((item) => item.status === "waiting").length
+	const contacted = items.filter((item) =>
+		["contacted", "notified"].includes(item.status),
+	).length
+	const booked = items.filter((item) => item.status === "booked").length
+	const cancelled = items.filter((item) => item.status === "cancelled").length
+
+	const totalEl = document.getElementById("adminWaitlistTotalCount")
+	const waitingEl = document.getElementById("adminWaitlistWaitingCount")
+	const contactedEl = document.getElementById("adminWaitlistContactedCount")
+	const bookedEl = document.getElementById("adminWaitlistBookedCount")
+	const cancelledEl = document.getElementById("adminWaitlistCancelledCount")
+
+	if (totalEl) totalEl.textContent = String(total)
+	if (waitingEl) waitingEl.textContent = String(waiting)
+	if (contactedEl) contactedEl.textContent = String(contacted)
+	if (bookedEl) bookedEl.textContent = String(booked)
+	if (cancelledEl) cancelledEl.textContent = String(cancelled)
+
+	if (!items.length) {
+		list.innerHTML =
+			'<div class="admin-empty-state">No waitlist requests yet. Clients who join a booked slot waitlist will appear here in realtime.</div>'
+		return
+	}
+
+	list.innerHTML = items
+		.map((item) => {
+			const customerName = getAdminWaitlistCustomerName(item)
+			const statusLabel = getWaitlistStatusLabel(item.status)
+			const stylistLabel = item.stylist || item.stylistKey || "Any Available"
+			const notes = item.notes || "No notes provided."
+			const notifiedMeta = item.notifiedAt
+				? formatAdminDate(item.notifiedAt)
+				: "Not notified"
+			const channelLabel = item.notificationChannel || "N/A"
+
+			return `
+      <article class="admin-review-item">
+        <div class="admin-review-item-head">
+          <div>
+            <div class="admin-booking-name">${escapeHtml(customerName)}</div>
+            <div class="admin-booking-id">Waitlist ID: ${escapeHtml(item.id)}</div>
+          </div>
+          <span class="admin-status-badge ${getWaitlistStatusClass(item.status)}">${escapeHtml(statusLabel)}</span>
+        </div>
+        <div class="admin-review-meta">
+          <div><span>Service:</span> ${escapeHtml(item.service || "N/A")}</div>
+          <div><span>Stylist:</span> ${escapeHtml(stylistLabel)}</div>
+          <div><span>Preferred Date:</span> ${escapeHtml(formatAdminDate(item.preferredDate))}</div>
+          <div><span>Preferred Time:</span> ${escapeHtml(item.preferredTime || "N/A")}</div>
+          <div><span>Slot ID:</span> ${escapeHtml(item.preferredSlotId || "N/A")}</div>
+          <div><span>Email:</span> ${item.email ? `<a class="admin-inline-link" href="mailto:${escapeHtml(item.email)}">${escapeHtml(item.email)}</a>` : "N/A"}</div>
+          <div><span>Phone:</span> ${item.phone ? `<a class="admin-inline-link" href="tel:${escapeHtml(item.phone)}">${escapeHtml(item.phone)}</a>` : "N/A"}</div>
+          <div><span>Joined:</span> ${escapeHtml(formatAdminDate(item.createdAt))}</div>
+          <div><span>Updated:</span> ${escapeHtml(formatAdminDate(item.updatedAt))}</div>
+          <div><span>Notified:</span> ${escapeHtml(notifiedMeta)}</div>
+          <div><span>Channel:</span> ${escapeHtml(channelLabel)}</div>
+        </div>
+        <div class="admin-booking-special-request">
+          <span>Waitlist Notes:</span>
+          <p>${escapeHtml(notes)}</p>
+        </div>
+        <div class="admin-booking-inspiration">
+          <div><span>Inspiration Image:</span> ${item.inspirationImageUrl ? `<a class="admin-inline-link" href="${escapeHtml(item.inspirationImageUrl)}" target="_blank" rel="noopener">Open full image</a>` : "Not provided"}</div>
+        </div>
+        <div class="admin-booking-actions">
+          <button class="admin-action-btn" data-waitlist-action="waiting" data-id="${escapeHtml(item.id)}">Set Waiting</button>
+          <button class="admin-action-btn" data-waitlist-action="contacted" data-id="${escapeHtml(item.id)}">Mark Contacted</button>
+          <button class="admin-action-btn" data-waitlist-action="booked" data-id="${escapeHtml(item.id)}">Mark Booked</button>
+          <button class="admin-action-btn danger" data-waitlist-action="cancelled" data-id="${escapeHtml(item.id)}">Cancel Request</button>
+        </div>
+      </article>
+    `
+		})
+		.join("")
+}
+
+async function updateWaitlistStatus(waitlistId, status) {
+	const normalizedStatus = normalizeWaitlistStatus(status)
+	const actorEmail = auth?.currentUser?.email || "admin"
+	const payload = {
+		status: normalizedStatus,
+		adminUpdatedBy: actorEmail,
+		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+	}
+
+	if (normalizedStatus === "contacted") {
+		payload.contactedAt = firebase.firestore.FieldValue.serverTimestamp()
+		payload.contactedBy = actorEmail
+	}
+
+	if (normalizedStatus === "booked") {
+		payload.bookedAt = firebase.firestore.FieldValue.serverTimestamp()
+		payload.bookedBy = actorEmail
+	}
+
+	if (normalizedStatus === "cancelled") {
+		payload.cancelledAt = firebase.firestore.FieldValue.serverTimestamp()
+		payload.cancelledBy = actorEmail
+	}
+
+	await db.collection("waitlist").doc(waitlistId).set(payload, { merge: true })
 }
 
 function normalizeReviewStatus(status) {
@@ -5158,6 +5436,30 @@ function startAdminContactListener() {
 		)
 }
 
+function startAdminWaitlistListener() {
+	if (!firebaseReady || !db || !adminUnlocked) return
+
+	stopAdminWaitlistListener()
+
+	adminWaitlistUnsubscribe = db
+		.collection("waitlist")
+		.limit(300)
+		.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+				renderAdminWaitlist(docs)
+			},
+			(error) => {
+				console.error("Admin waitlist listener failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Failed to watch waitlist in realtime: ${error.message || "unknown error"}`,
+					"adminWaitlistMessage",
+				)
+			},
+		)
+}
+
 function startAdminSecurityListener() {
 	if (!firebaseReady || !db || !adminUnlocked) return
 
@@ -5359,6 +5661,7 @@ function initializeAdminPanel() {
 	const galleryList = document.getElementById("adminGalleryList")
 	const reviewsList = document.getElementById("adminReviewsList")
 	const contactList = document.getElementById("adminContactList")
+	const waitlistList = document.getElementById("adminWaitlistList")
 	const securityList = document.getElementById("adminSecurityActivityList")
 	const adminUsersForm = document.getElementById("adminAdminsForm")
 	const adminUsersList = document.getElementById("adminAdminsList")
@@ -5375,6 +5678,7 @@ function initializeAdminPanel() {
 	const adminUsersRoleSelect = document.getElementById("adminManageRole")
 	const reviewsSortSelect = document.getElementById("adminReviewsSortSelect")
 	const messagesSortSelect = document.getElementById("adminMessagesSortSelect")
+	const waitlistSortSelect = document.getElementById("adminWaitlistSortSelect")
 	const securitySortSelect = document.getElementById("adminSecuritySortSelect")
 	const securityRiskFilterSelect = document.getElementById(
 		"adminSecurityRiskFilterSelect",
@@ -5931,6 +6235,14 @@ function initializeAdminPanel() {
 		})
 	}
 
+	if (waitlistSortSelect) {
+		waitlistSortSelect.value = adminWaitlistSortMode
+		waitlistSortSelect.addEventListener("change", (event) => {
+			adminWaitlistSortMode = event.target.value || "newest"
+			renderAdminWaitlist(adminWaitlistDocs)
+		})
+	}
+
 	if (securitySortSelect) {
 		securitySortSelect.value = adminSecuritySortMode
 		securitySortSelect.addEventListener("change", (event) => {
@@ -6131,6 +6443,39 @@ function initializeAdminPanel() {
 					"error",
 					`❌ Message action failed: ${error.message || "unknown error"}`,
 					"adminContactMessage",
+				)
+			} finally {
+				setAdminButtonLoadingState(actionBtn, false)
+			}
+		})
+	}
+
+	if (waitlistList) {
+		waitlistList.addEventListener("click", async (event) => {
+			const actionBtn = event.target.closest("button[data-waitlist-action]")
+			if (!actionBtn || !adminUnlocked || !auth?.currentUser) return
+
+			const action = actionBtn.dataset.waitlistAction
+			const waitlistId = actionBtn.dataset.id
+			if (!action || !waitlistId) return
+
+			setAdminButtonLoadingState(actionBtn, true, {
+				loadingText: "Applying...",
+			})
+
+			try {
+				await updateWaitlistStatus(waitlistId, action)
+				setAdminMessage(
+					"success",
+					`✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.`,
+					"adminWaitlistMessage",
+				)
+			} catch (error) {
+				console.error("Waitlist action failed:", error)
+				setAdminMessage(
+					"error",
+					`❌ Waitlist action failed: ${error.message || "unknown error"}`,
+					"adminWaitlistMessage",
 				)
 			} finally {
 				setAdminButtonLoadingState(actionBtn, false)

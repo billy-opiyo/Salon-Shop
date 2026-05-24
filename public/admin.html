@@ -172,6 +172,15 @@
 						<button
 							type="button"
 							class="admin-section-tab"
+							data-admin-section-tab="waitlist"
+							role="tab"
+							aria-selected="false"
+						>
+							Waitlist
+						</button>
+						<button
+							type="button"
+							class="admin-section-tab"
 							data-admin-section-tab="services"
 							role="tab"
 							aria-selected="false"
@@ -960,6 +969,60 @@
 						</div>
 
 						<div class="admin-review-list" id="adminContactList"></div>
+					</section>
+
+					<section
+						class="admin-management-section"
+						data-admin-section="waitlist"
+						role="tabpanel"
+					>
+						<div class="admin-stats">
+							<div class="admin-stat-card">
+								<div class="label">Total</div>
+								<strong id="adminWaitlistTotalCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Waiting</div>
+								<strong id="adminWaitlistWaitingCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Contacted</div>
+								<strong id="adminWaitlistContactedCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Booked</div>
+								<strong id="adminWaitlistBookedCount">0</strong>
+							</div>
+							<div class="admin-stat-card">
+								<div class="label">Cancelled</div>
+								<strong id="adminWaitlistCancelledCount">0</strong>
+							</div>
+						</div>
+
+						<div
+							class="form-message"
+							id="adminWaitlistMessage"
+							style="display: none"
+						></div>
+
+						<div class="admin-review-list-head">
+							<label for="adminWaitlistSortSelect">Sort Waitlist:</label>
+							<select
+								id="adminWaitlistSortSelect"
+								class="admin-review-sort-select"
+							>
+								<option value="newest">Newest first</option>
+								<option value="oldest">Oldest first</option>
+								<option value="date-time">Appointment date/time</option>
+								<option value="status-waiting-first">Waiting first</option>
+								<option value="name-az">Name (A-Z)</option>
+							</select>
+						</div>
+
+						<div
+							class="admin-review-list admin-waitlist-list"
+							id="adminWaitlistList"
+						></div>
 					</section>
 
 					<section
