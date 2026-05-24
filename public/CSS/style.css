@@ -3462,6 +3462,13 @@ h6 {
 }
 
 .admin-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: max-content;
+    max-width: 100%;
+    min-width: max-content;
+    flex: 0 0 auto;
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 0.75rem;
@@ -3469,6 +3476,20 @@ h6 {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     border: 1px solid transparent;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.admin-status,
+.admin-role-badge {
+    width: max-content;
+    max-width: 100%;
+    min-width: max-content;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
 }
 
 .admin-status-pending {
@@ -6168,13 +6189,26 @@ h6 {
     .review-submit-auth-badge,
     .waitlist-panel__badge,
     .admin-waitlist-chip,
-    .admin-status-badge,
-    .admin-role-badge,
     .dashboard-count-badge {
         max-width: 100%;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        line-height: 1;
+    }
+
+    /* Admin status badges must show complete labels on mobile. */
+    .admin-status-badge,
+    .admin-role-badge,
+    .admin-status {
+        display: inline-flex;
+        width: max-content;
+        max-width: 100%;
+        min-width: max-content;
+        flex: 0 0 auto;
+        white-space: nowrap;
+        overflow: visible;
+        text-overflow: clip;
         line-height: 1;
     }
 
@@ -8492,6 +8526,57 @@ body.reduced-motion *::after {
 
     .hero-float p {
         font-size: 0.54rem;
+    }
+
+    /* Tiny-width badge fit: reduce visual weight without truncating labels. */
+    .gallery-feature-pill,
+    .review-auth-badge,
+    .review-submit-auth-badge,
+    .waitlist-panel__badge,
+    .admin-waitlist-chip,
+    .admin-status-badge,
+    .admin-role-badge,
+    .admin-status {
+        padding-inline: 6px;
+        font-size: 0.62rem;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        overflow: visible;
+        text-overflow: clip;
+    }
+
+    .admin-status-badge,
+    .admin-role-badge,
+    .admin-status {
+        min-width: max-content;
+        width: max-content;
+    }
+
+    .dashboard-count-badge {
+        min-width: 20px;
+        height: 20px;
+        padding-inline: 6px;
+        font-size: 0.62rem;
+    }
+
+    .waitlist-queue-chip {
+        min-height: 23px;
+        gap: 3px;
+        padding: 3px 6px;
+    }
+
+    .waitlist-queue-chip__rank {
+        font-size: 0.72rem;
+    }
+
+    .waitlist-queue-chip__text,
+    .waitlist-queue-chip__size {
+        font-size: 0.52rem;
+        letter-spacing: 0.04em;
+    }
+
+    .waitlist-queue-chip__size {
+        padding: 2px 4px;
     }
 
     .auth-card {
