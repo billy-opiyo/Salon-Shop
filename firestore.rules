@@ -85,13 +85,18 @@ service cloud.firestore {
         'notes',
         'inspirationImageUrl',
         'status',
+        'preferredSlotId',
+        'waitlistId',
+        'bookingType',
+        'isWaitlisted',
+        'waitlistStatus',
         'uid',
         'createdAt',
         'updatedAt'
       ]);
     }
 
-    function bookingCreateIsValid() {
+    function bookingCreateCommonFieldsAreValid() {
       return bookingCreateHasAllowedKeys()
         && request.resource.data.firstName is string
         && request.resource.data.lastName is string
@@ -108,9 +113,32 @@ service cloud.firestore {
         && request.resource.data['service'] != ''
         && request.resource.data.date != ''
         && request.resource.data.time != ''
-        && request.resource.data.slotId != ''
-        && request.resource.data.status in ['pending', 'confirmed']
         && request.resource.data.uid == request.auth.uid;
+    }
+
+    function bookingCreateConfirmedSlotIsValid() {
+      return request.resource.data.slotId != ''
+        && request.resource.data.status in ['pending', 'confirmed'];
+    }
+
+    function bookingCreateWaitlistIsValid() {
+      return request.resource.data.status == 'waitlisted'
+        && request.resource.data.slotId == ''
+        && request.resource.data.preferredSlotId is string
+        && request.resource.data.preferredSlotId != ''
+        && request.resource.data.waitlistId is string
+        && request.resource.data.waitlistId != ''
+        && request.resource.data.bookingType == 'waitlist'
+        && request.resource.data.isWaitlisted == true
+        && request.resource.data.waitlistStatus == 'waiting';
+    }
+
+    function bookingCreateIsValid() {
+      return bookingCreateCommonFieldsAreValid()
+        && (
+          bookingCreateConfirmedSlotIsValid()
+          || bookingCreateWaitlistIsValid()
+        );
     }
 
     function bookingOwnerUpdateHasAllowedKeys() {
@@ -150,7 +178,7 @@ service cloud.firestore {
         && changed.hasOnly(['status', 'updatedAt'])
         && changed.hasAny(['status'])
         && request.resource.data.status == 'cancelled'
-        && resource.data.status in ['pending', 'confirmed'];
+        && resource.data.status in ['pending', 'confirmed', 'waitlisted'];
     }
 
     function bookingOwnerUpdateIsValid() {
@@ -175,6 +203,8 @@ service cloud.firestore {
       ) || (
         fromStatus == 'confirmed' && toStatus in ['completed', 'cancelled']
       ) || (
+        fromStatus == 'waitlisted' && toStatus in ['pending', 'confirmed', 'cancelled']
+      ) || (
         fromStatus == 'completed' && toStatus == 'completed'
       ) || (
         fromStatus == 'cancelled' && toStatus == 'cancelled'
@@ -184,7 +214,7 @@ service cloud.firestore {
     function adminBookingUpdateIsValid() {
       let changed = request.resource.data.diff(resource.data).changedKeys();
       return changed.hasOnly(['status', 'updatedAt'])
-        && request.resource.data.status in ['pending', 'confirmed', 'completed', 'cancelled']
+        && request.resource.data.status in ['pending', 'confirmed', 'completed', 'cancelled', 'waitlisted']
         && bookingStatusTransitionAllowed(resource.data.status, request.resource.data.status);
     }
 

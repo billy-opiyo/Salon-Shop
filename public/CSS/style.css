@@ -2561,6 +2561,16 @@ h6 {
     color: var(--text-primary);
 }
 
+.admin-stat-card-waitlisted {
+    border-color: rgba(168, 85, 247, 0.42);
+    background: linear-gradient(180deg, rgba(168, 85, 247, 0.12), rgba(200, 150, 62, 0.04));
+    box-shadow: 0 8px 18px rgba(168, 85, 247, 0.08);
+}
+
+.admin-stat-card-waitlisted strong {
+    color: #d8b4fe;
+}
+
 .admin-management-section[data-admin-section="security"] .admin-stat-card[data-security-widget] {
     transition:
         border-color 0.25s ease,
@@ -2729,6 +2739,53 @@ h6 {
     scrollbar-gutter: stable;
     scrollbar-width: thin;
     scrollbar-color: var(--primary) var(--bg-secondary);
+}
+
+.admin-booking-filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 14px;
+    padding: 10px;
+    border: 1px solid rgba(200, 150, 62, 0.18);
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(200, 150, 62, 0.05));
+}
+
+.admin-booking-filter-btn {
+    min-height: 36px;
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: var(--transition-fast);
+}
+
+.admin-booking-filter-btn:hover,
+.admin-booking-filter-btn:focus-visible {
+    color: var(--text-primary);
+    border-color: rgba(200, 150, 62, 0.56);
+    box-shadow: 0 0 0 3px rgba(200, 150, 62, 0.12);
+}
+
+.admin-booking-filter-btn.active {
+    color: #0a0a0a;
+    border-color: rgba(232, 194, 122, 0.84);
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    box-shadow: 0 10px 20px rgba(200, 150, 62, 0.16);
+}
+
+.admin-booking-filter-btn.waitlisted.active {
+    color: #1a1028;
+    border-color: rgba(216, 180, 254, 0.88);
+    background: linear-gradient(135deg, #c084fc, #f0abfc);
+    box-shadow: 0 10px 20px rgba(168, 85, 247, 0.18);
 }
 
 .admin-blogs-list {
@@ -3246,6 +3303,24 @@ h6 {
     min-height: var(--admin-booking-card-height);
 }
 
+.admin-booking-item-waitlisted {
+    position: relative;
+    border-color: rgba(168, 85, 247, 0.5);
+    background:
+        linear-gradient(90deg, rgba(168, 85, 247, 0.12), transparent 34%),
+        var(--bg-secondary);
+    box-shadow: 0 0 0 1px rgba(216, 180, 254, 0.08) inset;
+}
+
+.admin-booking-item-waitlisted::before {
+    content: "";
+    position: absolute;
+    inset: 12px auto 12px 0;
+    width: 4px;
+    border-radius: 0 var(--radius-full) var(--radius-full) 0;
+    background: linear-gradient(180deg, #f0abfc, #a855f7);
+}
+
 .admin-booking-item-head {
     display: flex;
     justify-content: space-between;
@@ -3261,6 +3336,29 @@ h6 {
 
 .admin-booking-name {
     font-weight: 700;
+}
+
+.admin-booking-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-waitlist-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(216, 180, 254, 0.48);
+    background: rgba(168, 85, 247, 0.14);
+    color: #d8b4fe;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .admin-status-badge {
@@ -3283,6 +3381,12 @@ h6 {
     background: rgba(72, 187, 120, 0.15);
     color: #2f9e5a;
     border-color: rgba(72, 187, 120, 0.4);
+}
+
+.admin-status-waitlisted {
+    background: rgba(168, 85, 247, 0.16);
+    color: #c084fc;
+    border-color: rgba(168, 85, 247, 0.46);
 }
 
 .admin-status-completed {
@@ -3595,6 +3699,10 @@ h6 {
     background: #48bb78;
 }
 
+.admin-status-dot.waitlisted {
+    background: #c084fc;
+}
+
 .admin-status-dot.completed {
     background: #4299e1;
 }
@@ -3764,6 +3872,10 @@ h6 {
 
 .admin-schedule-event.admin-status-confirmed {
     border-left-color: #48bb78;
+}
+
+.admin-schedule-event.admin-status-waitlisted {
+    border-left-color: #a855f7;
 }
 
 .admin-schedule-event.admin-status-completed {

@@ -225,6 +225,10 @@
 								<div class="label">Confirmed</div>
 								<strong id="adminConfirmedCount">0</strong>
 							</div>
+							<div class="admin-stat-card admin-stat-card-waitlisted">
+								<div class="label">Waitlisted</div>
+								<strong id="adminWaitlistedBookingCount">0</strong>
+							</div>
 							<div class="admin-stat-card">
 								<div class="label">Completed</div>
 								<strong id="adminCompletedCount">0</strong>
@@ -240,6 +244,36 @@
 							id="adminActionMessage"
 							style="display: none"
 						></div>
+						<div
+							class="admin-booking-filter-controls"
+							id="adminBookingFilterControls"
+							aria-label="Booking status filter"
+						>
+							<button
+								type="button"
+								class="admin-booking-filter-btn active"
+								data-booking-status-filter="all"
+								aria-pressed="true"
+							>
+								All Bookings
+							</button>
+							<button
+								type="button"
+								class="admin-booking-filter-btn"
+								data-booking-status-filter="confirmed"
+								aria-pressed="false"
+							>
+								Confirmed
+							</button>
+							<button
+								type="button"
+								class="admin-booking-filter-btn waitlisted"
+								data-booking-status-filter="waitlisted"
+								aria-pressed="false"
+							>
+								Waitlisted Only
+							</button>
+						</div>
 						<div class="admin-bookings-list" id="adminBookingsList"></div>
 					</section>
 
@@ -303,6 +337,7 @@
 							<div class="admin-schedule-legend" aria-label="Status colors">
 								<span><i class="admin-status-dot pending"></i>Pending</span>
 								<span><i class="admin-status-dot confirmed"></i>Confirmed</span>
+								<span><i class="admin-status-dot waitlisted"></i>Waitlisted</span>
 								<span><i class="admin-status-dot completed"></i>Completed</span>
 								<span><i class="admin-status-dot cancelled"></i>Cancelled</span>
 							</div>

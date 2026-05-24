@@ -1220,6 +1220,7 @@ let auth = null
 let functionsService = null
 let activeAvailabilityUnsubscribe = null
 let currentBookedSlotEntries = []
+let pendingWaitlistBooking = null
 let serviceCategorySettingsUnsubscribe = null
 let authMode = "signin"
 let authObserverAttached = false
@@ -3294,10 +3295,15 @@ function normalizeBookingStatus(status = "") {
 		.toLowerCase()
 	if (raw === "complete") return "completed"
 	if (raw === "canceled") return "cancelled"
+	if (raw === "waitlist" || raw === "waiting") return "waitlisted"
 	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
 		return "confirmed"
 	}
-	if (["pending", "confirmed", "completed", "cancelled"].includes(raw)) {
+	if (
+		["pending", "confirmed", "completed", "cancelled", "waitlisted"].includes(
+			raw,
+		)
+	) {
 		return raw
 	}
 	return "pending"
@@ -5007,6 +5013,55 @@ function getSlotId(date, stylist, time) {
 	return `${date}__${stylistKey}__${normalizedTime}`
 }
 
+function getCurrentBookingFormDate() {
+	return String(document.getElementById("datePicker")?.value || "").trim()
+}
+
+function getCurrentBookingFormStylistKey() {
+	return normalizeStylistKey(
+		document.getElementById("stylistSelect")?.value || "any",
+	)
+}
+
+function getMatchingPendingWaitlistBooking() {
+	if (!pendingWaitlistBooking) return null
+
+	const dateValue = getCurrentBookingFormDate()
+	const currentStylistKey = getCurrentBookingFormStylistKey()
+	const waitlistStylistKey = normalizeStylistKey(
+		pendingWaitlistBooking.stylistKey || "any",
+	)
+	const sameDate =
+		String(pendingWaitlistBooking.date || "").trim() === dateValue
+	const sameStylist =
+		currentStylistKey === "any" ||
+		waitlistStylistKey === "any" ||
+		waitlistStylistKey === currentStylistKey
+
+	if (!sameDate || !sameStylist) return null
+	if (!pendingWaitlistBooking.time || !pendingWaitlistBooking.slotId)
+		return null
+	return pendingWaitlistBooking
+}
+
+function setPendingWaitlistBooking(selection = {}) {
+	pendingWaitlistBooking = {
+		date: String(selection.date || "").trim(),
+		time: String(selection.time || "").trim(),
+		slotId: String(selection.slotId || "").trim(),
+		stylistKey: normalizeStylistKey(selection.stylistKey || "any"),
+		waitlistId: String(selection.waitlistId || "").trim(),
+		inspirationImageUrl: String(selection.inspirationImageUrl || "").trim(),
+	}
+}
+
+function clearPendingWaitlistBooking({ refreshSlots = false } = {}) {
+	pendingWaitlistBooking = null
+	if (refreshSlots) {
+		renderBookingTimeSlots(currentBookedSlotEntries)
+	}
+}
+
 function getSortedBookedSlotEntries(entries = []) {
 	return [...entries].sort((a, b) => {
 		const aIndex = timeSlots.indexOf(a.time)
@@ -5041,6 +5096,10 @@ function renderWaitlistPanel(bookedEntries = []) {
 	})
 
 	const hasBookedSlots = currentBookedSlotEntries.length > 0
+	const pendingSelection = getMatchingPendingWaitlistBooking()
+	if (pendingSelection) {
+		waitlistSelect.value = pendingSelection.slotId
+	}
 	panel.classList.toggle("hidden", !hasBookedSlots)
 	joinBtn.disabled = !hasBookedSlots
 }
@@ -5055,20 +5114,33 @@ function renderBookingTimeSlots(bookedEntries = []) {
 			.map((entry) => String(entry?.time || "").trim())
 			.filter(Boolean),
 	)
+	const pendingSelection = getMatchingPendingWaitlistBooking()
 
 	select.innerHTML = '<option value="">Select Time</option>'
 	timeSlots.forEach((slot) => {
+		const isWaitlistedSelection = pendingSelection?.time === slot
+		const isBooked = bookedTimeSet.has(slot)
 		const opt = document.createElement("option")
 		opt.value = slot
-		opt.textContent = bookedTimeSet.has(slot) ? `${slot} — Booked` : slot
-		if (bookedTimeSet.has(slot)) {
+		opt.textContent = isWaitlistedSelection
+			? `${slot} — Waitlisted (booked)`
+			: isBooked
+				? `${slot} — Booked`
+				: slot
+		if (isWaitlistedSelection) {
+			opt.dataset.waitlisted = "true"
+			opt.dataset.slotId = pendingSelection.slotId
+			opt.dataset.stylistKey = pendingSelection.stylistKey || "any"
+		} else if (isBooked) {
 			opt.disabled = true
 			opt.dataset.booked = "true"
 		}
 		select.appendChild(opt)
 	})
 
-	if (previousSelection && !bookedTimeSet.has(previousSelection)) {
+	if (pendingSelection?.time) {
+		select.value = pendingSelection.time
+	} else if (previousSelection && !bookedTimeSet.has(previousSelection)) {
 		select.value = previousSelection
 	} else {
 		select.value = ""
@@ -5219,22 +5291,30 @@ async function handleJoinWaitlistButtonClick() {
 					: getStylistDisplayName(waitlistStylistKey),
 		}
 
-		await joinWaitlistForUnavailableSlot({
+		const waitlistId = await joinWaitlistForUnavailableSlot({
 			bookingData: waitlistBookingData,
 			stylistKey: waitlistStylistKey,
 			activeUid,
 			slotId: selectedSlotId,
 			inspirationImageUrl,
 		})
+		setPendingWaitlistBooking({
+			date: data.date,
+			time: selectedTime,
+			slotId: selectedSlotId,
+			stylistKey: waitlistStylistKey,
+			waitlistId,
+			inspirationImageUrl,
+		})
+		renderBookingTimeSlots(currentBookedSlotEntries)
 		joinedSuccessfully = true
 
 		showTimedFormMessage(
 			msg,
 			"success",
-			`✅ You have joined the waitlist for ${selectedTime}. We’ll notify you if this slot opens up.`,
+			`✅ You have joined the waitlist for ${selectedTime}. Now click Confirm Booking to save this waitlisted appointment to your dashboard.`,
 			6000,
 		)
-		waitlistSelect.value = ""
 	} catch (error) {
 		console.error("Manual waitlist join failed:", error)
 		showTimedFormMessage(
@@ -5323,8 +5403,8 @@ async function joinWaitlistForUnavailableSlot({
 		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
 	}
 
-	await db.collection("waitlist").add(waitlistPayload)
-	return true
+	const waitlistDocRef = await db.collection("waitlist").add(waitlistPayload)
+	return waitlistDocRef?.id || true
 }
 
 async function uploadImageToCloudinary(file) {
@@ -5442,6 +5522,42 @@ function handleAvailabilityWatch() {
 		subscribeToAvailability(dateValue, stylistValue)
 	} else {
 		populateTimeSlots()
+	}
+}
+
+function handleBookingAvailabilityInputChange() {
+	clearPendingWaitlistBooking()
+	handleAvailabilityWatch()
+}
+
+function handleBookingTimeSelectionChange() {
+	const timeSelect = document.getElementById("timeSelect")
+	const selectedOption = timeSelect?.options?.[timeSelect.selectedIndex]
+	if (selectedOption?.dataset?.waitlisted !== "true" && pendingWaitlistBooking) {
+		clearPendingWaitlistBooking({ refreshSlots: true })
+	}
+}
+
+function setBookingSuccessContent(mode = "confirmed") {
+	const bookingSuccess = document.getElementById("bookingSuccess")
+	if (!bookingSuccess) return
+
+	const title = bookingSuccess.querySelector("h3")
+	const desc = bookingSuccess.querySelector("p")
+
+	if (mode === "waitlisted") {
+		if (title) title.textContent = "Waitlist Request Saved!"
+		if (desc) {
+			desc.textContent =
+				"Your waitlisted appointment has been saved. It will appear in your dashboard and the admin bookings list while you wait for the slot to open."
+		}
+		return
+	}
+
+	if (title) title.textContent = "Booking Confirmed!"
+	if (desc) {
+		desc.textContent =
+			"Check your email for confirmation details. We'll send a reminder on Whatsapp 2 Hours before your appointment."
 	}
 }
 
@@ -7431,8 +7547,20 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 		data.service = customServiceValue
 	}
 
-	const stylistKey = data.stylist && data.stylist.trim() ? data.stylist : "any"
-	const slotId = getSlotId(data.date, stylistKey, data.time)
+	const pendingWaitlistSelection = getMatchingPendingWaitlistBooking()
+	if (pendingWaitlistSelection?.time) {
+		data.time = pendingWaitlistSelection.time
+	}
+
+	const selectedStylistKey = normalizeStylistKey(data.stylist || "any")
+	const stylistKey = pendingWaitlistSelection
+		? normalizeStylistKey(
+				pendingWaitlistSelection.stylistKey || selectedStylistKey,
+			)
+		: selectedStylistKey
+	const slotId = pendingWaitlistSelection
+		? ""
+		: getSlotId(data.date, stylistKey, data.time)
 
 	clearFormMessage(msg)
 
@@ -7468,13 +7596,71 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 				)
 			}
 
-			let inspirationImageUrl = ""
+			let inspirationImageUrl = String(
+				pendingWaitlistSelection?.inspirationImageUrl || "",
+			).trim()
 			const selectedFile = imageInput?.files?.[0]
-			if (selectedFile) {
+			if (!inspirationImageUrl && selectedFile) {
 				inspirationImageUrl = await uploadImageToCloudinary(selectedFile)
 			}
 
 			const bookingRef = db.collection("bookings").doc()
+
+			if (pendingWaitlistSelection) {
+				await bookingRef.set({
+					firstName: data.firstName || "",
+					lastName: data.lastName || "",
+					email: String(data.email || "")
+						.trim()
+						.toLowerCase(),
+					phone: data.phone || "",
+					service: data.service || "",
+					stylist:
+						stylistKey === "any" ? "" : getStylistDisplayName(stylistKey),
+					stylistKey,
+					date: data.date || "",
+					time: data.time || "",
+					slotId: "",
+					preferredSlotId: pendingWaitlistSelection.slotId,
+					waitlistId: pendingWaitlistSelection.waitlistId || "",
+					bookingType: "waitlist",
+					isWaitlisted: true,
+					waitlistStatus: "waiting",
+					notes: data.notes || "",
+					inspirationImageUrl,
+					status: "waitlisted",
+					uid: activeUid,
+					createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+				})
+
+				form.style.display = "none"
+				const bookingSuccess = document.getElementById("bookingSuccess")
+				setBookingSuccessContent("waitlisted")
+				bookingSuccess.style.display = "block"
+				showTimedFormMessage(
+					msg,
+					"success",
+					"✅ Waitlisted booking saved in realtime!",
+				)
+
+				bookingSuccess.setAttribute("tabindex", "-1")
+				bookingSuccess.scrollIntoView({ behavior: "smooth", block: "center" })
+				bookingSuccess.focus({ preventScroll: true })
+
+				setPostBookingPromptVisible(!signedInUser)
+				if (signedInUser && activeUid) {
+					await upsertUserProfile(auth.currentUser, {
+						phone: data.phone || "",
+					})
+					await loadUserDashboardData(auth.currentUser)
+				}
+
+				clearPendingWaitlistBooking()
+				handleAvailabilityWatch()
+				return
+			}
+
 			const slotRef = db.collection("bookingSlots").doc(slotId)
 
 			await db.runTransaction(async (transaction) => {
@@ -7520,6 +7706,7 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 
 			form.style.display = "none"
 			const bookingSuccess = document.getElementById("bookingSuccess")
+			setBookingSuccessContent("confirmed")
 			bookingSuccess.style.display = "block"
 			showTimedFormMessage(
 				msg,
@@ -7595,7 +7782,9 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 })
 
 function resetBooking() {
+	clearPendingWaitlistBooking()
 	document.getElementById("bookingForm").reset()
+	setBookingSuccessContent("confirmed")
 	populateTimeSlots()
 	toggleCustomServiceInput()
 	document.getElementById("bookingForm").style.display = "block"
@@ -8049,12 +8238,19 @@ initializeFirebaseServices().then(async () => {
 
 	const stylistSelect = document.getElementById("stylistSelect")
 	const dateInput = document.getElementById("datePicker")
+	const timeSelect = document.getElementById("timeSelect")
 
 	if (stylistSelect) {
-		stylistSelect.addEventListener("change", handleAvailabilityWatch)
+		stylistSelect.addEventListener(
+			"change",
+			handleBookingAvailabilityInputChange,
+		)
 	}
 	if (dateInput) {
-		dateInput.addEventListener("change", handleAvailabilityWatch)
+		dateInput.addEventListener("change", handleBookingAvailabilityInputChange)
+	}
+	if (timeSelect) {
+		timeSelect.addEventListener("change", handleBookingTimeSelectionChange)
 	}
 
 	startGalleryRealtimeListener()

@@ -27,6 +27,7 @@ let adminReviewRawDocs = []
 let adminContactDocs = []
 let adminWaitlistDocs = []
 let adminBookingDocs = []
+let adminBookingStatusFilter = "all"
 let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
 let adminWaitlistSortMode = "newest"
@@ -357,6 +358,8 @@ function getStatusClass(status) {
 			return "admin-status-completed"
 		case "cancelled":
 			return "admin-status-cancelled"
+		case "waitlisted":
+			return "admin-status-waitlisted"
 		default:
 			return "admin-status-pending"
 	}
@@ -369,15 +372,23 @@ function normalizeStatus(status) {
 
 	if (raw === "complete") return "completed"
 	if (raw === "canceled") return "cancelled"
+	if (raw === "waitlist" || raw === "waiting") return "waitlisted"
 	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
 		return "confirmed"
 	}
 
-	if (["pending", "confirmed", "completed", "cancelled"].includes(raw)) {
+	if (["pending", "confirmed", "completed", "cancelled", "waitlisted"].includes(raw)) {
 		return raw
 	}
 
 	return "pending"
+}
+
+function normalizeAdminBookingFilter(filter = "all") {
+	const raw = String(filter || "all")
+		.trim()
+		.toLowerCase()
+	return ["confirmed", "waitlisted"].includes(raw) ? raw : "all"
 }
 
 function extractRawStatus(booking = {}) {
@@ -3929,16 +3940,20 @@ function renderAdminBookings(docs) {
 	const list = document.getElementById("adminBookingsList")
 	if (!list) return
 
-	const normalizedDocs = docs.map((b) => ({
+	const normalizedDocs = (Array.isArray(docs) ? docs : []).map((b) => ({
 		...b,
 		status: normalizeStatus(extractRawStatus(b)),
 	}))
 	adminBookingDocs = normalizedDocs
+	adminBookingStatusFilter = normalizeAdminBookingFilter(adminBookingStatusFilter)
 
 	const total = normalizedDocs.length
 	const pending = normalizedDocs.filter((b) => b.status === "pending").length
 	const confirmed = normalizedDocs.filter(
 		(b) => b.status === "confirmed",
+	).length
+	const waitlisted = normalizedDocs.filter(
+		(b) => b.status === "waitlisted",
 	).length
 	const completed = normalizedDocs.filter(
 		(b) => b.status === "completed",
@@ -3950,14 +3965,26 @@ function renderAdminBookings(docs) {
 	const totalEl = document.getElementById("adminTotalCount")
 	const pendingEl = document.getElementById("adminPendingCount")
 	const confirmedEl = document.getElementById("adminConfirmedCount")
+	const waitlistedEl = document.getElementById("adminWaitlistedBookingCount")
 	const completedEl = document.getElementById("adminCompletedCount")
 	const cancelledEl = document.getElementById("adminCancelledCount")
 
 	if (totalEl) totalEl.textContent = String(total)
 	if (pendingEl) pendingEl.textContent = String(pending)
 	if (confirmedEl) confirmedEl.textContent = String(confirmed)
+	if (waitlistedEl) waitlistedEl.textContent = String(waitlisted)
 	if (completedEl) completedEl.textContent = String(completed)
 	if (cancelledEl) cancelledEl.textContent = String(cancelled)
+
+	const filterButtons = document.querySelectorAll("[data-booking-status-filter]")
+	filterButtons.forEach((button) => {
+		const buttonFilter = normalizeAdminBookingFilter(
+			button.dataset.bookingStatusFilter,
+		)
+		const isActive = buttonFilter === adminBookingStatusFilter
+		button.classList.toggle("active", isActive)
+		button.setAttribute("aria-pressed", isActive ? "true" : "false")
+	})
 
 	if (!normalizedDocs.length) {
 		list.innerHTML =
@@ -3966,7 +3993,22 @@ function renderAdminBookings(docs) {
 		return
 	}
 
-	const sortedDocs = [...normalizedDocs].sort((a, b) => {
+	const visibleDocs =
+		adminBookingStatusFilter === "all"
+			? normalizedDocs
+			: normalizedDocs.filter((b) => b.status === adminBookingStatusFilter)
+
+	if (!visibleDocs.length) {
+		const emptyCopy =
+			adminBookingStatusFilter === "waitlisted"
+				? "No waitlisted bookings right now. Waitlisted entries will appear here separately from confirmed bookings."
+				: "No confirmed bookings match this filter right now."
+		list.innerHTML = `<div class="admin-empty-state">${emptyCopy}</div>`
+		renderAdminSchedule()
+		return
+	}
+
+	const sortedDocs = [...visibleDocs].sort((a, b) => {
 		const aUpdated = toTimestampMs(a.updatedAt)
 		const bUpdated = toTimestampMs(b.updatedAt)
 		if (aUpdated !== bUpdated) return bUpdated - aUpdated
@@ -3979,6 +4021,7 @@ function renderAdminBookings(docs) {
 	list.innerHTML = sortedDocs
 		.map((b) => {
 			const status = normalizeStatus(extractRawStatus(b))
+			const isWaitlisted = status === "waitlisted"
 			const customerName = getAdminBookingCustomerName(b)
 			const specialRequest = String(b.notes || b.specialRequest || "").trim()
 			const inspirationImageUrl = String(
@@ -3989,23 +4032,26 @@ function renderAdminBookings(docs) {
 			).trim()
 
 			return `
-        <div class="admin-booking-item">
+        <div class="admin-booking-item ${isWaitlisted ? "admin-booking-item-waitlisted" : ""}">
           <div class="admin-booking-item-head">
             <div>
-              <div class="admin-booking-name">${customerName}</div>
-              <div class="admin-booking-id">Booking ID: ${b.id}</div>
+              <div class="admin-booking-name-row">
+                <div class="admin-booking-name">${escapeHtml(customerName)}</div>
+                ${isWaitlisted ? '<span class="admin-waitlist-chip">Waitlist</span>' : ""}
+              </div>
+              <div class="admin-booking-id">Booking ID: ${escapeHtml(b.id || "N/A")}</div>
             </div>
-            <span class="admin-status-badge ${getStatusClass(status)}">${status}</span>
+            <span class="admin-status-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
           </div>
           <div class="admin-booking-meta">
-            <div><span>Service:</span> ${b.service || "N/A"}</div>
-            <div><span>Stylist:</span> ${b.stylist || "Any Available"}</div>
-			<div><span>Date:</span> ${formatAdminDate(b.date)}</div>
-            <div><span>Time:</span> ${b.time || "N/A"}</div>
-            <div><span>Email:</span> ${b.email || "N/A"}</div>
-            <div><span>Phone:</span> ${b.phone || "N/A"}</div>
-            <div><span>WhatsApp:</span> ${b.whatsappStatus || "pending"}</div>
-            <div><span>Reminder Sent:</span> ${b.reminderSentAt ? formatAdminDate(b.reminderSentAt) : "Not sent"}</div>
+            <div><span>Service:</span> ${escapeHtml(b.service || "N/A")}</div>
+            <div><span>Stylist:</span> ${escapeHtml(b.stylist || "Any Available")}</div>
+			<div><span>Date:</span> ${escapeHtml(formatAdminDate(b.date))}</div>
+            <div><span>Time:</span> ${escapeHtml(b.time || "N/A")}</div>
+            <div><span>Email:</span> ${escapeHtml(b.email || "N/A")}</div>
+            <div><span>Phone:</span> ${escapeHtml(b.phone || "N/A")}</div>
+            <div><span>WhatsApp:</span> ${escapeHtml(b.whatsappStatus || "pending")}</div>
+            <div><span>Reminder Sent:</span> ${escapeHtml(b.reminderSentAt ? formatAdminDate(b.reminderSentAt) : "Not sent")}</div>
           </div>
           <div class="admin-booking-special-request">
             <span>Special Request:</span>
@@ -4020,10 +4066,10 @@ function renderAdminBookings(docs) {
 						}
           </div>
           <div class="admin-booking-actions">
-            <button class="admin-action-btn" data-action="pending" data-id="${b.id}">Set Pending</button>
-            <button class="admin-action-btn" data-action="confirmed" data-id="${b.id}">Confirm</button>
-            <button class="admin-action-btn" data-action="completed" data-id="${b.id}">Complete</button>
-            <button class="admin-action-btn danger" data-action="cancel-release" data-id="${b.id}">Cancel + Release Slot</button>
+            <button class="admin-action-btn" data-action="pending" data-id="${escapeHtml(b.id || "")}">Set Pending</button>
+            <button class="admin-action-btn" data-action="confirmed" data-id="${escapeHtml(b.id || "")}">Confirm</button>
+            <button class="admin-action-btn" data-action="completed" data-id="${escapeHtml(b.id || "")}">Complete</button>
+            <button class="admin-action-btn danger" data-action="cancel-release" data-id="${escapeHtml(b.id || "")}">Cancel + Release Slot</button>
           </div>
         </div>
       `
@@ -5646,6 +5692,9 @@ function initializeAdminPanel() {
 	const loginBtn = document.getElementById("adminLoginBtn")
 	const passwordToggleBtn = document.getElementById("adminPasswordToggle")
 	const bookingList = document.getElementById("adminBookingsList")
+	const bookingFilterControls = document.getElementById(
+		"adminBookingFilterControls",
+	)
 	const scheduleGrid = document.getElementById("adminScheduleGrid")
 	const scheduleDetails = document.getElementById("adminScheduleDetails")
 	const schedulePrevBtn = document.getElementById("adminSchedulePrev")
@@ -5860,6 +5909,18 @@ function initializeAdminPanel() {
 			setAdminButtonLoadingState(button, false)
 		}
 	})
+
+	if (bookingFilterControls) {
+		bookingFilterControls.addEventListener("click", (event) => {
+			const button = event.target.closest("[data-booking-status-filter]")
+			if (!button) return
+
+			adminBookingStatusFilter = normalizeAdminBookingFilter(
+				button.dataset.bookingStatusFilter,
+			)
+			renderAdminBookings(adminBookingDocs)
+		})
+	}
 
 	securityList.addEventListener("click", async (event) => {
 		const actionBtn = event.target.closest("button[data-security-action]")
