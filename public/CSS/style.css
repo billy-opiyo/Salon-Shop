@@ -1492,6 +1492,65 @@ h6 {
     flex: 1;
 }
 
+.waitlist-panel {
+    background: rgba(200, 150, 62, 0.1);
+    border: 1px solid rgba(200, 150, 62, 0.32);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+}
+
+.waitlist-panel__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.waitlist-panel__header strong {
+    display: block;
+    color: var(--primary);
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+}
+
+.waitlist-panel__header small {
+    display: block;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.waitlist-panel__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    background: rgba(200, 150, 62, 0.16);
+    color: var(--primary);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.waitlist-panel__controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.waitlist-panel__controls .btn {
+    min-height: 46px;
+    white-space: nowrap;
+}
+
+#timeSelect option:disabled {
+    color: var(--text-muted);
+}
+
 .submit-booking {
     width: 100%;
     padding: 16px;
@@ -1533,6 +1592,14 @@ h6 {
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .waitlist-panel__controls {
+        grid-template-columns: 1fr;
+    }
+
+    .waitlist-panel__controls .btn {
+        width: 100%;
     }
 }
 

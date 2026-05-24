@@ -1218,6 +1218,7 @@ let db = null
 let auth = null
 let functionsService = null
 let activeAvailabilityUnsubscribe = null
+let currentBookedSlotEntries = []
 let serviceCategorySettingsUnsubscribe = null
 let authMode = "signin"
 let authObserverAttached = false
@@ -5005,6 +5006,222 @@ function getSlotId(date, stylist, time) {
 	return `${date}__${stylistKey}__${normalizedTime}`
 }
 
+function getSortedBookedSlotEntries(entries = []) {
+	return [...entries].sort((a, b) => {
+		const aIndex = timeSlots.indexOf(a.time)
+		const bIndex = timeSlots.indexOf(b.time)
+		const safeAIndex = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex
+		const safeBIndex = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex
+		if (safeAIndex !== safeBIndex) return safeAIndex - safeBIndex
+		return String(a.stylistLabel || "").localeCompare(
+			String(b.stylistLabel || ""),
+		)
+	})
+}
+
+function renderWaitlistPanel(bookedEntries = []) {
+	const panel = document.getElementById("waitlistPanel")
+	const waitlistSelect = document.getElementById("waitlistTimeSelect")
+	const joinBtn = document.getElementById("joinWaitlistBtn")
+	if (!panel || !waitlistSelect || !joinBtn) return
+
+	currentBookedSlotEntries = getSortedBookedSlotEntries(
+		bookedEntries.filter((entry) => entry?.time && entry?.slotId),
+	)
+
+	waitlistSelect.innerHTML = '<option value="">Select booked time</option>'
+	currentBookedSlotEntries.forEach((entry) => {
+		const opt = document.createElement("option")
+		opt.value = entry.slotId
+		opt.dataset.time = entry.time
+		opt.dataset.stylistKey = entry.stylistKey || "any"
+		opt.textContent = `${entry.time} — ${entry.stylistLabel || "Booked"}`
+		waitlistSelect.appendChild(opt)
+	})
+
+	const hasBookedSlots = currentBookedSlotEntries.length > 0
+	panel.classList.toggle("hidden", !hasBookedSlots)
+	joinBtn.disabled = !hasBookedSlots
+}
+
+function renderBookingTimeSlots(bookedEntries = []) {
+	const select = document.getElementById("timeSelect")
+	if (!select) return
+
+	const previousSelection = String(select.value || "").trim()
+	const bookedTimeSet = new Set(
+		bookedEntries
+			.map((entry) => String(entry?.time || "").trim())
+			.filter(Boolean),
+	)
+
+	select.innerHTML = '<option value="">Select Time</option>'
+	timeSlots.forEach((slot) => {
+		const opt = document.createElement("option")
+		opt.value = slot
+		opt.textContent = bookedTimeSet.has(slot) ? `${slot} — Booked` : slot
+		if (bookedTimeSet.has(slot)) {
+			opt.disabled = true
+			opt.dataset.booked = "true"
+		}
+		select.appendChild(opt)
+	})
+
+	if (previousSelection && !bookedTimeSet.has(previousSelection)) {
+		select.value = previousSelection
+	} else {
+		select.value = ""
+	}
+
+	renderWaitlistPanel(bookedEntries)
+}
+
+function getBookingFormDataForWaitlist(timeOverride = "") {
+	const form = document.getElementById("bookingForm")
+	const data = form ? Object.fromEntries(new FormData(form).entries()) : {}
+	const customServiceInput = document.getElementById("customServiceInput")
+	const customServiceValue = String(customServiceInput?.value || "").trim()
+
+	if (data.service === CUSTOM_SERVICE_OPTION_VALUE) {
+		data.service = customServiceValue
+	}
+
+	if (timeOverride) {
+		data.time = String(timeOverride || "").trim()
+	}
+
+	return data
+}
+
+function validateWaitlistBookingData(data = {}) {
+	if (!String(data.firstName || "").trim())
+		return "Please enter your first name."
+	if (!String(data.lastName || "").trim()) return "Please enter your last name."
+	if (!String(data.email || "").trim()) return "Please enter your email."
+	if (!String(data.phone || "").trim()) return "Please enter your phone number."
+	if (!String(data.service || "").trim())
+		return "Please select or type a service."
+	if (!String(data.date || "").trim()) return "Please choose a date."
+	if (!String(data.time || "").trim()) return "Please choose a booked time."
+	return ""
+}
+
+async function getOrCreateBookingSessionUid() {
+	if (!auth) return null
+	if (auth.currentUser) {
+		return auth.currentUser.uid
+	}
+
+	const userCredential = await auth.signInAnonymously()
+	return userCredential?.user?.uid || auth.currentUser?.uid || null
+}
+
+async function handleJoinWaitlistButtonClick() {
+	const waitlistSelect = document.getElementById("waitlistTimeSelect")
+	const joinBtn = document.getElementById("joinWaitlistBtn")
+	const msg = document.getElementById("bookingMessage")
+	const imageInput = document.getElementById("inspirationImage")
+	const selectedOption = waitlistSelect?.options?.[waitlistSelect.selectedIndex]
+	const selectedTime = String(selectedOption?.dataset?.time || "").trim()
+	const selectedSlotId = String(selectedOption?.value || "").trim()
+
+	if (!selectedTime || !selectedSlotId) {
+		showTimedFormMessage(
+			msg,
+			"error",
+			"⚠️ Please select the booked time you want to waitlist for.",
+		)
+		return
+	}
+
+	const data = getBookingFormDataForWaitlist(selectedTime)
+	const validationError = validateWaitlistBookingData(data)
+	if (validationError) {
+		showTimedFormMessage(msg, "error", `⚠️ ${validationError}`)
+		return
+	}
+
+	if (!firebaseReady || !db || !auth) {
+		showTimedFormMessage(
+			msg,
+			"error",
+			"⚠️ Waitlist service is not configured yet. Add Firebase keys in APP_CONFIG.",
+		)
+		return
+	}
+
+	clearFormMessage(msg)
+	setButtonLoadingState(joinBtn, true, { loadingText: "Joining..." })
+
+	try {
+		const slotDoc = await db
+			.collection("bookingSlots")
+			.doc(selectedSlotId)
+			.get()
+		if (!slotDoc.exists || slotDoc.data()?.taken !== true) {
+			throw new Error(
+				"This slot just opened. Please select it from Time Slot and confirm your booking.",
+			)
+		}
+
+		const activeUid = await getOrCreateBookingSessionUid()
+		if (!activeUid) {
+			throw new Error(
+				"Unable to authenticate waitlist session. Please refresh and try again.",
+			)
+		}
+
+		let inspirationImageUrl = ""
+		const selectedFile = imageInput?.files?.[0]
+		if (selectedFile) {
+			inspirationImageUrl = await uploadImageToCloudinary(selectedFile)
+		}
+
+		const waitlistStylistKey = normalizeStylistKey(
+			selectedOption?.dataset?.stylistKey || data.stylist || "any",
+		)
+		const waitlistBookingData = {
+			...data,
+			time: selectedTime,
+			stylist:
+				waitlistStylistKey === "any"
+					? ""
+					: getStylistDisplayName(waitlistStylistKey),
+		}
+
+		await joinWaitlistForUnavailableSlot({
+			bookingData: waitlistBookingData,
+			stylistKey: waitlistStylistKey,
+			activeUid,
+			slotId: selectedSlotId,
+			inspirationImageUrl,
+		})
+
+		showTimedFormMessage(
+			msg,
+			"success",
+			`✅ You have joined the waitlist for ${selectedTime}. We’ll notify you if this slot opens up.`,
+			6000,
+		)
+		waitlistSelect.value = ""
+	} catch (error) {
+		console.error("Manual waitlist join failed:", error)
+		showTimedFormMessage(
+			msg,
+			"error",
+			`❌ ${error?.message || "Could not join waitlist. Please try again."}`,
+		)
+	} finally {
+		setButtonLoadingState(joinBtn, false, { resetText: "Join Waitlist" })
+	}
+}
+
+function bindWaitlistControls() {
+	document
+		.getElementById("joinWaitlistBtn")
+		?.addEventListener("click", handleJoinWaitlistButtonClick)
+}
+
 const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
 const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
 
@@ -5132,10 +5349,10 @@ function subscribeToAvailability(date, stylist) {
 		activeAvailabilityUnsubscribe = null
 	}
 
-	const stylistKey = stylist && stylist.trim() ? stylist : "any"
+	const stylistKey = normalizeStylistKey(stylist || "any")
 	const timeSelect = document.getElementById("timeSelect")
-	const startId = `${date}__${stylistKey}__`
-	const endId = `${date}__${stylistKey}__\uf8ff`
+	const startId = `${date}__`
+	const endId = `${date}__\uf8ff`
 
 	const query = db
 		.collection("bookingSlots")
@@ -5144,23 +5361,33 @@ function subscribeToAvailability(date, stylist) {
 
 	activeAvailabilityUnsubscribe = query.onSnapshot(
 		(snapshot) => {
-			const taken = new Set()
+			const bookedEntries = []
 			snapshot.forEach((doc) => {
-				const data = doc.data()
-				if (data.taken && data.time) taken.add(data.time)
+				const data = doc.data() || {}
+				const time = String(data.time || "").trim()
+				const docStylistKey = normalizeStylistKey(
+					data.stylistKey || data.stylist || "any",
+				)
+				const blocksSelectedStylist =
+					stylistKey === "any"
+						? true
+						: docStylistKey === stylistKey || docStylistKey === "any"
+
+				if (data.taken && time && blocksSelectedStylist) {
+					bookedEntries.push({
+						slotId: doc.id,
+						time,
+						stylistKey: docStylistKey,
+						stylistLabel: getStylistDisplayName(docStylistKey),
+					})
+				}
 			})
 
-			timeSelect.innerHTML = '<option value="">Select Time</option>'
-			timeSlots.forEach((slot) => {
-				if (taken.has(slot)) return
-				const opt = document.createElement("option")
-				opt.value = slot
-				opt.textContent = slot
-				timeSelect.appendChild(opt)
-			})
+			renderBookingTimeSlots(bookedEntries)
 		},
 		(error) => {
 			console.error("Realtime availability listener failed:", error)
+			if (timeSelect) renderBookingTimeSlots([])
 		},
 	)
 }
@@ -5169,12 +5396,18 @@ function handleAvailabilityWatch() {
 	const dateValue = document.getElementById("datePicker").value
 	const stylistValue = document.getElementById("stylistSelect").value
 	if (!dateValue) {
+		if (typeof activeAvailabilityUnsubscribe === "function") {
+			activeAvailabilityUnsubscribe()
+			activeAvailabilityUnsubscribe = null
+		}
 		populateTimeSlots()
 		return
 	}
 
 	if (firebaseReady) {
 		subscribeToAvailability(dateValue, stylistValue)
+	} else {
+		populateTimeSlots()
 	}
 }
 
@@ -6969,13 +7202,8 @@ function initializeCustomServiceInput() {
 
 function populateTimeSlots() {
 	const select = document.getElementById("timeSelect")
-	select.innerHTML = '<option value="">Select Time</option>'
-	timeSlots.forEach((t) => {
-		const opt = document.createElement("option")
-		opt.value = t
-		opt.textContent = t
-		select.appendChild(opt)
-	})
+	if (!select) return
+	renderBookingTimeSlots([])
 }
 
 // ============ NAVIGATION & UI ============
@@ -7778,6 +8006,7 @@ populateReviewServiceSelect()
 populateServiceSelect()
 initializeCustomServiceInput()
 populateTimeSlots()
+bindWaitlistControls()
 initAnimatedHeaderLogo()
 
 // Initialize booking integrations

@@ -670,6 +670,36 @@
 										<option value="">Select Time</option>
 									</select>
 								</div>
+								<div
+									class="form-group full waitlist-panel hidden"
+									id="waitlistPanel"
+								>
+									<div class="waitlist-panel__header">
+										<div>
+											<strong>Want a booked time?</strong>
+											<small id="waitlistHint">
+												Booked slots are shown as disabled above. Choose one
+												below to join the waitlist.
+											</small>
+										</div>
+										<span class="waitlist-panel__badge">Waitlist</span>
+									</div>
+									<div class="waitlist-panel__controls">
+										<select
+											id="waitlistTimeSelect"
+											aria-label="Booked time to join waitlist"
+										>
+											<option value="">Select booked time</option>
+										</select>
+										<button
+											type="button"
+											class="btn btn-outline"
+											id="joinWaitlistBtn"
+										>
+											Join Waitlist
+										</button>
+									</div>
+								</div>
 								<div class="form-group full">
 									<label>Inspiration Photo (Optional)</label>
 									<input
