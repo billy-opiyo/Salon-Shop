@@ -937,6 +937,7 @@ let reviewMessageTimer = null
 let reviewsToggleAnimationTimer = null
 const recentlyReportedReviewIds = new Set()
 const reviewReportResetTimers = new Map()
+let waitlistJoinFeedbackTimer = null
 let favoritesToastTimer = null
 let dashboardFavoritesMessageTimer = null
 let authMessageTimer = null
@@ -5106,6 +5107,32 @@ function validateWaitlistBookingData(data = {}) {
 	return ""
 }
 
+function clearWaitlistJoinedButtonFeedback(button = null, resetText = true) {
+	if (waitlistJoinFeedbackTimer) {
+		clearTimeout(waitlistJoinFeedbackTimer)
+		waitlistJoinFeedbackTimer = null
+	}
+
+	if (resetText && button) {
+		button.textContent = "Join Waitlist"
+		button.dataset.originalLabel = "Join Waitlist"
+	}
+}
+
+function showWaitlistJoinedButtonFeedback(button, duration = 2500) {
+	if (!button) return
+
+	clearWaitlistJoinedButtonFeedback(button, false)
+	button.textContent = "Joined"
+	button.dataset.originalLabel = "Join Waitlist"
+
+	waitlistJoinFeedbackTimer = setTimeout(() => {
+		button.textContent = "Join Waitlist"
+		button.dataset.originalLabel = "Join Waitlist"
+		waitlistJoinFeedbackTimer = null
+	}, duration)
+}
+
 async function getOrCreateBookingSessionUid() {
 	if (!auth) return null
 	if (auth.currentUser) {
@@ -5124,6 +5151,9 @@ async function handleJoinWaitlistButtonClick() {
 	const selectedOption = waitlistSelect?.options?.[waitlistSelect.selectedIndex]
 	const selectedTime = String(selectedOption?.dataset?.time || "").trim()
 	const selectedSlotId = String(selectedOption?.value || "").trim()
+	let joinedSuccessfully = false
+
+	clearWaitlistJoinedButtonFeedback(joinBtn)
 
 	if (!selectedTime || !selectedSlotId) {
 		showTimedFormMessage(
@@ -5196,6 +5226,7 @@ async function handleJoinWaitlistButtonClick() {
 			slotId: selectedSlotId,
 			inspirationImageUrl,
 		})
+		joinedSuccessfully = true
 
 		showTimedFormMessage(
 			msg,
@@ -5213,6 +5244,9 @@ async function handleJoinWaitlistButtonClick() {
 		)
 	} finally {
 		setButtonLoadingState(joinBtn, false, { resetText: "Join Waitlist" })
+		if (joinedSuccessfully) {
+			showWaitlistJoinedButtonFeedback(joinBtn)
+		}
 	}
 }
 
