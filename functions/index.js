@@ -211,6 +211,17 @@ async function assertCanManageAdmins(request) {
 	return context
 }
 
+async function assertCanManageBookings(request) {
+	const context = await getCallerAdminAccessContext(request)
+	if (!context.hasPermission(ADMIN_PERMISSION_KEYS.canManageBookings)) {
+		throw new HttpsError(
+			"permission-denied",
+			"Admin booking management permission required",
+		)
+	}
+	return context
+}
+
 async function createAdminAuditLogEntry({
 	action = "",
 	actorUid = "",
@@ -746,6 +757,176 @@ function formatBookingDateTimeForMessage(booking = {}) {
 			hour12: true,
 			timeZone: NAIROBI_TIMEZONE,
 		}),
+	}
+}
+
+function normalizeServerBookingStatus(status = "") {
+	const raw = String(status || "pending")
+		.trim()
+		.toLowerCase()
+	if (raw === "complete") return "completed"
+	if (raw === "canceled") return "cancelled"
+	if (raw === "waitlist" || raw === "waiting") return "waitlisted"
+	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
+		return "confirmed"
+	}
+	if (
+		["pending", "confirmed", "completed", "cancelled", "waitlisted"].includes(
+			raw,
+		)
+	) {
+		return raw
+	}
+	return "pending"
+}
+
+function normalizeServerWaitlistStatus(status = "") {
+	const raw = String(status || "waiting")
+		.trim()
+		.toLowerCase()
+	if (raw === "waitlist" || raw === "waitlisted") return "waiting"
+	if (raw === "canceled") return "cancelled"
+	if (
+		[
+			"waiting",
+			"notified",
+			"contacted",
+			"booked",
+			"cancelled",
+			"notification_failed",
+		].includes(raw)
+	) {
+		return raw
+	}
+	return "waiting"
+}
+
+function isActiveWaitlistQueueStatus(status = "") {
+	return ["waiting", "notified", "contacted", "notification_failed"].includes(
+		normalizeServerWaitlistStatus(status),
+	)
+}
+
+function formatOrdinalPosition(value = 0) {
+	const n = Math.max(0, Number(value || 0))
+	if (!n) return "N/A"
+	const mod100 = n % 100
+	if (mod100 >= 11 && mod100 <= 13) return `${n}th`
+	switch (n % 10) {
+		case 1:
+			return `${n}st`
+		case 2:
+			return `${n}nd`
+		case 3:
+			return `${n}rd`
+		default:
+			return `${n}th`
+	}
+}
+
+function getWaitlistQueueSlotId(entry = {}) {
+	return String(entry.preferredSlotId || entry.slotId || "").trim()
+}
+
+async function commitFirestoreWritesInChunks(writes = []) {
+	const db = admin.firestore()
+	for (let index = 0; index < writes.length; index += 450) {
+		const batch = db.batch()
+		writes.slice(index, index + 450).forEach((write) => {
+			batch.set(write.ref, write.payload, { merge: true })
+		})
+		await batch.commit()
+	}
+}
+
+async function recalculateWaitlistQueuePositionsForSlot(slotId = "") {
+	const safeSlotId = String(slotId || "").trim()
+	if (!safeSlotId) return
+
+	const db = admin.firestore()
+	const waitlistSnapshot = await db
+		.collection("waitlist")
+		.where("preferredSlotId", "==", safeSlotId)
+		.limit(300)
+		.get()
+
+	const waitlistEntries = waitlistSnapshot.docs.map((doc) => ({
+		id: doc.id,
+		ref: doc.ref,
+		data: doc.data() || {},
+	}))
+
+	const activeEntries = waitlistEntries
+		.filter((entry) => isActiveWaitlistQueueStatus(entry.data.status))
+		.sort((a, b) => {
+			const createdDiff =
+				toMillis(a.data.createdAt) - toMillis(b.data.createdAt)
+			if (createdDiff !== 0) return createdDiff
+			return a.id.localeCompare(b.id)
+		})
+
+	const positionByWaitlistId = new Map()
+	activeEntries.forEach((entry, index) => {
+		const position = index + 1
+		positionByWaitlistId.set(entry.id, {
+			position,
+			label: formatOrdinalPosition(position),
+			total: activeEntries.length,
+		})
+	})
+
+	const writes = []
+	waitlistEntries.forEach((entry) => {
+		const position = positionByWaitlistId.get(entry.id)
+		writes.push({
+			ref: entry.ref,
+			payload: {
+				queuePosition: position?.position || null,
+				queuePositionLabel: position?.label || "",
+				queueSize: activeEntries.length,
+				positionUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+			},
+		})
+	})
+
+	try {
+		const bookingsSnapshot = await db
+			.collection("bookings")
+			.where("preferredSlotId", "==", safeSlotId)
+			.limit(300)
+			.get()
+
+		bookingsSnapshot.docs.forEach((doc) => {
+			const booking = doc.data() || {}
+			const waitlistId = String(booking.waitlistId || "").trim()
+			const position = waitlistId ? positionByWaitlistId.get(waitlistId) : null
+			if (
+				normalizeServerBookingStatus(booking.status) !== "waitlisted" &&
+				!position
+			) {
+				return
+			}
+
+			writes.push({
+				ref: doc.ref,
+				payload: {
+					waitlistPosition: position?.position || null,
+					waitlistPositionLabel: position?.label || "",
+					waitlistQueueSize: activeEntries.length,
+					waitlistPositionUpdatedAt:
+						admin.firestore.FieldValue.serverTimestamp(),
+				},
+			})
+		})
+	} catch (error) {
+		logger.warn("Could not mirror waitlist positions onto bookings", {
+			slotId: safeSlotId,
+			errorMessage: error?.message || "Unknown error",
+		})
+	}
+
+	if (writes.length) {
+		await commitFirestoreWritesInChunks(writes)
 	}
 }
 
@@ -1572,6 +1753,173 @@ exports.adminListAdminUsers = onCall(
 	},
 )
 
+exports.adminMoveWaitlistBookingToConfirmed = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const actor = await assertCanManageBookings(request)
+		const data = request.data || {}
+		const bookingId = String(data.bookingId || "").trim()
+		const suppliedWaitlistId = String(data.waitlistId || "").trim()
+		if (!bookingId) {
+			throw new HttpsError("invalid-argument", "Booking ID is required")
+		}
+
+		const db = admin.firestore()
+		const bookingRef = db.collection("bookings").doc(bookingId)
+		let convertedSlotId = ""
+		let waitlistId = suppliedWaitlistId
+		let beforeBooking = null
+		let afterBooking = null
+
+		await db.runTransaction(async (transaction) => {
+			const bookingSnap = await transaction.get(bookingRef)
+			if (!bookingSnap.exists) {
+				throw new HttpsError("not-found", "Waitlisted booking not found")
+			}
+
+			const booking = bookingSnap.data() || {}
+			beforeBooking = booking
+			const currentStatus = normalizeServerBookingStatus(booking.status)
+			if (currentStatus !== "waitlisted") {
+				throw new HttpsError(
+					"failed-precondition",
+					"Only waitlisted bookings can be moved to confirmed",
+				)
+			}
+
+			const preferredSlotId = String(
+				booking.preferredSlotId || booking.slotId || "",
+			).trim()
+			if (!preferredSlotId) {
+				throw new HttpsError(
+					"failed-precondition",
+					"This waitlisted booking has no preferred slot to confirm",
+				)
+			}
+
+			const date = String(booking.date || "").trim()
+			const time = String(booking.time || "").trim()
+			const stylistKey = String(booking.stylistKey || "any").trim() || "any"
+			if (!date || !time) {
+				throw new HttpsError(
+					"failed-precondition",
+					"This waitlisted booking is missing date or time details",
+				)
+			}
+
+			waitlistId = waitlistId || String(booking.waitlistId || "").trim()
+			const slotRef = db.collection("bookingSlots").doc(preferredSlotId)
+			const slotSnap = await transaction.get(slotRef)
+			if (slotSnap.exists) {
+				const slotData = slotSnap.data() || {}
+				const slotBookingId = String(slotData.bookingId || "").trim()
+				if (
+					slotData.taken === true &&
+					slotBookingId &&
+					slotBookingId !== bookingId
+				) {
+					throw new HttpsError(
+						"already-exists",
+						"This slot is already taken by another booking",
+					)
+				}
+			}
+
+			const serverNow = admin.firestore.FieldValue.serverTimestamp()
+			transaction.set(
+				slotRef,
+				{
+					taken: true,
+					date,
+					time,
+					stylistKey,
+					bookingId,
+					uid: String(booking.uid || "").trim(),
+					createdAt: slotSnap.exists
+						? slotSnap.data()?.createdAt || serverNow
+						: serverNow,
+					updatedAt: serverNow,
+				},
+				{ merge: true },
+			)
+
+			const bookingPatch = {
+				status: "confirmed",
+				bookingType: "confirmed",
+				isWaitlisted: false,
+				waitlistStatus: "booked",
+				slotId: preferredSlotId,
+				waitlistPosition: null,
+				waitlistPositionLabel: "",
+				waitlistQueueSize: null,
+				waitlistConvertedAt: serverNow,
+				waitlistConvertedBy: actor.email || actor.uid,
+				updatedAt: serverNow,
+			}
+
+			transaction.set(bookingRef, bookingPatch, { merge: true })
+			afterBooking = { ...booking, ...bookingPatch }
+
+			if (waitlistId) {
+				const waitlistRef = db.collection("waitlist").doc(waitlistId)
+				transaction.set(
+					waitlistRef,
+					{
+						status: "booked",
+						bookedAt: serverNow,
+						bookedBy: actor.email || actor.uid,
+						convertedBookingId: bookingId,
+						queuePosition: null,
+						queuePositionLabel: "",
+						updatedAt: serverNow,
+					},
+					{ merge: true },
+				)
+			}
+
+			convertedSlotId = preferredSlotId
+		})
+
+		if (convertedSlotId) {
+			await recalculateWaitlistQueuePositionsForSlot(convertedSlotId)
+		}
+
+		await createAdminAuditLogEntry({
+			action: "waitlist_booking_moved_to_confirmed",
+			actorUid: actor.uid,
+			actorEmail: actor.email,
+			targetUid: String(afterBooking?.uid || "").trim(),
+			targetEmail: String(afterBooking?.email || "")
+				.trim()
+				.toLowerCase(),
+			before: beforeBooking
+				? {
+						status: normalizeServerBookingStatus(beforeBooking.status),
+						slotId: String(beforeBooking.slotId || "").trim(),
+						preferredSlotId: String(beforeBooking.preferredSlotId || "").trim(),
+						waitlistId: String(beforeBooking.waitlistId || "").trim(),
+					}
+				: null,
+			after: {
+				status: "confirmed",
+				slotId: convertedSlotId,
+				waitlistId,
+			},
+			metadata: { bookingId, waitlistId },
+		})
+
+		return {
+			ok: true,
+			bookingId,
+			waitlistId,
+			slotId: convertedSlotId,
+			status: "confirmed",
+		}
+	},
+)
+
 exports.sendBookingConfirmationEmail = onDocumentCreated(
 	{
 		document: "bookings/{bookingId}",
@@ -2031,6 +2379,47 @@ exports.trackBookingCanceled = onDocumentUpdated(
 				toStatus: nextStatus,
 			},
 		})
+	},
+)
+
+exports.syncWaitlistQueuePositions = onDocumentUpdated(
+	{
+		document: "waitlist/{waitlistId}",
+		region: "europe-west1",
+	},
+	async (event) => {
+		const before = event.data?.before?.data() || {}
+		const after = event.data?.after?.data() || {}
+		const beforeSlotId = getWaitlistQueueSlotId(before)
+		const afterSlotId = getWaitlistQueueSlotId(after)
+		const queueAffectingChange =
+			beforeSlotId !== afterSlotId ||
+			normalizeServerWaitlistStatus(before.status) !==
+				normalizeServerWaitlistStatus(after.status) ||
+			toMillis(before.createdAt) !== toMillis(after.createdAt)
+
+		if (!queueAffectingChange) return
+
+		const slotIds = new Set([beforeSlotId, afterSlotId].filter(Boolean))
+
+		await Promise.allSettled(
+			[...slotIds].map((slotId) =>
+				recalculateWaitlistQueuePositionsForSlot(slotId),
+			),
+		)
+	},
+)
+
+exports.initializeWaitlistQueuePosition = onDocumentCreated(
+	{
+		document: "waitlist/{waitlistId}",
+		region: "europe-west1",
+	},
+	async (event) => {
+		const data = event.data?.data() || {}
+		const slotId = getWaitlistQueueSlotId(data)
+		if (!slotId) return
+		await recalculateWaitlistQueuePositionsForSlot(slotId)
 	},
 )
 

@@ -19,6 +19,9 @@ Public Website Features
 - Smooth section navigation for Home, Gallery, Services, Booking, Dashboard, Reviews, Blog, and Contact.
 - Animated counters for happy clients, expert braiders, services rendered, and satisfaction rate.
 - Scroll-based UI animation support.
+- Very-small-screen responsive polish for <=490px phone widths.
+- Compact, high-contrast chip and badge styling for narrow screens.
+- Single-line chip/badge behavior with graceful ellipsis fallback to reduce wrapping/clipping.
 - SEO-related meta description, keywords, Open Graph title, and favicon.
 - Localhost redirect handling for Firebase Auth compatibility when opening from 127.0.0.1.
 
@@ -41,6 +44,7 @@ Services Features
 - Service category visibility can be controlled from the admin console.
 - Disabled categories are hidden from public services tabs/cards.
 - Disabled categories are removed from the booking service dropdown.
+- Service category tabs receive extra compact sizing and contrast tuning on <=490px screens.
 
 Available Service Catalog
 -------------------------
@@ -115,6 +119,7 @@ Gallery Features
 - Sorting controls including recommended, name A-Z/Z-A, created date, modified date, new, and old.
 - Featured rails for Trending Braids and Most Booked Braids.
 - Dynamic labels such as “Most Booked Braids” and “View All Braids”.
+- Gallery filter chips and featured pills are compacted on <=490px screens to avoid awkward wrapping.
 - “View All” / compact gallery behavior.
 - Gallery empty state when no styles match filters.
 - Before/after image support.
@@ -156,6 +161,7 @@ Waitlist Features
 - Waitlist status support such as waiting and notified flows.
 - Backend notifies the next waitlisted client when a booking slot lock is deleted/released.
 - Waitlist notification can use available email/WhatsApp contact data.
+- Waitlist badges and queue chips are optimized for compact <=490px layouts.
 
 Client Authentication Features
 ------------------------------
@@ -197,6 +203,7 @@ Client Dashboard Features
 - Login history count badge.
 - Login history displays recent security activity for the account.
 - Login history includes status, method, device/browser, and location labels.
+- Dashboard count badges and waitlist queue chips receive compact <=490px styling.
 
 Manage Account Features
 -----------------------
@@ -232,6 +239,7 @@ Reviews Features
 - Local review draft/profanity-related storage keys.
 - Review edit tracking through backend automation.
 - Review rate-limit update through backend automation.
+- Review/auth badges are tuned for compact high-contrast display on <=490px screens.
 
 Blog Features
 -------------
@@ -270,6 +278,7 @@ Admin Console Access Features
 - Admin logout support.
 - Back-to-homepage link.
 - Confirmation modal for destructive actions.
+- Admin status badges, role badges, and security filter notes are compacted for <=490px screens.
 
 Admin Bookings Features
 -----------------------
@@ -586,6 +595,7 @@ Deployment and QA Features
 - Public and admin pages can be tested locally/static or through Firebase Hosting.
 - README includes manual end-to-end QA guide.
 - QA scenarios cover public site, auth/dashboard, booking/slot locking, waitlist, reviews/moderation, contact/messages, admin content, backend automation, security tab, service-category visibility, login-history, and admin delegation.
+- QA guide includes very-small-screen chip/badge visual regression checks at 490px, 390px, and 360px widths.
 - functions/package.json currently has placeholder test script, so manual QA is the active test approach.
 
 Project Documentation Features

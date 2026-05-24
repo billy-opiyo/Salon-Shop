@@ -3361,6 +3361,70 @@ h6 {
     text-transform: uppercase;
 }
 
+.waitlist-queue-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-height: 28px;
+    max-width: 100%;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(240, 171, 252, 0.72);
+    background: linear-gradient(135deg, rgba(48, 20, 72, 0.98), rgba(126, 58, 150, 0.96) 48%, rgba(200, 150, 62, 0.92));
+    color: #fff7dc;
+    line-height: 1;
+    white-space: nowrap;
+    vertical-align: middle;
+    box-shadow: 0 10px 24px rgba(168, 85, 247, 0.22), 0 0 0 2px rgba(200, 150, 62, 0.08) inset;
+}
+
+.waitlist-queue-chip__rank {
+    color: #ffe7a6;
+    font-size: 0.88rem;
+    font-weight: 950;
+    letter-spacing: 0.01em;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.28);
+}
+
+.waitlist-queue-chip__text,
+.waitlist-queue-chip__size {
+    font-size: 0.63rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.waitlist-queue-chip__size {
+    padding: 3px 6px;
+    border-radius: var(--radius-full);
+    background: rgba(10, 10, 10, 0.28);
+    color: #fff0be;
+}
+
+.admin-waitlist-queue-chip {
+    flex: 0 1 auto;
+}
+
+.admin-waitlist-card--queued {
+    position: relative;
+    overflow: hidden;
+    border-color: rgba(168, 85, 247, 0.48);
+    background:
+        linear-gradient(90deg, rgba(168, 85, 247, 0.1), rgba(200, 150, 62, 0.05) 42%, transparent),
+        var(--bg-secondary);
+    box-shadow: 0 0 0 1px rgba(216, 180, 254, 0.08) inset;
+}
+
+.admin-waitlist-card--queued::before {
+    content: "";
+    position: absolute;
+    inset: 12px auto 12px 0;
+    width: 4px;
+    border-radius: 0 var(--radius-full) var(--radius-full) 0;
+    background: linear-gradient(180deg, #f0abfc, #c084fc 48%, #c8963e);
+}
+
 .admin-status-badge {
     padding: 4px 10px;
     border-radius: 999px;
@@ -5964,12 +6028,20 @@ h6 {
 
     .services-tabs {
         justify-content: flex-start;
-        gap: 8px;
+        gap: 6px;
     }
 
     .services-tab {
-        padding: 8px 14px;
-        font-size: 0.78rem;
+        min-height: 30px;
+        max-width: 100%;
+        padding: 6px 10px;
+        font-size: 0.72rem;
+        line-height: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border-color: rgba(200, 150, 62, 0.45);
+        background: rgba(255, 255, 255, 0.035);
     }
 
     .services-grid {
@@ -6024,12 +6096,109 @@ h6 {
     }
 
     .gallery-filter-group {
-        gap: 8px;
+        gap: 6px;
     }
 
     .gallery-filter-chip {
-        padding: 7px 10px;
+        min-height: 30px;
+        max-width: 100%;
+        padding: 6px 9px;
+        font-size: 0.72rem;
+        line-height: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border-color: rgba(200, 150, 62, 0.42);
+        background: rgba(255, 255, 255, 0.035);
+        color: rgba(245, 240, 235, 0.88);
+    }
+
+    .gallery-filter-chip.active,
+    .services-tab.active,
+    .services-tab:hover {
+        background: #d5a348;
+        border-color: #edc878;
+        color: #080604;
+        box-shadow: 0 6px 16px rgba(200, 150, 62, 0.16);
+    }
+
+    .gallery-featured-list,
+    .review-auth-badges {
+        gap: 6px;
+    }
+
+    .gallery-feature-pill,
+    .review-auth-badge,
+    .review-submit-auth-badge,
+    .waitlist-panel__badge,
+    .admin-waitlist-chip,
+    .admin-status-badge,
+    .admin-role-badge,
+    .dashboard-count-badge {
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1;
+    }
+
+    .gallery-feature-pill {
+        padding: 6px 9px;
+        font-size: 0.72rem;
+        background: rgba(200, 150, 62, 0.18);
+        border-color: rgba(232, 194, 122, 0.5);
+        color: #ffe3a4;
+    }
+
+    .waitlist-panel__badge,
+    .review-submit-auth-badge {
+        padding: 4px 8px;
+        font-size: 0.66rem;
+        border-color: rgba(232, 194, 122, 0.48);
+        color: #ffe0a0;
+    }
+
+    .review-auth-badge {
+        padding: 5px 8px;
+        font-size: 0.72rem;
+        background: rgba(10, 10, 10, 0.34);
+        border-color: rgba(232, 194, 122, 0.42);
+    }
+
+    .dashboard-count-badge {
+        min-width: 22px;
+        height: 22px;
+        padding: 0 7px;
+        font-size: 0.68rem;
+        background: rgba(200, 150, 62, 0.24);
+        color: #ffe2a1;
+    }
+
+    .waitlist-queue-chip {
+        min-height: 25px;
+        gap: 4px;
+        padding: 3px 8px;
+        box-shadow: 0 6px 16px rgba(168, 85, 247, 0.18), 0 0 0 1px rgba(255, 231, 166, 0.08) inset;
+    }
+
+    .waitlist-queue-chip__rank {
         font-size: 0.78rem;
+    }
+
+    .waitlist-queue-chip__text,
+    .waitlist-queue-chip__size {
+        font-size: 0.56rem;
+        letter-spacing: 0.05em;
+    }
+
+    .waitlist-queue-chip__size {
+        padding: 2px 5px;
+    }
+
+    .admin-security-privacy-note {
+        padding: 8px 10px;
+        font-size: 0.78rem;
+        line-height: 1.35;
     }
 
     .testimonial-card {
@@ -7797,6 +7966,43 @@ body.light-mode #serviceSelect option[data-custom-category-header="true"] {
     display: grid;
     align-content: start;
     gap: 2px;
+}
+
+#dashboardBookingsList li.dashboard-booking-row--waitlisted {
+    position: relative;
+    overflow: hidden;
+    border-color: rgba(168, 85, 247, 0.52);
+    background:
+        linear-gradient(90deg, rgba(168, 85, 247, 0.14), rgba(200, 150, 62, 0.07) 48%, transparent),
+        var(--bg-card);
+    box-shadow: 0 0 0 1px rgba(216, 180, 254, 0.08) inset;
+}
+
+#dashboardBookingsList li.dashboard-booking-row--waitlisted::before {
+    content: "";
+    position: absolute;
+    inset: 10px auto 10px 0;
+    width: 4px;
+    border-radius: 0 var(--radius-full) var(--radius-full) 0;
+    background: linear-gradient(180deg, #f0abfc, #a855f7 54%, #c8963e);
+}
+
+.dashboard-booking-status-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.dashboard-waitlist-queue-chip {
+    width: fit-content;
+    margin: 3px 0 2px;
+}
+
+.dashboard-waitlist-place-text {
+    color: var(--primary-light);
+    font-size: 0.8rem;
+    font-weight: 700;
 }
 
 #dashboardBookingsList li .admin-booking-actions {

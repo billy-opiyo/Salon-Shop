@@ -3289,6 +3289,117 @@ function renderDashboardLoginHistory(items = []) {
 		.join("")
 }
 
+function formatOrdinalPosition(value = 0) {
+	const n = Math.max(0, Number(value || 0))
+	if (!n) return ""
+	const mod100 = n % 100
+	if (mod100 >= 11 && mod100 <= 13) return `${n}th`
+	switch (n % 10) {
+		case 1:
+			return `${n}st`
+		case 2:
+			return `${n}nd`
+		case 3:
+			return `${n}rd`
+		default:
+			return `${n}th`
+	}
+}
+
+function isActiveDashboardWaitlistQueueStatus(status = "") {
+	return ["waiting", "notified", "contacted", "notification_failed"].includes(
+		String(status || "")
+			.trim()
+			.toLowerCase(),
+	)
+}
+
+function getDashboardWaitlistQueueKey(booking = {}) {
+	const slotId = String(
+		booking.preferredSlotId || booking.slotId || booking.selectedSlotId || "",
+	).trim()
+	if (slotId) return `slot:${slotId}`
+	return [
+		String(booking.date || booking.preferredDate || "").trim(),
+		String(booking.time || booking.preferredTime || "").trim(),
+		normalizeStylistKey(booking.stylistKey || booking.stylist || "any"),
+	]
+		.join("|")
+		.toLowerCase()
+}
+
+function enrichDashboardWaitlistPositions(bookings = []) {
+	const items = Array.isArray(bookings) ? [...bookings] : []
+	const queueMap = new Map()
+
+	items.forEach((booking) => {
+		const status = normalizeBookingStatus(booking?.status)
+		if (status !== "waitlisted") return
+		if (
+			!isActiveDashboardWaitlistQueueStatus(booking.waitlistStatus || "waiting")
+		) {
+			return
+		}
+		const key = getDashboardWaitlistQueueKey(booking)
+		if (!queueMap.has(key)) queueMap.set(key, [])
+		queueMap.get(key).push(booking)
+	})
+
+	queueMap.forEach((queueItems) => {
+		queueItems.sort((a, b) => {
+			const createdDiff =
+				toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt)
+			if (createdDiff !== 0) return createdDiff
+			return String(a.id || "").localeCompare(String(b.id || ""))
+		})
+
+		queueItems.forEach((booking, index) => {
+			const calculatedPosition = index + 1
+			const queueSize = queueItems.length
+			const existingPosition = Number(booking.waitlistPosition || 0) || null
+			const existingLabel = String(booking.waitlistPositionLabel || "").trim()
+
+			booking.waitlistPosition = existingPosition || calculatedPosition
+			booking.waitlistPositionLabel =
+				existingLabel ||
+				formatOrdinalPosition(existingPosition || calculatedPosition)
+			booking.waitlistQueueSize =
+				Number(booking.waitlistQueueSize || 0) || queueSize
+		})
+	})
+
+	return items
+}
+
+function getDashboardWaitlistSummary(booking = {}) {
+	const positionLabel = String(booking.waitlistPositionLabel || "").trim()
+	const position = Number(booking.waitlistPosition || 0) || null
+	const queueSize = Number(booking.waitlistQueueSize || 0) || null
+	const label = positionLabel || formatOrdinalPosition(position)
+	if (!label) return ""
+	return queueSize ? `${label} of ${queueSize}` : label
+}
+
+function renderDashboardWaitlistQueueChip(booking = {}) {
+	const positionLabel = String(booking.waitlistPositionLabel || "").trim()
+	const position = Number(booking.waitlistPosition || 0) || null
+	const queueSize = Number(booking.waitlistQueueSize || 0) || null
+	const label = positionLabel || formatOrdinalPosition(position)
+	if (!label) return ""
+
+	const accessibleLabel = queueSize
+		? `Waitlist place: ${label} of ${queueSize}`
+		: `Waitlist place: ${label}`
+
+	return `
+		<span class="waitlist-queue-chip dashboard-waitlist-queue-chip" aria-label="${escapeHtml(accessibleLabel)}">
+			<span class="waitlist-queue-chip__rank">${escapeHtml(label)}</span>
+			<span class="waitlist-queue-chip__text">in queue</span>
+			${queueSize ? `<span class="waitlist-queue-chip__size">of ${escapeHtml(queueSize)}</span>` : ""}
+		</span>
+	`
+}
+
 function normalizeBookingStatus(status = "") {
 	const raw = String(status || "pending")
 		.trim()
@@ -3402,21 +3513,35 @@ function renderDashboardBookingRows(bookings = []) {
 		return
 	}
 
-	authUi.dashboardBookingsList.innerHTML = bookings
+	const bookingsWithQueuePositions = enrichDashboardWaitlistPositions(bookings)
+
+	authUi.dashboardBookingsList.innerHTML = bookingsWithQueuePositions
 		.map((booking) => {
 			const status = normalizeBookingStatus(booking.status)
+			const isWaitlisted = status === "waitlisted"
 			const active = isBookingActionable(booking)
 			const disabledAttr = active ? "" : "disabled"
 			const id = escapeHtml(booking.id || "")
 			const stylistLabel = escapeHtml(
 				getStylistDisplayName(booking.stylistKey || booking.stylist),
 			)
+			const waitlistSummary = isWaitlisted
+				? getDashboardWaitlistSummary(booking)
+				: ""
+			const waitlistQueueChip = isWaitlisted
+				? renderDashboardWaitlistQueueChip(booking)
+				: ""
 			return `
-      <li>
-        <strong>${escapeHtml(booking.service || "Service")}</strong><br />
-        ${escapeHtml(booking.date || "No date")} at ${escapeHtml(booking.time || "No time")}<br />
-        Stylist: ${stylistLabel}<br />
-        Status: ${escapeHtml(status)}
+	      <li class="dashboard-booking-row ${isWaitlisted ? "dashboard-booking-row--waitlisted" : ""}">
+	        <strong>${escapeHtml(booking.service || "Service")}</strong>
+	        <span>${escapeHtml(booking.date || "No date")} at ${escapeHtml(booking.time || "No time")}</span>
+	        <span>Stylist: ${stylistLabel}</span>
+	        <span class="dashboard-booking-status-line"><span>Status: ${escapeHtml(status)}</span>${waitlistQueueChip}</span>
+        ${
+					waitlistSummary
+						? `<span class="dashboard-waitlist-place-text">Waitlist Place: ${escapeHtml(waitlistSummary)}</span>`
+						: ""
+				}
         ${
 					active
 						? `<div class="admin-booking-actions" style="margin-top:10px">
@@ -4058,6 +4183,41 @@ async function loadUserDashboardData(userOrUid) {
 			.map((doc) => ({ id: doc.id, ...(doc.data() || {}) }))
 			.sort((a, b) => toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt))
 			.slice(0, 12)
+		if (typeof trackLoginActivity === "function") {
+			const userForSession =
+				typeof userOrUid === "string"
+					? auth?.currentUser
+					: userOrUid || auth?.currentUser
+			const hasCurrentSessionEntry = loginHistoryItems.some((item = {}) => {
+				const status = String(item.status || "")
+					.trim()
+					.toLowerCase()
+				if (status !== "success") return false
+				const method = String(item.method || "")
+					.trim()
+					.toLowerCase()
+				const likelySessionMethod =
+					method === "google" || method === "email/password"
+				const itemMs = toTimestampMs(item.createdAt)
+				return likelySessionMethod && itemMs && Date.now() - itemMs <= 90 * 1000
+			})
+
+			if (
+				!hasCurrentSessionEntry &&
+				userForSession &&
+				!userForSession.isAnonymous
+			) {
+				void trackLoginActivity({
+					method:
+						String(userForSession.providerData?.[0]?.providerId || "") ===
+						"google.com"
+							? "google"
+							: "email/password",
+					status: "success",
+					context: { source: "dashboard-load" },
+				})
+			}
+		}
 		renderDashboardLoginHistory(loginHistoryItems)
 
 		if (latestPhone && authUi.dashboardProfilePhone) {
@@ -5533,7 +5693,10 @@ function handleBookingAvailabilityInputChange() {
 function handleBookingTimeSelectionChange() {
 	const timeSelect = document.getElementById("timeSelect")
 	const selectedOption = timeSelect?.options?.[timeSelect.selectedIndex]
-	if (selectedOption?.dataset?.waitlisted !== "true" && pendingWaitlistBooking) {
+	if (
+		selectedOption?.dataset?.waitlisted !== "true" &&
+		pendingWaitlistBooking
+	) {
 		clearPendingWaitlistBooking({ refreshSlots: true })
 	}
 }

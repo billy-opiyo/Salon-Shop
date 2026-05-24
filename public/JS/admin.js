@@ -377,7 +377,11 @@ function normalizeStatus(status) {
 		return "confirmed"
 	}
 
-	if (["pending", "confirmed", "completed", "cancelled", "waitlisted"].includes(raw)) {
+	if (
+		["pending", "confirmed", "completed", "cancelled", "waitlisted"].includes(
+			raw,
+		)
+	) {
 		return raw
 	}
 
@@ -1239,6 +1243,22 @@ async function callAdminListAdminUsersAction() {
 	const callable = adminFunctionsService.httpsCallable("adminListAdminUsers")
 	const response = await callable({})
 	return response?.data || { ok: true, admins: [] }
+}
+
+async function callAdminMoveWaitlistBookingToConfirmedAction(payload = {}) {
+	if (
+		!firebaseReady ||
+		!adminFunctionsService ||
+		typeof adminFunctionsService.httpsCallable !== "function"
+	) {
+		throw new Error("Cloud Functions service is not ready yet.")
+	}
+
+	const callable = adminFunctionsService.httpsCallable(
+		"adminMoveWaitlistBookingToConfirmed",
+	)
+	const response = await callable(payload)
+	return response?.data || { ok: true }
 }
 
 function normalizeManagedAdminUserDoc(doc = {}) {
@@ -3422,6 +3442,171 @@ function getAdminWaitlistCustomerName(item = {}) {
 	)
 }
 
+function formatAdminOrdinalPosition(value = 0) {
+	const n = Math.max(0, Number(value || 0))
+	if (!n) return "N/A"
+	const mod100 = n % 100
+	if (mod100 >= 11 && mod100 <= 13) return `${n}th`
+	switch (n % 10) {
+		case 1:
+			return `${n}st`
+		case 2:
+			return `${n}nd`
+		case 3:
+			return `${n}rd`
+		default:
+			return `${n}th`
+	}
+}
+
+function isActiveAdminWaitlistQueueStatus(status = "") {
+	return ["waiting", "notified", "contacted", "notification_failed"].includes(
+		normalizeWaitlistStatus(status),
+	)
+}
+
+function getAdminWaitlistQueueKey(item = {}) {
+	const slotId = String(item.preferredSlotId || item.slotId || "").trim()
+	if (slotId) return `slot:${slotId}`
+	return [
+		String(item.preferredDate || "").trim(),
+		String(item.preferredTime || "").trim(),
+		String(item.stylistKey || item.stylist || "any")
+			.trim()
+			.toLowerCase() || "any",
+	]
+		.join("|")
+		.toLowerCase()
+}
+
+function decorateAdminWaitlistPositions(items = []) {
+	const queueMap = new Map()
+	items.forEach((item) => {
+		if (!isActiveAdminWaitlistQueueStatus(item.status)) return
+		const key = getAdminWaitlistQueueKey(item)
+		if (!queueMap.has(key)) queueMap.set(key, [])
+		queueMap.get(key).push(item)
+	})
+
+	queueMap.forEach((queueItems) => {
+		queueItems.sort((a, b) => {
+			const createdDiff =
+				toTimestampMs(a.createdAt) - toTimestampMs(b.createdAt)
+			if (createdDiff !== 0) return createdDiff
+			return String(a.id || "").localeCompare(String(b.id || ""))
+		})
+		queueItems.forEach((item, index) => {
+			item.queuePosition = index + 1
+			item.queuePositionLabel = formatAdminOrdinalPosition(index + 1)
+			item.queueSize = queueItems.length
+		})
+	})
+
+	return items.map((item) => ({
+		...item,
+		queuePosition: isActiveAdminWaitlistQueueStatus(item.status)
+			? Number(item.queuePosition || 0) || null
+			: null,
+		queuePositionLabel: isActiveAdminWaitlistQueueStatus(item.status)
+			? String(item.queuePositionLabel || "").trim()
+			: "",
+		queueSize: isActiveAdminWaitlistQueueStatus(item.status)
+			? Number(item.queueSize || 0) || null
+			: null,
+	}))
+}
+
+function getAdminWaitlistQueueInfoForBooking(booking = {}) {
+	const directPosition = Number(booking.waitlistPosition || 0) || null
+	const directLabel = String(booking.waitlistPositionLabel || "").trim()
+	const directSize = Number(booking.waitlistQueueSize || 0) || null
+	if (directPosition || directLabel) {
+		return {
+			position: directPosition,
+			label: directLabel || formatAdminOrdinalPosition(directPosition),
+			size: directSize,
+		}
+	}
+
+	const waitlistId = String(booking.waitlistId || "").trim()
+	if (!waitlistId) return { position: null, label: "", size: null }
+	const linked = adminWaitlistDocs.find(
+		(item) => String(item.id || "") === waitlistId,
+	)
+	if (!linked) return { position: null, label: "", size: null }
+
+	const position = Number(linked.queuePosition || 0) || null
+	return {
+		position,
+		label:
+			String(linked.queuePositionLabel || "").trim() ||
+			formatAdminOrdinalPosition(position),
+		size: Number(linked.queueSize || 0) || null,
+	}
+}
+
+function getAdminWaitlistEntryForBooking(booking = {}) {
+	const waitlistId = String(booking.waitlistId || "").trim()
+	if (!waitlistId) return null
+	return (
+		adminWaitlistDocs.find(
+			(item) => String(item.id || "").trim() === waitlistId,
+		) || null
+	)
+}
+
+function isAdminBookingVisibleInWaitlistFilter(booking = {}) {
+	const status = normalizeStatus(extractRawStatus(booking))
+	if (status !== "waitlisted") return false
+
+	const linkedWaitlistEntry = getAdminWaitlistEntryForBooking(booking)
+	if (!linkedWaitlistEntry) return true
+
+	return isActiveAdminWaitlistQueueStatus(linkedWaitlistEntry.status)
+}
+
+function formatAdminQueueSummary(queueInfo = {}) {
+	const label = String(queueInfo.label || "").trim()
+	if (!label || label === "N/A") return "N/A"
+	const size = Number(queueInfo.size || 0) || null
+	return size ? `${label} of ${size}` : label
+}
+
+function renderAdminWaitlistQueueChip(queueInfo = {}, extraClass = "") {
+	const label = String(queueInfo.label || "").trim()
+	if (!label || label === "N/A") return ""
+
+	const size = Number(queueInfo.size || 0) || null
+	const chipClasses = [
+		"waitlist-queue-chip",
+		"admin-waitlist-queue-chip",
+		String(extraClass || "").trim(),
+	]
+		.filter(Boolean)
+		.join(" ")
+	const accessibleLabel = size
+		? `Waitlist place: ${label} of ${size}`
+		: `Waitlist place: ${label}`
+
+	return `
+		<span class="${escapeHtml(chipClasses)}" aria-label="${escapeHtml(accessibleLabel)}">
+			<span class="waitlist-queue-chip__rank">${escapeHtml(label)}</span>
+			<span class="waitlist-queue-chip__text">in queue</span>
+			${size ? `<span class="waitlist-queue-chip__size">of ${escapeHtml(size)}</span>` : ""}
+		</span>
+	`
+}
+
+function findAdminBookingForWaitlistEntry(waitlistItem = {}) {
+	const waitlistId = String(waitlistItem.id || "").trim()
+	if (!waitlistId) return null
+	return adminBookingDocs.find((booking = {}) => {
+		const status = normalizeStatus(extractRawStatus(booking))
+		if (status !== "waitlisted") return false
+		return String(booking.waitlistId || "").trim() === waitlistId
+	})
+}
+
 function normalizeWaitlistDoc(doc = {}) {
 	return {
 		id: String(doc.id || ""),
@@ -3452,6 +3637,9 @@ function normalizeWaitlistDoc(doc = {}) {
 		contactedAt: doc.contactedAt || null,
 		bookedAt: doc.bookedAt || null,
 		cancelledAt: doc.cancelledAt || null,
+		queuePosition: Number(doc.queuePosition || 0) || null,
+		queuePositionLabel: String(doc.queuePositionLabel || "").trim(),
+		queueSize: Number(doc.queueSize || 0) || null,
 	}
 }
 
@@ -3527,8 +3715,15 @@ function renderAdminWaitlist(docs = []) {
 	const list = document.getElementById("adminWaitlistList")
 	if (!list) return
 
-	const normalizedItems = docs.map(normalizeWaitlistDoc)
+	const normalizedItems = decorateAdminWaitlistPositions(
+		docs.map(normalizeWaitlistDoc),
+	)
 	adminWaitlistDocs = normalizedItems
+
+	if (Array.isArray(adminBookingDocs) && adminBookingDocs.length) {
+		renderAdminBookings(adminBookingDocs)
+	}
+
 	const items = sortAdminWaitlistEntries(normalizedItems)
 
 	const total = items.length
@@ -3567,17 +3762,38 @@ function renderAdminWaitlist(docs = []) {
 				? formatAdminDate(item.notifiedAt)
 				: "Not notified"
 			const channelLabel = item.notificationChannel || "N/A"
+			const isQueued = isActiveAdminWaitlistQueueStatus(item.status)
+			const queueSummary = isQueued
+				? formatAdminQueueSummary({
+						label: item.queuePositionLabel,
+						size: item.queueSize,
+					})
+				: "N/A"
+			const queueChip = isQueued
+				? renderAdminWaitlistQueueChip({
+						label: item.queuePositionLabel,
+						size: item.queueSize,
+					})
+				: ""
+			const linkedBooking = findAdminBookingForWaitlistEntry(item)
+			const linkedBookingId = String(linkedBooking?.id || "").trim()
+			const canMoveToConfirmed = Boolean(isQueued && linkedBookingId)
 
 			return `
-      <article class="admin-review-item">
+	      <article class="admin-review-item admin-waitlist-card ${isQueued ? "admin-waitlist-card--queued" : ""}">
         <div class="admin-review-item-head">
           <div>
-            <div class="admin-booking-name">${escapeHtml(customerName)}</div>
+	            <div class="admin-booking-name-row">
+	              <div class="admin-booking-name">${escapeHtml(customerName)}</div>
+	              ${queueChip}
+	            </div>
             <div class="admin-booking-id">Waitlist ID: ${escapeHtml(item.id)}</div>
+            ${linkedBookingId ? `<div class="admin-booking-id">Linked Booking: ${escapeHtml(linkedBookingId)}</div>` : ""}
           </div>
           <span class="admin-status-badge ${getWaitlistStatusClass(item.status)}">${escapeHtml(statusLabel)}</span>
         </div>
         <div class="admin-review-meta">
+          <div><span>Waitlist Place:</span> ${escapeHtml(queueSummary)}</div>
           <div><span>Service:</span> ${escapeHtml(item.service || "N/A")}</div>
           <div><span>Stylist:</span> ${escapeHtml(stylistLabel)}</div>
           <div><span>Preferred Date:</span> ${escapeHtml(formatAdminDate(item.preferredDate))}</div>
@@ -3598,6 +3814,7 @@ function renderAdminWaitlist(docs = []) {
           <div><span>Inspiration Image:</span> ${item.inspirationImageUrl ? `<a class="admin-inline-link" href="${escapeHtml(item.inspirationImageUrl)}" target="_blank" rel="noopener">Open full image</a>` : "Not provided"}</div>
         </div>
         <div class="admin-booking-actions">
+          <button class="admin-action-btn" data-waitlist-action="move-confirmed" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}" ${canMoveToConfirmed ? "" : "disabled"}>Move to Confirmed</button>
           <button class="admin-action-btn" data-waitlist-action="waiting" data-id="${escapeHtml(item.id)}">Set Waiting</button>
           <button class="admin-action-btn" data-waitlist-action="contacted" data-id="${escapeHtml(item.id)}">Mark Contacted</button>
           <button class="admin-action-btn" data-waitlist-action="booked" data-id="${escapeHtml(item.id)}">Mark Booked</button>
@@ -3945,15 +4162,17 @@ function renderAdminBookings(docs) {
 		status: normalizeStatus(extractRawStatus(b)),
 	}))
 	adminBookingDocs = normalizedDocs
-	adminBookingStatusFilter = normalizeAdminBookingFilter(adminBookingStatusFilter)
+	adminBookingStatusFilter = normalizeAdminBookingFilter(
+		adminBookingStatusFilter,
+	)
 
 	const total = normalizedDocs.length
 	const pending = normalizedDocs.filter((b) => b.status === "pending").length
 	const confirmed = normalizedDocs.filter(
 		(b) => b.status === "confirmed",
 	).length
-	const waitlisted = normalizedDocs.filter(
-		(b) => b.status === "waitlisted",
+	const waitlisted = normalizedDocs.filter((b) =>
+		isAdminBookingVisibleInWaitlistFilter(b),
 	).length
 	const completed = normalizedDocs.filter(
 		(b) => b.status === "completed",
@@ -3976,7 +4195,9 @@ function renderAdminBookings(docs) {
 	if (completedEl) completedEl.textContent = String(completed)
 	if (cancelledEl) cancelledEl.textContent = String(cancelled)
 
-	const filterButtons = document.querySelectorAll("[data-booking-status-filter]")
+	const filterButtons = document.querySelectorAll(
+		"[data-booking-status-filter]",
+	)
 	filterButtons.forEach((button) => {
 		const buttonFilter = normalizeAdminBookingFilter(
 			button.dataset.bookingStatusFilter,
@@ -3996,7 +4217,9 @@ function renderAdminBookings(docs) {
 	const visibleDocs =
 		adminBookingStatusFilter === "all"
 			? normalizedDocs
-			: normalizedDocs.filter((b) => b.status === adminBookingStatusFilter)
+			: adminBookingStatusFilter === "waitlisted"
+				? normalizedDocs.filter((b) => isAdminBookingVisibleInWaitlistFilter(b))
+				: normalizedDocs.filter((b) => b.status === adminBookingStatusFilter)
 
 	if (!visibleDocs.length) {
 		const emptyCopy =
@@ -4022,10 +4245,37 @@ function renderAdminBookings(docs) {
 		.map((b) => {
 			const status = normalizeStatus(extractRawStatus(b))
 			const isWaitlisted = status === "waitlisted"
-			const customerName = getAdminBookingCustomerName(b)
-			const specialRequest = String(b.notes || b.specialRequest || "").trim()
+			const linkedWaitlistEntry = isWaitlisted
+				? getAdminWaitlistEntryForBooking(b)
+				: null
+			const customerName = linkedWaitlistEntry
+				? getAdminWaitlistCustomerName(linkedWaitlistEntry)
+				: getAdminBookingCustomerName(b)
+			const specialRequest = String(
+				linkedWaitlistEntry?.notes || b.notes || b.specialRequest || "",
+			).trim()
+			const waitlistQueueInfo = isWaitlisted
+				? getAdminWaitlistQueueInfoForBooking(b)
+				: { position: null, label: "", size: null }
+			const waitlistQueueSummary = isWaitlisted
+				? formatAdminQueueSummary(waitlistQueueInfo)
+				: "N/A"
+			const waitlistQueueChip = isWaitlisted
+				? renderAdminWaitlistQueueChip(waitlistQueueInfo)
+				: ""
+			const waitlistId = String(b.waitlistId || "").trim()
+			const waitlistStatusLabel = isWaitlisted
+				? getWaitlistStatusLabel(linkedWaitlistEntry?.status || "waiting")
+				: ""
+			const displayDate =
+				linkedWaitlistEntry?.preferredDate || b.date || b.bookingDate || ""
+			const displayTime =
+				linkedWaitlistEntry?.preferredTime || b.time || b.bookingTime || ""
+			const displayEmail = linkedWaitlistEntry?.email || b.email || ""
+			const displayPhone = linkedWaitlistEntry?.phone || b.phone || ""
 			const inspirationImageUrl = String(
-				b.inspirationImageUrl ||
+				linkedWaitlistEntry?.inspirationImageUrl ||
+					b.inspirationImageUrl ||
 					b.inspirationImage ||
 					b.referenceImageUrl ||
 					"",
@@ -4037,19 +4287,22 @@ function renderAdminBookings(docs) {
             <div>
               <div class="admin-booking-name-row">
                 <div class="admin-booking-name">${escapeHtml(customerName)}</div>
-                ${isWaitlisted ? '<span class="admin-waitlist-chip">Waitlist</span>' : ""}
+		                ${isWaitlisted ? `<span class="admin-waitlist-chip">${escapeHtml(`Waitlist · ${waitlistStatusLabel}`)}</span>` : ""}
+	                ${waitlistQueueChip}
               </div>
               <div class="admin-booking-id">Booking ID: ${escapeHtml(b.id || "N/A")}</div>
             </div>
             <span class="admin-status-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
           </div>
           <div class="admin-booking-meta">
+            ${isWaitlisted ? `<div><span>Waitlist Place:</span> ${escapeHtml(waitlistQueueSummary)}</div>` : ""}
+	            ${isWaitlisted ? `<div><span>Waitlist Status:</span> ${escapeHtml(waitlistStatusLabel)}</div>` : ""}
             <div><span>Service:</span> ${escapeHtml(b.service || "N/A")}</div>
             <div><span>Stylist:</span> ${escapeHtml(b.stylist || "Any Available")}</div>
-			<div><span>Date:</span> ${escapeHtml(formatAdminDate(b.date))}</div>
-            <div><span>Time:</span> ${escapeHtml(b.time || "N/A")}</div>
-            <div><span>Email:</span> ${escapeHtml(b.email || "N/A")}</div>
-            <div><span>Phone:</span> ${escapeHtml(b.phone || "N/A")}</div>
+			<div><span>Date:</span> ${escapeHtml(formatAdminDate(displayDate))}</div>
+	            <div><span>Time:</span> ${escapeHtml(displayTime || "N/A")}</div>
+	            <div><span>Email:</span> ${escapeHtml(displayEmail || "N/A")}</div>
+	            <div><span>Phone:</span> ${escapeHtml(displayPhone || "N/A")}</div>
             <div><span>WhatsApp:</span> ${escapeHtml(b.whatsappStatus || "pending")}</div>
             <div><span>Reminder Sent:</span> ${escapeHtml(b.reminderSentAt ? formatAdminDate(b.reminderSentAt) : "Not sent")}</div>
           </div>
@@ -4067,7 +4320,11 @@ function renderAdminBookings(docs) {
           </div>
           <div class="admin-booking-actions">
             <button class="admin-action-btn" data-action="pending" data-id="${escapeHtml(b.id || "")}">Set Pending</button>
-            <button class="admin-action-btn" data-action="confirmed" data-id="${escapeHtml(b.id || "")}">Confirm</button>
+            ${
+							isWaitlisted
+								? `<button class="admin-action-btn" data-action="move-waitlist-confirmed" data-id="${escapeHtml(b.id || "")}" data-waitlist-id="${escapeHtml(waitlistId)}">Move to Confirmed</button>`
+								: `<button class="admin-action-btn" data-action="confirmed" data-id="${escapeHtml(b.id || "")}">Confirm</button>`
+						}
             <button class="admin-action-btn" data-action="completed" data-id="${escapeHtml(b.id || "")}">Complete</button>
             <button class="admin-action-btn danger" data-action="cancel-release" data-id="${escapeHtml(b.id || "")}">Cancel + Release Slot</button>
           </div>
@@ -5890,6 +6147,16 @@ function initializeAdminPanel() {
 					"✅ Booking cancelled and slot released successfully.",
 					"adminActionMessage",
 				)
+			} else if (action === "move-waitlist-confirmed") {
+				await callAdminMoveWaitlistBookingToConfirmedAction({
+					bookingId,
+					waitlistId: String(button.dataset.waitlistId || "").trim(),
+				})
+				setAdminMessage(
+					"success",
+					"✅ Waitlisted booking moved to confirmed and slot locked.",
+					"adminActionMessage",
+				)
 			} else {
 				await updateBookingStatus(bookingId, action)
 				setAdminMessage(
@@ -6525,12 +6792,30 @@ function initializeAdminPanel() {
 			})
 
 			try {
-				await updateWaitlistStatus(waitlistId, action)
-				setAdminMessage(
-					"success",
-					`✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.`,
-					"adminWaitlistMessage",
-				)
+				if (action === "move-confirmed") {
+					const bookingId = String(actionBtn.dataset.bookingId || "").trim()
+					if (!bookingId) {
+						throw new Error(
+							"This waitlist row has no linked waitlisted booking yet.",
+						)
+					}
+					await callAdminMoveWaitlistBookingToConfirmedAction({
+						bookingId,
+						waitlistId,
+					})
+					setAdminMessage(
+						"success",
+						"✅ Waitlist request moved to confirmed booking and slot locked.",
+						"adminWaitlistMessage",
+					)
+				} else {
+					await updateWaitlistStatus(waitlistId, action)
+					setAdminMessage(
+						"success",
+						`✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.`,
+						"adminWaitlistMessage",
+					)
+				}
 			} catch (error) {
 				console.error("Waitlist action failed:", error)
 				setAdminMessage(

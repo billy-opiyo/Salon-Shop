@@ -86,6 +86,9 @@ This project is built to:
   - Public Services includes a dedicated **Braids Services** category tab
   - Public Gallery includes service-category filtering alongside existing sort/filter controls
   - Braids-specific gallery labels/actions now surface “Most Booked Braids” and “View All Braids” where relevant
+- Added **very-small-screen UI polish**:
+  - Compact <=490px service/gallery chips, feature pills, waitlist badges, review/auth badges, admin status badges, and dashboard count badges
+  - Improved badge contrast, single-line behavior, and ellipsis fallback to reduce wrapping/clipping on narrow phones
 
 ---
 
@@ -505,6 +508,7 @@ Use this section as the project QA checklist for releases, Firebase deployments,
 - [ ] Admin test account has `canManageBookings` permission for Bookings, Schedule, and Waitlist QA.
 - [ ] Test accounts are available for guest, client, admin, and super-admin flows.
 - [ ] Browser DevTools and Cloud Functions logs are available for troubleshooting.
+- [ ] Responsive QA viewports are ready in DevTools, especially 490px, 390px, and 360px widths.
 
 Deploy rules/functions before full QA:
 
@@ -528,6 +532,7 @@ Use the following scenarios to confirm all major features are working.
 1. Open `index.html` (or deployed site) and verify:
    - Hero, Services, Gallery, Reviews, Blog, and Contact sections render.
    - Dark mode toggle works.
+   - At <=490px viewport width, service tabs, gallery filter chips, feature pills, waitlist badges, review/auth badges, and dashboard count badges stay compact/readable without clipping.
 2. In **Gallery**:
    - Change filters/sort options.
    - Open a style in lightbox; test next/prev and close.
@@ -844,6 +849,19 @@ Use this to validate the **Admins** section and scoped access controls end-to-en
 8. Regression check:
    - Attempt direct client write to `adminUsers` from browser console/client SDK
    - Expected: write is rejected by Firestore rules
+
+### N) Very-small-screen chip/badge visual regression
+
+Use this after stylesheet changes or before production deploys to confirm compact labels behave well on narrow devices.
+
+1. In browser DevTools, test public `index.html` at 490px, 390px, and 360px widths.
+2. Verify **Services** tabs remain compact, readable, and tappable.
+3. Verify **Gallery** service/category chips, length/size/style chips, and featured pills stay single-line with no layout clipping.
+4. Trigger the booking waitlist panel and verify the **Waitlist** badge remains compact beside the copy.
+5. Sign in and verify dashboard count badges and waitlist queue chips do not overflow card headings or booking rows.
+6. Open `admin.html` at <=490px and verify admin status/role badges and security filter notes stay readable without horizontal page overflow.
+7. Toggle light mode and repeat key chip/badge checks for contrast.
+8. Expected: chips and badges stay compact, high-contrast, and either fit naturally or truncate gracefully with ellipsis instead of wrapping awkwardly.
 
 ---
 
