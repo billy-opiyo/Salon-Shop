@@ -2741,6 +2741,22 @@ h6 {
     scrollbar-color: var(--primary) var(--bg-secondary);
 }
 
+.admin-bookings-list.admin-bookings-list--waitlisted-filter {
+    --admin-bookings-visible-cards: 3;
+    --admin-booking-card-height: 210px;
+    max-height: calc((var(--admin-booking-card-height) * var(--admin-bookings-visible-cards)) + (12px * (var(--admin-bookings-visible-cards) - 1)));
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 8px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #e0ac4f #17120d;
+}
+
+.admin-bookings-list.admin-bookings-list--waitlisted-filter>.admin-booking-item {
+    min-height: var(--admin-booking-card-height);
+}
+
 .admin-booking-filter-controls {
     display: flex;
     flex-wrap: wrap;
@@ -3293,6 +3309,26 @@ h6 {
 
 .admin-bookings-list::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+}
+
+.admin-bookings-list.admin-bookings-list--waitlisted-filter::-webkit-scrollbar {
+    width: 10px;
+}
+
+.admin-bookings-list.admin-bookings-list--waitlisted-filter::-webkit-scrollbar-track {
+    background: linear-gradient(180deg, #120d08, #21170d 45%, #120d08);
+    border-radius: var(--radius-full);
+}
+
+.admin-bookings-list.admin-bookings-list--waitlisted-filter::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #fff0be, #e0ac4f 42%, #c8963e 72%, #9c6f25);
+    border: 1px solid rgba(255, 224, 154, 0.45);
+    border-radius: var(--radius-full);
+    box-shadow: inset 0 0 0 1px rgba(120, 78, 20, 0.24);
+}
+
+.admin-bookings-list.admin-bookings-list--waitlisted-filter::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #fff7d6, #efbf62 42%, #d6a74f 72%, #b9832f);
 }
 
 .admin-booking-item {

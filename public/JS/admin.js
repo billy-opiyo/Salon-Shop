@@ -4165,6 +4165,12 @@ function renderAdminBookings(docs) {
 	adminBookingStatusFilter = normalizeAdminBookingFilter(
 		adminBookingStatusFilter,
 	)
+	const isWaitlistedFilterActive = adminBookingStatusFilter === "waitlisted"
+	list.classList.toggle(
+		"admin-bookings-list--waitlisted-filter",
+		isWaitlistedFilterActive,
+	)
+	list.dataset.bookingStatusFilter = adminBookingStatusFilter
 
 	const total = normalizedDocs.length
 	const pending = normalizedDocs.filter((b) => b.status === "pending").length
