@@ -4,7 +4,7 @@ Production-ready Firebase salon platform for **Royal Braids** with:
 
 - Public website (`public/index.html`) for services, gallery, booking, reviews, blog, and contact
 - Client authentication + personal dashboard (appointments, reviews, favorites, account settings)
-- Admin console (`public/admin.html`) for bookings, schedule view, gallery, blogs, reviews, and messages
+- Admin console (`public/admin.html`) for bookings, schedule view, waitlist, gallery, blogs, reviews, messages, service visibility, security monitoring, and admin-user delegation
 - Firestore realtime data pipelines
 - Cloud Functions automation for email + WhatsApp booking notifications and waitlist alerts
 
@@ -38,7 +38,7 @@ This project is built to:
 1. Showcase salon services, styles, and content dynamically.
 2. Accept online bookings with anti-double-booking slot locking.
 3. Support authenticated client self-service (dashboard, favorites, reschedule/cancel actions).
-4. Give admins one panel for operations (bookings, calendar schedule, content, and messages).
+4. Give admins one panel for operations (bookings, calendar schedule, waitlist, content, messages, services, security, and admin users).
 5. Enforce security via Firebase Auth + strict Firestore Rules.
 
 ---
@@ -65,6 +65,7 @@ This project is built to:
   - Booking system field initialization + per-user review/contact rate-limit updates
 - Expanded **Admin operations**:
   - Schedule tab with day/week calendar view and quick booking actions
+  - Waitlist tab with realtime queue monitoring, counters, sorting, and status transitions
   - Existing CRUD/moderation modules maintained for gallery, blogs, reviews, and messages
 - Added **Service Category Visibility Management**:
   - New **Services** tab in admin console for category ON/OFF controls
@@ -155,9 +156,9 @@ This project is built to:
 
 ### Admin App (`admin.html` + `admin.js`)
 
-1. Email/password admin login with allowed-email gating.
+1. Email/password admin login gated by `adminUsers/{uid}` role, active state, and permissions.
 2. Realtime listeners for bookings, gallery, blogs, reviews, and contact messages.
-3. Calendar-like schedule board (day/week) for operational booking management.
+3. Calendar-like schedule board (day/week), waitlist queue, and quick operational booking management.
 
 ### Backend Automation
 
@@ -233,9 +234,9 @@ This project is built to:
 
 ### Access + UX
 
-- Firebase admin login + allowed email guard
+- Firebase admin login gated by `adminUsers/{uid}` role, active state, and scoped permissions
 - Password visibility toggle
-- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages, Services, Security, Admins**
+- Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages, Waitlist, Services, Admins, Security**
 - Confirmation modal for destructive actions
 
 ### Admins (Role + Permission Management)
@@ -254,6 +255,15 @@ This project is built to:
 - Status actions (pending / confirmed / completed)
 - Cancel + release slot action
 - Day/week schedule board with quick-detail action panel
+
+### Waitlist
+
+- Dedicated **Waitlist** admin tab for booked-slot waitlist requests
+- Realtime queue from the `waitlist` collection with counters for total, waiting, contacted, booked, and cancelled
+- Sort modes: newest, oldest, appointment date/time, waiting-first, and name A-Z
+- Request cards show client/contact details, desired service/date/time/stylist, notification channel/status, and notes
+- Admin status transitions: set waiting, mark contacted, mark booked, and cancel request
+- Waitlist tab access follows booking-management permissions (`canManageBookings`)
 
 ### Gallery
 
@@ -492,6 +502,7 @@ Use this section as the project QA checklist for releases, Firebase deployments,
 - [ ] Cloud Functions in `functions/index.js` are deployed with the Node.js 22 runtime.
 - [ ] Required function secrets are set for Cloudinary, Resend, and WhatsApp Cloud API.
 - [ ] At least one `super_admin` document exists in `adminUsers/{uid}`.
+- [ ] Admin test account has `canManageBookings` permission for Bookings, Schedule, and Waitlist QA.
 - [ ] Test accounts are available for guest, client, admin, and super-admin flows.
 - [ ] Browser DevTools and Cloud Functions logs are available for troubleshooting.
 
@@ -554,7 +565,34 @@ Use the following scenarios to confirm all major features are working.
 4. Delete the related `bookingSlots/{slotId}` lock (admin cancellation path is easiest).
 5. Expected: top waitlisted client gets notified (email/WhatsApp based on available contact data) and waitlist status updates.
 
-### E) Reviews + moderation test
+### E) Admin waitlist operations test
+
+Use this to verify the current **Admin → Waitlist** queue after creating at least one waitlist request.
+
+1. Sign in to `admin.html` with an admin account that has `canManageBookings`.
+2. Open **Waitlist** and verify:
+   - Total, Waiting, Contacted, Booked, and Cancelled counters render.
+   - Existing `waitlist` documents appear without permission errors.
+   - Request cards show client name/contact, desired service/date/time/stylist, notification details, and notes when present.
+3. Test **Sort Waitlist** modes:
+   - Newest first
+   - Oldest first
+   - Appointment date/time
+   - Waiting first
+   - Name A-Z
+4. Run each status action on a test request:
+   - **Set Waiting**
+   - **Mark Contacted**
+   - **Mark Booked**
+   - **Cancel Request**
+5. Expected in Firestore:
+   - `waitlist/{waitlistId}.status` changes to the selected status.
+   - `updatedAt` and `updatedBy` metadata are written.
+6. Permission regression:
+   - Sign in as a standard admin without `canManageBookings`, or deactivate the admin record.
+   - Expected: Waitlist tab is hidden/blocked and direct unauthorized reads/writes are rejected by Firestore rules.
+
+### F) Reviews + moderation test
 
 1. Submit a review while signed in.
 2. Confirm review saved as `pending`.
@@ -564,7 +602,7 @@ Use the following scenarios to confirm all major features are working.
    - Toggle featured and test delete.
 4. Expected: public site only shows approved reviews.
 
-### F) Contact + admin messages test
+### G) Contact + admin messages test
 
 1. Submit contact form.
 2. Verify document created in `contactMessages` with `status: "new"`.
@@ -574,7 +612,7 @@ Use the following scenarios to confirm all major features are working.
    - Delete one message.
 4. Expected: counts and status badges update in realtime.
 
-### G) Admin content management test
+### H) Admin content management test
 
 1. Admin login using allowed email.
 2. **Gallery**: create/edit/delete a style (with image).
@@ -584,7 +622,7 @@ Use the following scenarios to confirm all major features are working.
    - Open an event and run quick actions.
 5. Expected: public site reflects gallery/blog changes in realtime.
 
-### H) Backend automation verification
+### I) Backend automation verification
 
 After creating confirmed test bookings, including one roughly 2 hours away, verify on booking docs:
 
@@ -605,7 +643,7 @@ Expected: successful execution logs for:
 - `sendUpcomingBookingWhatsAppReminders`
 - `notifyWaitlistOnSlotOpen`
 
-### I) Security tab testing procedure (all Security features)
+### J) Security tab testing procedure (all Security features)
 
 Use this procedure to validate the full **Admin → Security** module end-to-end.
 
@@ -747,7 +785,7 @@ From any activity row linked to a known user (`uid` present), run each action:
    - No client can directly create/update/delete `loginActivities`, `securityAlerts`, `accountChangeHistory`, or `activityTimeline`.
    - Only callable backend paths write these security records.
 
-### J) Services tab category-visibility testing (new feature)
+### K) Services tab category-visibility testing (new feature)
 
 Use this to verify the new **Admin → Services** controls and public-site sync.
 
@@ -768,7 +806,7 @@ Use this to verify the new **Admin → Services** controls and public-site sync.
    - Public UI returns those categories without page-break regressions.
    - Admin success message confirms live application.
 
-### K) Client dashboard login-history testing (new feature)
+### L) Client dashboard login-history testing (new feature)
 
 Use this to validate the user-facing **Security & Privacy** block in dashboard.
 
@@ -784,7 +822,7 @@ Use this to validate the user-facing **Security & Privacy** block in dashboard.
    - Use a different non-admin account and confirm it cannot read another user’s entries.
    - Admin account can still review activity from Security tab.
 
-### L) Admin role/permission delegation testing (new feature)
+### M) Admin role/permission delegation testing (new feature)
 
 Use this to validate the **Admins** section and scoped access controls end-to-end.
 
