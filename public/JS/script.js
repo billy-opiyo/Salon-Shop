@@ -1887,6 +1887,45 @@ async function trackAccountSecurityChange({
 	}
 }
 
+function getHttpsCallableFunction(functionName = "") {
+	if (
+		!firebaseReady ||
+		!functionsService ||
+		typeof functionsService.httpsCallable !== "function"
+	) {
+		throw new Error(
+			"Booking actions are not ready yet. Please refresh and try again.",
+		)
+	}
+
+	const safeFunctionName = String(functionName || "").trim()
+	if (!safeFunctionName) {
+		throw new Error("Booking action is not configured.")
+	}
+
+	return functionsService.httpsCallable(safeFunctionName)
+}
+
+async function callClientCancelBookingAction(bookingId = "") {
+	const cancelBooking = getHttpsCallableFunction("clientCancelBooking")
+	return cancelBooking({ bookingId: String(bookingId || "").trim() })
+}
+
+async function callClientRescheduleBookingAction({
+	bookingId = "",
+	date = "",
+	time = "",
+	stylistKey = "any",
+} = {}) {
+	const rescheduleBooking = getHttpsCallableFunction("clientRescheduleBooking")
+	return rescheduleBooking({
+		bookingId: String(bookingId || "").trim(),
+		date: String(date || "").trim(),
+		time: String(time || "").trim(),
+		stylistKey: normalizeStylistKey(stylistKey || "any"),
+	})
+}
+
 async function finalizeGoogleSignInResult(user, context = {}) {
 	if (!user || user.isAnonymous) {
 		throw new Error("Google sign-in did not complete. Please try again.")
@@ -3423,6 +3462,7 @@ function normalizeBookingStatus(status = "") {
 		.toLowerCase()
 	if (raw === "complete") return "completed"
 	if (raw === "canceled") return "cancelled"
+	if (raw === "booked") return "confirmed"
 	if (raw === "waitlist" || raw === "waiting") return "waitlisted"
 	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
 		return "confirmed"
@@ -3732,41 +3772,8 @@ function openDashboardRescheduleModal(booking) {
 }
 
 async function cancelDashboardBooking(bookingId) {
-	if (!firebaseReady || !db || !auth?.currentUser || !bookingId) return
-
-	const bookingRef = db.collection("bookings").doc(bookingId)
-	await db.runTransaction(async (transaction) => {
-		const bookingDoc = await transaction.get(bookingRef)
-		if (!bookingDoc.exists) {
-			throw new Error("Booking no longer exists.")
-		}
-
-		const booking = { id: bookingDoc.id, ...(bookingDoc.data() || {}) }
-		if (!isDashboardBookingOwnedByCurrentUser(booking)) {
-			throw new Error("You can only cancel your own booking.")
-		}
-		if (!isBookingActionable(booking)) {
-			throw new Error("This booking can no longer be cancelled.")
-		}
-
-		if (booking.slotId) {
-			const slotRef = db.collection("bookingSlots").doc(String(booking.slotId))
-			const slotDoc = await transaction.get(slotRef)
-			if (slotDoc.exists) {
-				transaction.delete(slotRef)
-			}
-		}
-
-		transaction.set(
-			bookingRef,
-			{
-				status: "cancelled",
-				uid: auth.currentUser.uid,
-				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-			},
-			{ merge: true },
-		)
-	})
+	if (!firebaseReady || !auth?.currentUser || !bookingId) return
+	await callClientCancelBookingAction(bookingId)
 }
 
 async function saveDashboardRescheduleChanges() {
@@ -3807,71 +3814,11 @@ async function saveDashboardRescheduleChanges() {
 	}
 
 	try {
-		const bookingRef = db.collection("bookings").doc(bookingId)
-		const nextSlotRef = db.collection("bookingSlots").doc(nextSlotId)
-
-		await db.runTransaction(async (transaction) => {
-			const bookingDoc = await transaction.get(bookingRef)
-			if (!bookingDoc.exists) {
-				throw new Error("Booking no longer exists.")
-			}
-
-			const booking = { id: bookingDoc.id, ...(bookingDoc.data() || {}) }
-			const normalizedCurrentStatus = normalizeBookingStatus(booking.status)
-			if (!isDashboardBookingOwnedByCurrentUser(booking)) {
-				throw new Error("You can only reschedule your own booking.")
-			}
-			if (!isBookingActionable(booking)) {
-				throw new Error("This booking can no longer be rescheduled.")
-			}
-
-			const nextSlotDoc = await transaction.get(nextSlotRef)
-			if (nextSlotDoc.exists && nextSlotDoc.data()?.taken) {
-				throw new Error("Selected slot is no longer available.")
-			}
-
-			let previousSlotRef = null
-			let previousSlotDoc = null
-			if (booking.slotId) {
-				previousSlotRef = db
-					.collection("bookingSlots")
-					.doc(String(booking.slotId))
-				previousSlotDoc = await transaction.get(previousSlotRef)
-			}
-
-			transaction.set(nextSlotRef, {
-				taken: true,
-				date: nextDate,
-				time: nextTime,
-				stylistKey: nextStylistKey,
-				bookingId,
-				uid: auth.currentUser.uid,
-				createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-			})
-
-			if (previousSlotRef && previousSlotDoc?.exists) {
-				transaction.delete(previousSlotRef)
-			}
-
-			transaction.set(
-				bookingRef,
-				{
-					date: nextDate,
-					time: nextTime,
-					stylistKey: nextStylistKey,
-					stylist:
-						nextStylistKey === "any"
-							? ""
-							: getStylistDisplayName(nextStylistKey),
-					slotId: nextSlotId,
-					uid: auth.currentUser.uid,
-					status:
-						normalizedCurrentStatus === "pending" ? "pending" : "confirmed",
-					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-				},
-				{ merge: true },
-			)
+		await callClientRescheduleBookingAction({
+			bookingId,
+			date: nextDate,
+			time: nextTime,
+			stylistKey: nextStylistKey,
 		})
 
 		closeDashboardRescheduleModal()

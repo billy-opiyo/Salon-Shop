@@ -780,6 +780,7 @@ function normalizeServerBookingStatus(status = "") {
 		.toLowerCase()
 	if (raw === "complete") return "completed"
 	if (raw === "canceled") return "cancelled"
+	if (raw === "booked") return "confirmed"
 	if (raw === "waitlist" || raw === "waiting") return "waitlisted"
 	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
 		return "confirmed"
@@ -813,6 +814,127 @@ function normalizeServerWaitlistStatus(status = "") {
 		return raw
 	}
 	return "waiting"
+}
+
+const CLIENT_BOOKING_ACTION_STATUSES = new Set(["pending", "confirmed"])
+const KNOWN_STYLIST_KEYS = new Set([
+	"any",
+	"fatima",
+	"zainab",
+	"grace",
+	"amina",
+	"sarah",
+])
+const STYLIST_LABEL_BY_KEY = {
+	any: "Any Available",
+	fatima: "Fatima Hassan - Master Braider",
+	zainab: "Zainab Mohamed - Senior Stylist",
+	grace: "Grace Wanjiku - Natural Hair Expert",
+	amina: "Amina Diallo - Braiding Specialist",
+	sarah: "Sarah Omondi - Kids Specialist",
+}
+
+function normalizeServerStylistKey(value = "") {
+	const raw = String(value || "")
+		.trim()
+		.toLowerCase()
+
+	if (!raw || raw === "any" || raw === "any available") return "any"
+	if (KNOWN_STYLIST_KEYS.has(raw)) return raw
+	if (raw.includes("fatima")) return "fatima"
+	if (raw.includes("zainab")) return "zainab"
+	if (raw.includes("grace")) return "grace"
+	if (raw.includes("amina")) return "amina"
+	if (raw.includes("sarah")) return "sarah"
+	return "any"
+}
+
+function getServerStylistDisplayName(value = "") {
+	const key = normalizeServerStylistKey(value)
+	return STYLIST_LABEL_BY_KEY[key] || STYLIST_LABEL_BY_KEY.any
+}
+
+function getServerSlotId(date = "", stylistKey = "any", time = "") {
+	const safeDate = String(date || "").trim()
+	const safeStylistKey = normalizeServerStylistKey(stylistKey)
+	const normalizedTime = String(time || "")
+		.trim()
+		.replace(/\s+/g, "")
+		.replace(/[:]/g, "")
+	return `${safeDate}__${safeStylistKey}__${normalizedTime}`
+}
+
+function getCallableClientContext(request) {
+	if (!request?.auth?.uid) {
+		throw new HttpsError("unauthenticated", "Sign in required")
+	}
+
+	const uid = String(request.auth.uid || "").trim()
+	if (!uid) {
+		throw new HttpsError("unauthenticated", "Invalid auth session")
+	}
+
+	return {
+		uid,
+		email: getCallerEmailFromRequest(request),
+	}
+}
+
+function assertClientOwnsBooking(booking = {}, caller = {}) {
+	const bookingUid = String(booking.uid || "").trim()
+	if (bookingUid && bookingUid === caller.uid) return
+
+	const bookingEmail = String(booking.email || "")
+		.trim()
+		.toLowerCase()
+	if (caller.email && bookingEmail && bookingEmail === caller.email) return
+
+	throw new HttpsError(
+		"permission-denied",
+		"You can only manage your own booking",
+	)
+}
+
+function assertClientBookingIsActionable(booking = {}) {
+	const status = normalizeServerBookingStatus(booking.status)
+	if (!CLIENT_BOOKING_ACTION_STATUSES.has(status)) {
+		throw new HttpsError(
+			"failed-precondition",
+			"This booking can no longer be changed",
+		)
+	}
+	return status
+}
+
+function normalizeClientBookingDate(value = "") {
+	const safeDate = normalizeShortText(value || "", 20)
+	if (!/^\d{4}-\d{2}-\d{2}$/.test(safeDate)) {
+		throw new HttpsError("invalid-argument", "A valid date is required")
+	}
+	return safeDate
+}
+
+function normalizeClientBookingTime(value = "") {
+	const safeTime = normalizeShortText(value || "", 20)
+	if (!safeTime) {
+		throw new HttpsError("invalid-argument", "A valid time is required")
+	}
+	return safeTime
+}
+
+function shouldReleaseSlotForBooking(
+	slotData = {},
+	bookingId = "",
+	booking = {},
+) {
+	const slotBookingId = String(slotData.bookingId || "").trim()
+	if (slotBookingId) return slotBookingId === bookingId
+
+	// Legacy slots may not have bookingId. In that case, trust the slotId stored
+	// on the verified owner booking unless the slot clearly belongs to another uid.
+	const slotUid = String(slotData.uid || "").trim()
+	const bookingUid = String(booking.uid || "").trim()
+	return !slotUid || !bookingUid || slotUid === bookingUid
 }
 
 function isActiveWaitlistQueueStatus(status = "") {
@@ -1930,6 +2052,185 @@ exports.adminMoveWaitlistBookingToConfirmed = onCall(
 			waitlistId,
 			slotId: convertedSlotId,
 			status: "confirmed",
+		}
+	},
+)
+
+exports.clientCancelBooking = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const caller = getCallableClientContext(request)
+		const bookingId = String(request.data?.bookingId || "").trim()
+		if (!bookingId) {
+			throw new HttpsError("invalid-argument", "Booking ID is required")
+		}
+
+		const db = admin.firestore()
+		const bookingRef = db.collection("bookings").doc(bookingId)
+		let releasedSlotId = ""
+
+		await db.runTransaction(async (transaction) => {
+			const bookingSnap = await transaction.get(bookingRef)
+			if (!bookingSnap.exists) {
+				throw new HttpsError("not-found", "Booking no longer exists")
+			}
+
+			const booking = bookingSnap.data() || {}
+			assertClientOwnsBooking(booking, caller)
+			assertClientBookingIsActionable(booking)
+
+			const slotId = String(booking.slotId || "").trim()
+			if (slotId) {
+				const slotRef = db.collection("bookingSlots").doc(slotId)
+				const slotSnap = await transaction.get(slotRef)
+				if (
+					slotSnap.exists &&
+					shouldReleaseSlotForBooking(slotSnap.data() || {}, bookingId, booking)
+				) {
+					transaction.delete(slotRef)
+					releasedSlotId = slotId
+				}
+			}
+
+			transaction.set(
+				bookingRef,
+				{
+					status: "cancelled",
+					uid: caller.uid,
+					updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+				},
+				{ merge: true },
+			)
+		})
+
+		return {
+			ok: true,
+			bookingId,
+			releasedSlotId,
+			status: "cancelled",
+		}
+	},
+)
+
+exports.clientRescheduleBooking = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const caller = getCallableClientContext(request)
+		const data = request.data || {}
+		const bookingId = String(data.bookingId || "").trim()
+		if (!bookingId) {
+			throw new HttpsError("invalid-argument", "Booking ID is required")
+		}
+
+		const nextDate = normalizeClientBookingDate(data.date)
+		const nextTime = normalizeClientBookingTime(data.time)
+		const nextStylistKey = normalizeServerStylistKey(data.stylistKey || "any")
+		const nextSlotId = getServerSlotId(nextDate, nextStylistKey, nextTime)
+		let previousSlotId = ""
+		let nextStatus = "confirmed"
+
+		const db = admin.firestore()
+		const bookingRef = db.collection("bookings").doc(bookingId)
+		const nextSlotRef = db.collection("bookingSlots").doc(nextSlotId)
+
+		await db.runTransaction(async (transaction) => {
+			const bookingSnap = await transaction.get(bookingRef)
+			if (!bookingSnap.exists) {
+				throw new HttpsError("not-found", "Booking no longer exists")
+			}
+
+			const booking = bookingSnap.data() || {}
+			assertClientOwnsBooking(booking, caller)
+			const currentStatus = assertClientBookingIsActionable(booking)
+			nextStatus = currentStatus === "pending" ? "pending" : "confirmed"
+
+			previousSlotId = String(booking.slotId || "").trim()
+			if (nextSlotId === previousSlotId) {
+				throw new HttpsError(
+					"failed-precondition",
+					"Please choose a different time from your current booking",
+				)
+			}
+
+			const nextSlotSnap = await transaction.get(nextSlotRef)
+			if (nextSlotSnap.exists && nextSlotSnap.data()?.taken === true) {
+				const nextSlotBookingId = String(
+					nextSlotSnap.data()?.bookingId || "",
+				).trim()
+				if (!nextSlotBookingId || nextSlotBookingId !== bookingId) {
+					throw new HttpsError(
+						"already-exists",
+						"Selected slot is no longer available",
+					)
+				}
+			}
+
+			let previousSlotRef = null
+			let previousSlotSnap = null
+			if (previousSlotId) {
+				previousSlotRef = db.collection("bookingSlots").doc(previousSlotId)
+				previousSlotSnap = await transaction.get(previousSlotRef)
+			}
+
+			const serverNow = admin.firestore.FieldValue.serverTimestamp()
+			transaction.set(
+				nextSlotRef,
+				{
+					taken: true,
+					date: nextDate,
+					time: nextTime,
+					stylistKey: nextStylistKey,
+					bookingId,
+					uid: caller.uid,
+					createdAt: nextSlotSnap.exists
+						? nextSlotSnap.data()?.createdAt || serverNow
+						: serverNow,
+					updatedAt: serverNow,
+				},
+				{ merge: true },
+			)
+
+			if (
+				previousSlotRef &&
+				previousSlotSnap?.exists &&
+				shouldReleaseSlotForBooking(
+					previousSlotSnap.data() || {},
+					bookingId,
+					booking,
+				)
+			) {
+				transaction.delete(previousSlotRef)
+			}
+
+			transaction.set(
+				bookingRef,
+				{
+					date: nextDate,
+					time: nextTime,
+					stylistKey: nextStylistKey,
+					stylist:
+						nextStylistKey === "any"
+							? ""
+							: getServerStylistDisplayName(nextStylistKey),
+					slotId: nextSlotId,
+					uid: caller.uid,
+					status: nextStatus,
+					updatedAt: serverNow,
+				},
+				{ merge: true },
+			)
+		})
+
+		return {
+			ok: true,
+			bookingId,
+			previousSlotId,
+			slotId: nextSlotId,
+			status: nextStatus,
 		}
 	},
 )
