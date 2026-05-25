@@ -36,6 +36,8 @@
 		/>
 		<link rel="stylesheet" href="CSS/style.css" />
 		<link rel="icon" type="image/x-icon" href="IMG/Royal Braids logo.png" />
+		<script src="client-config.js"></script>
+		<script src="JS/apply-client-config.js" defer></script>
 		<script
 			src="JS/script.js?v=20260524-waitlist-joined-feedback"
 			defer
@@ -49,16 +51,20 @@
 					<span
 						class="logo-icon logo-cube"
 						aria-label="Royal Braids rotating logo"
+						data-client-attr="aria-label:brand.logoAlt"
 					>
 						<span class="logo-cube-track" id="logoCubeTrack">
 							<img
 								id="logoCubeImage"
 								src="IMG/logo.png"
 								alt="Royal Braids rotating logo"
+								data-client-attr="src:brand.logoSrc; alt:brand.logoAlt"
 							/>
 						</span>
 					</span>
-					ROYAL<br />BRAIDS
+					<span class="logo-text" data-client-html="brand.shortNameHtml"
+						>ROYAL<br />BRAIDS</span
+					>
 				</a>
 
 				<br />
@@ -123,16 +129,19 @@
 				<img
 					src="IMG/1000_F_595420115_RZi6MAsq90qVRMfFz37ZKBianocAltUu.jpg"
 					alt="African Hair Braiding Salon"
+					data-client-attr="src:brand.heroImage; alt:brand.heroImageAlt"
 				/>
 			</div>
 			<div class="container">
 				<div class="hero-content">
 					<div class="hero-text animate-on-scroll">
-						<div class="section-subtitle">
+						<div class="section-subtitle" data-client-text="brand.heroSubtitle">
 							Premium African Hair Braiding & Beauty
 						</div>
-						<h1>Celebrate Your Crown with <span>Beautiful Braids</span></h1>
-						<p>
+						<h1 data-client-html="brand.heroTitleHtml">
+							Celebrate Your Crown with <span>Beautiful Braids</span>
+						</h1>
+						<p data-client-text="brand.heroDescription">
 							From signature braids, hair services and flawless twists to
 							glowing beauty spa rituals, precision nails, radiant makeup,
 							barber grooming, eyebrows & lash enhancements, and bridal-ready
@@ -187,7 +196,9 @@
 										d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"
 									></path>
 								</svg>
-								+254 700 123 456
+								<span data-client-text="contact.phonePrimary"
+									>+254 700 123 456</span
+								>
 							</div>
 							<div class="hero-info-item">
 								<svg
@@ -202,7 +213,9 @@
 									></path>
 									<polyline points="22,6 12,13 2,6"></polyline>
 								</svg>
-								info@royalbraids.ke
+								<span data-client-text="contact.emailPrimary"
+									>info@royalbraids.ke</span
+								>
 							</div>
 							<div class="hero-info-item">
 								<svg
@@ -215,7 +228,9 @@
 									<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"></path>
 									<circle cx="12" cy="10" r="3"></circle>
 								</svg>
-								Westlands, Nairobi
+								<span data-client-text="contact.locationShort"
+									>Westlands, Nairobi</span
+								>
 							</div>
 						</div>
 					</div>
@@ -1198,7 +1213,7 @@
 							</div>
 							<div class="contact-item-text">
 								<h4>Location</h4>
-								<p>
+								<p data-client-html="contact.addressHtml">
 									Westlands Shopping Centre, 2nd Floor<br />Waiyaki Way,
 									Nairobi, Kenya
 								</p>
@@ -1221,12 +1236,20 @@
 							<div class="contact-item-text">
 								<h4>Phone</h4>
 								<p>
-									<a href="tel:+254700123456" target="_blank"
+									<a
+										href="tel:+254700123456"
+										target="_blank"
+										data-client-text="contact.phonePrimary"
+										data-client-attr="href:contact.phonePrimaryHref"
 										>+254 700 123 456</a
 									>
 								</p>
 								<p>
-									<a href="tel:+254711987654" target="_blank"
+									<a
+										href="tel:+254711987654"
+										target="_blank"
+										data-client-text="contact.phoneSecondary"
+										data-client-attr="href:contact.phoneSecondaryHref"
 										>+254 711 987 654</a
 									>
 								</p>
@@ -1250,12 +1273,20 @@
 							<div class="contact-item-text">
 								<h4>Email</h4>
 								<p>
-									<a href="mailto:info@royalbraids.ke" target="_blank"
+									<a
+										href="mailto:info@royalbraids.ke"
+										target="_blank"
+										data-client-text="contact.emailPrimary"
+										data-client-attr="href:contact.emailPrimaryHref"
 										>info@royalbraids.ke</a
 									>
 								</p>
 								<p>
-									<a href="mailto:bookings@royalbraids.ke" target="_blank"
+									<a
+										href="mailto:bookings@royalbraids.ke"
+										target="_blank"
+										data-client-text="contact.emailBookings"
+										data-client-attr="href:contact.emailBookingsHref"
 										>bookings@royalbraids.ke</a
 									>
 								</p>
@@ -1279,19 +1310,27 @@
 								<table class="hours-table">
 									<tr>
 										<td>Monday - Friday</td>
-										<td>8:00 AM - 8:00 PM</td>
+										<td data-client-text="contact.weekdayHours">
+											8:00 AM - 8:00 PM
+										</td>
 									</tr>
 									<tr>
 										<td>Saturday</td>
-										<td>9:00 AM - 7:00 PM</td>
+										<td data-client-text="contact.saturdayHours">
+											9:00 AM - 7:00 PM
+										</td>
 									</tr>
 									<tr>
 										<td>Sunday</td>
-										<td>10:00 AM - 5:00 PM</td>
+										<td data-client-text="contact.sundayHours">
+											10:00 AM - 5:00 PM
+										</td>
 									</tr>
 									<tr>
 										<td>Public Holidays</td>
-										<td>10:00 AM - 4:00 PM</td>
+										<td data-client-text="contact.publicHolidayHours">
+											10:00 AM - 4:00 PM
+										</td>
 									</tr>
 								</table>
 							</div>
@@ -1300,6 +1339,7 @@
 					<div class="map-container animate-on-scroll delay-2">
 						<iframe
 							src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3988.8199!2d36.8075!3d-1.2644!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x182f17390b2f4643%3A0x4b25b087296c88f7!2sWestlands%2C+Nairobi!5e0!3m2!1sen!2ske!4v1"
+							data-client-attr="src:contact.mapEmbedUrl"
 							allowfullscreen
 							loading="lazy"
 						></iframe>
@@ -1387,8 +1427,10 @@
 			<div class="container">
 				<div class="footer-grid">
 					<div>
-						<div class="footer-logo">👑 ROYAL BRAIDS</div>
-						<p class="footer-desc">
+						<div class="footer-logo" data-client-html="brand.footerLogoHtml">
+							👑 ROYAL BRAIDS
+						</div>
+						<p class="footer-desc" data-client-text="brand.footerDescription">
 							Nairobi’s premier beauty destination for braids and
 							beyond—offering expert hair styling, spa indulgence, nail
 							artistry, makeup, barber grooming, lash enhancement, wellness
@@ -1400,6 +1442,7 @@
 								target="_blank"
 								class="social-link"
 								aria-label="Instagram"
+								data-client-attr="href:social.instagram"
 							>
 								<i class="fab fa-instagram"></i>
 							</a>
@@ -1408,6 +1451,7 @@
 								target="_blank"
 								class="social-link"
 								aria-label="Facebook"
+								data-client-attr="href:social.facebook"
 							>
 								<i class="fab fa-facebook-f"></i>
 							</a>
@@ -1416,6 +1460,7 @@
 								target="_blank"
 								class="social-link"
 								aria-label="Twitter/X"
+								data-client-attr="href:social.twitter"
 							>
 								<svg
 									viewBox="0 0 24 24"
@@ -1433,6 +1478,7 @@
 								target="_blank"
 								class="social-link"
 								aria-label="TikTok"
+								data-client-attr="href:social.tiktok"
 							>
 								<i class="fab fa-tiktok"></i>
 							</a>
@@ -1441,6 +1487,7 @@
 								target="_blank"
 								class="social-link"
 								aria-label="WhatsApp"
+								data-client-attr="href:social.whatsapp"
 							>
 								<i class="fab fa-whatsapp"></i>
 							</a>
@@ -1469,25 +1516,56 @@
 					<div>
 						<h4>Contact Info</h4>
 						<ul class="footer-links">
-							<li>📍 Westlands, Nairobi</li>
 							<li>
-								<a href="tel:+254700123456" target="_blank"
-									>📞 +254 700 123 456</a
+								📍
+								<span data-client-text="contact.locationShort"
+									>Westlands, Nairobi</span
 								>
 							</li>
 							<li>
-								<a href="mailto:info@royalcuts.ke" target="_blank"
-									>📧 info@royalbraids.ke</a
+								<a
+									href="tel:+254700123456"
+									target="_blank"
+									data-client-attr="href:contact.phonePrimaryHref"
+									>📞
+									<span data-client-text="contact.phonePrimary"
+										>+254 700 123 456</span
+									></a
 								>
 							</li>
-							<li>🕐 Mon-Fri: 8AM - 8PM</li>
-							<li>🕐 Sat-Sun: 9AM - 7PM</li>
+							<li>
+								<a
+									href="mailto:info@royalcuts.ke"
+									target="_blank"
+									data-client-attr="href:contact.emailPrimaryHref"
+									>📧
+									<span data-client-text="contact.emailPrimary"
+										>info@royalbraids.ke</span
+									></a
+								>
+							</li>
+							<li>
+								🕐
+								<span data-client-text="contact.footerWeekdayHours"
+									>Mon-Fri: 8AM - 8PM</span
+								>
+							</li>
+							<li>
+								🕐
+								<span data-client-text="contact.footerWeekendHours"
+									>Sat-Sun: 9AM - 7PM</span
+								>
+							</li>
 						</ul>
 					</div>
 				</div>
 				<div class="footer-bottom">
-					<p>&copy; 2026 Royal Braids. All rights reserved.</p>
-					<p>Crafted with ❤️ in Nairobi, Kenya</p>
+					<p data-client-text="brand.copyright">
+						&copy; 2026 Royal Braids. All rights reserved.
+					</p>
+					<p data-client-text="brand.craftedBy">
+						Crafted with ❤️ in Nairobi, Kenya
+					</p>
 				</div>
 			</div>
 		</footer>
@@ -2030,19 +2108,5 @@
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
-
-		<script>
-			window.APP_CONFIG = {
-				firebase: {
-					apiKey: "AIzaSyAyVcRjG55o6nwaXpRzZyt2BtX2RamGEqg",
-					authDomain: "services-website-billydev.firebaseapp.com",
-					projectId: "services-website-billydev",
-					storageBucket: "services-website-billydev.firebasestorage.app",
-					messagingSenderId: "712913782427",
-					appId: "1:712913782427:web:e997553d71bd9a1f6a283e",
-					measurementId: "G-B6LVQBEN3G",
-				},
-			}
-		</script>
 	</body>
 </html>

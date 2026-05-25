@@ -8,6 +8,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler")
 const { defineSecret } = require("firebase-functions/params")
 const logger = require("firebase-functions/logger")
 const admin = require("firebase-admin")
+const CLIENT_CONFIG = require("./client-config")
 
 const CLOUDINARY_CLOUD_NAME = defineSecret("CLOUDINARY_CLOUD_NAME")
 const CLOUDINARY_API_KEY = defineSecret("CLOUDINARY_API_KEY")
@@ -22,8 +23,21 @@ const WHATSAPP_CLOUD_PHONE_NUMBER_ID = defineSecret(
 	"WHATSAPP_CLOUD_PHONE_NUMBER_ID",
 )
 const WHATSAPP_CLOUD_API_VERSION = "v20.0"
-const NAIROBI_TIMEZONE = "Africa/Nairobi"
-const NAIROBI_UTC_OFFSET_HOURS = 3
+const CLIENT_BUSINESS_NAME =
+	String(CLIENT_CONFIG.businessName || "Royal Braids").trim() || "Royal Braids"
+const CLIENT_TEAM_NAME =
+	String(CLIENT_CONFIG.teamName || `${CLIENT_BUSINESS_NAME} Team`).trim() ||
+	`${CLIENT_BUSINESS_NAME} Team`
+const CLIENT_CLOUDINARY_FOLDER =
+	String(CLIENT_CONFIG.cloudinaryFolder || "royal-braids/uploads").trim() ||
+	"royal-braids/uploads"
+const NAIROBI_TIMEZONE =
+	String(CLIENT_CONFIG.timezone || "Africa/Nairobi").trim() || "Africa/Nairobi"
+const NAIROBI_UTC_OFFSET_HOURS = Number.isFinite(
+	Number(CLIENT_CONFIG.utcOffsetHours),
+)
+	? Number(CLIENT_CONFIG.utcOffsetHours)
+	: 3
 const REVIEW_RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000
 const CONTACT_RATE_LIMIT_COOLDOWN_MS = 60 * 1000
 const LOGIN_LOCK_WINDOW_MS = 15 * 60 * 1000
@@ -389,7 +403,7 @@ function normalizeAdminUpdatePayload(data = {}) {
 }
 
 async function createCloudinarySignedUpload({
-	folder = "royal-braids/uploads",
+	folder = CLIENT_CLOUDINARY_FOLDER,
 	tags = "",
 } = {}) {
 	const cloudName = String(CLOUDINARY_CLOUD_NAME.value() || "").trim()
@@ -404,7 +418,7 @@ async function createCloudinarySignedUpload({
 	}
 
 	const timestamp = Math.floor(Date.now() / 1000)
-	const safeFolder = normalizeShortText(folder || "royal-braids/uploads", 200)
+	const safeFolder = normalizeShortText(folder || CLIENT_CLOUDINARY_FOLDER, 200)
 	const safeTags = normalizeShortText(tags || "", 200)
 
 	const signingParams = {
@@ -440,7 +454,7 @@ exports.createCloudinarySignedUpload = onCall(
 
 		const data = request.data || {}
 		const folder = normalizeShortText(
-			data.folder || "royal-braids/uploads",
+			data.folder || CLIENT_CLOUDINARY_FOLDER,
 			200,
 		)
 		const tags = normalizeShortText(data.tags || "", 200)
@@ -1952,14 +1966,14 @@ exports.sendBookingConfirmationEmail = onDocumentCreated(
 			`Date: ${booking.date || "N/A"}`,
 			`Time: ${booking.time || "N/A"}`,
 			"",
-			"Thank you for choosing Royal Braids!",
+			`Thank you for choosing ${CLIENT_BUSINESS_NAME}!`,
 		].join("\n")
 
 		const htmlContent = `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
           <h2 style="margin-bottom: 8px;">Booking Confirmed ✅</h2>
           <p>Hi <strong>${customerName}</strong>,</p>
-          <p>Your appointment at <strong>Royal Braids</strong> has been confirmed.</p>
+          <p>Your appointment at <strong>${CLIENT_BUSINESS_NAME}</strong> has been confirmed.</p>
           <table style="border-collapse: collapse; margin: 16px 0;">
             <tr><td style="padding: 6px 10px; font-weight: bold;">Booking ID:</td><td style="padding: 6px 10px;">${bookingId}</td></tr>
             <tr><td style="padding: 6px 10px; font-weight: bold;">Service:</td><td style="padding: 6px 10px;">${booking.service || "N/A"}</td></tr>
@@ -1968,14 +1982,14 @@ exports.sendBookingConfirmationEmail = onDocumentCreated(
             <tr><td style="padding: 6px 10px; font-weight: bold;">Time:</td><td style="padding: 6px 10px;">${booking.time || "N/A"}</td></tr>
           </table>
           <p>We look forward to seeing you.</p>
-          <p>— Royal Braids Team</p>
+          <p>— ${CLIENT_TEAM_NAME}</p>
         </div>
       `
 
 		const message = {
 			to: booking.email,
 			from: RESEND_FROM_EMAIL.value(),
-			subject: "Royal Braids Booking Confirmation",
+			subject: `${CLIENT_BUSINESS_NAME} Booking Confirmation`,
 			text: textContent,
 			html: htmlContent,
 		}
@@ -2042,7 +2056,7 @@ exports.sendBookingConfirmationWhatsApp = onDocumentCreated(
 		const customerName = buildCustomerName(booking)
 		const { dateLabel, timeLabel } = formatBookingDateTimeForMessage(booking)
 		const messageBody = [
-			`Hi ${customerName}, your Royal Braids booking is confirmed ✅`,
+			`Hi ${customerName}, your ${CLIENT_BUSINESS_NAME} booking is confirmed ✅`,
 			`Booking ID: ${bookingId}`,
 			`Service: ${booking?.service || "N/A"}`,
 			`Stylist: ${booking?.stylist || "Any Available"}`,
@@ -2087,7 +2101,7 @@ exports.sendBookingConfirmationWhatsApp = onDocumentCreated(
 exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 	{
 		schedule: "every 15 minutes",
-		timeZone: "Africa/Nairobi",
+		timeZone: NAIROBI_TIMEZONE,
 		region: "us-central1",
 		secrets: [WHATSAPP_CLOUD_ACCESS_TOKEN, WHATSAPP_CLOUD_PHONE_NUMBER_ID],
 	},
@@ -2145,7 +2159,7 @@ exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 			const customerName = buildCustomerName(booking)
 			const { dateLabel, timeLabel } = formatBookingDateTimeForMessage(booking)
 			const messageBody = [
-				`Hi ${customerName}, reminder from Royal Braids ⏰`,
+				`Hi ${customerName}, reminder from ${CLIENT_BUSINESS_NAME} ⏰`,
 				"Your appointment is in about 2 hours.",
 				`Service: ${booking?.service || "N/A"}`,
 				`Stylist: ${booking?.stylist || "Any Available"}`,
@@ -2495,7 +2509,7 @@ exports.notifyWaitlistOnSlotOpen = onDocumentDeleted(
 			`Time: ${timeLabel}`,
 			`Stylist: ${stylistLabel}`,
 			"",
-			"Please return to Royal Braids booking page to secure it.",
+			`Please return to ${CLIENT_BUSINESS_NAME} booking page to secure it.`,
 		].join("\n")
 
 		let emailSent = false
@@ -2507,7 +2521,7 @@ exports.notifyWaitlistOnSlotOpen = onDocumentDeleted(
 				await resend.emails.send({
 					to: entry.email,
 					from: RESEND_FROM_EMAIL.value(),
-					subject: "Slot Available: Your Royal Braids Waitlist Alert",
+					subject: `Slot Available: Your ${CLIENT_BUSINESS_NAME} Waitlist Alert`,
 					text: textBody,
 				})
 				emailSent = true

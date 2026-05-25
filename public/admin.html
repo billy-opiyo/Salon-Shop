@@ -14,23 +14,12 @@
 		/>
 		<link rel="stylesheet" href="CSS/style.css" />
 		<link rel="icon" type="image/x-icon" href="IMG/Royal Braids logo.png" />
+		<script src="client-config.js"></script>
+		<script src="JS/apply-client-config.js" defer></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
-		<script>
-			window.APP_CONFIG = {
-				firebase: {
-					apiKey: "AIzaSyAyVcRjG55o6nwaXpRzZyt2BtX2RamGEqg",
-					authDomain: "services-website-billydev.firebaseapp.com",
-					projectId: "services-website-billydev",
-					storageBucket: "services-website-billydev.firebasestorage.app",
-					messagingSenderId: "712913782427",
-					appId: "1:712913782427:web:e997553d71bd9a1f6a283e",
-					measurementId: "G-B6LVQBEN3G",
-				},
-			}
-		</script>
 		<script src="JS/admin.js" defer></script>
 	</head>
 	<body>
@@ -337,7 +326,9 @@
 							<div class="admin-schedule-legend" aria-label="Status colors">
 								<span><i class="admin-status-dot pending"></i>Pending</span>
 								<span><i class="admin-status-dot confirmed"></i>Confirmed</span>
-								<span><i class="admin-status-dot waitlisted"></i>Waitlisted</span>
+								<span
+									><i class="admin-status-dot waitlisted"></i>Waitlisted</span
+								>
 								<span><i class="admin-status-dot completed"></i>Completed</span>
 								<span><i class="admin-status-dot cancelled"></i>Cancelled</span>
 							</div>

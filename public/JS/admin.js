@@ -1,5 +1,8 @@
 const appConfig = window.APP_CONFIG || {}
 const firebaseConfig = appConfig.firebase || {}
+const clientCloudinaryFolder =
+	String(appConfig.cloudinaryFolder || "royal-braids/gallery").trim() ||
+	"royal-braids/gallery"
 
 let firebaseReady = false
 let db = null
@@ -5212,7 +5215,7 @@ async function uploadImageToCloudinary(file) {
 		"createCloudinarySignedUpload",
 	)
 	const signResponse = await signUploadCallable({
-		folder: "royal-braids/gallery",
+		folder: clientCloudinaryFolder,
 		tags: "admin_upload,gallery",
 	})
 	const signatureData = signResponse?.data || {}
@@ -5230,7 +5233,7 @@ async function uploadImageToCloudinary(file) {
 	body.append("api_key", signatureData.apiKey)
 	body.append("timestamp", String(signatureData.timestamp || ""))
 	body.append("signature", signatureData.signature)
-	body.append("folder", signatureData.folder || "royal-braids/gallery")
+	body.append("folder", signatureData.folder || clientCloudinaryFolder)
 	if (signatureData.tags) body.append("tags", signatureData.tags)
 
 	const response = await fetch(signatureData.uploadUrl, {
