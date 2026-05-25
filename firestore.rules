@@ -50,6 +50,43 @@ service cloud.firestore {
       );
     }
 
+    function bookingEmailMatchesSignedInUser() {
+      return isSignedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email != ''
+        && resource.data.email is string
+        && resource.data.email != ''
+        && resource.data.email == request.auth.token.email;
+    }
+
+    function bookingOwnerMatchesSignedInUser() {
+      return isSignedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || (
+            bookingEmailMatchesSignedInUser()
+            && request.resource.data.uid == request.auth.uid
+          )
+        );
+    }
+
+    function bookingSlotLinkedBookingMatchesSignedInUser() {
+      return isSignedIn()
+        && resource.data.bookingId is string
+        && resource.data.bookingId != ''
+        && exists(/databases/$(database)/documents/bookings/$(resource.data.bookingId))
+        && (
+          get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data.uid == request.auth.uid
+          || (
+            request.auth.token.email is string
+            && request.auth.token.email != ''
+            && get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data.email is string
+            && get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data.email != ''
+            && get(/databases/$(database)/documents/bookings/$(resource.data.bookingId)).data.email == request.auth.token.email
+          )
+        );
+    }
+
     function reviewRateLimitDocPath() {
       return /databases/$(database)/documents/rateLimits/$(request.auth.uid);
     }
@@ -142,22 +179,23 @@ service cloud.firestore {
     }
 
     function bookingOwnerUpdateHasAllowedKeys() {
-      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'date',
         'time',
         'stylist',
         'stylistKey',
         'slotId',
         'status',
+        'uid',
         'updatedAt'
       ]);
     }
 
     function bookingOwnerRescheduleIsValid() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
-      return changed.hasAny(['date', 'time', 'slotId'])
-        && changed.hasAny(['date', 'time', 'stylistKey'])
-        && changed.hasAny(['slotId'])
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return affected.hasAny(['date', 'time', 'slotId'])
+        && affected.hasAny(['date', 'time', 'stylistKey'])
+        && affected.hasAny(['slotId'])
         && request.resource.data.date is string
         && request.resource.data.time is string
         && request.resource.data.stylist is string
@@ -169,28 +207,30 @@ service cloud.firestore {
         && request.resource.data.slotId != resource.data.slotId
         && request.resource.data.status in ['pending', 'confirmed']
         && resource.data.status in ['pending', 'confirmed']
-        && request.resource.data.status == resource.data.status;
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.uid == request.auth.uid;
     }
 
     function bookingOwnerCancelIsValid() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
-      return !changed.hasAny(['date', 'time', 'slotId'])
-        && changed.hasOnly(['status', 'updatedAt'])
-        && changed.hasAny(['status'])
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return !affected.hasAny(['date', 'time', 'slotId'])
+        && affected.hasOnly(['status', 'uid', 'updatedAt'])
+        && affected.hasAny(['status'])
         && request.resource.data.status == 'cancelled'
+        && request.resource.data.uid == request.auth.uid
         && resource.data.status in ['pending', 'confirmed', 'waitlisted'];
     }
 
     function bookingOwnerUpdateIsValid() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
-      let touchesSlotFields = changed.hasAny(['date', 'time', 'stylist', 'stylistKey', 'slotId']);
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      let touchesSlotFields = affected.hasAny(['date', 'time', 'stylist', 'stylistKey', 'slotId']);
       return isSignedIn()
-        && resource.data.uid == request.auth.uid
+        && bookingOwnerMatchesSignedInUser()
         && bookingOwnerUpdateHasAllowedKeys()
         && (bookingOwnerRescheduleIsValid() || bookingOwnerCancelIsValid())
         && (
           touchesSlotFields
-            ? !changed.hasAny(['status']) || request.resource.data.status == 'confirmed'
+            ? !affected.hasAny(['status']) || request.resource.data.status == 'confirmed'
             : true
         );
     }
@@ -263,7 +303,9 @@ service cloud.firestore {
 
       // Prevent users from editing slot locks directly.
       allow update: if false;
-      allow delete: if hasAdminPermission('canManageBookings') || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow delete: if hasAdminPermission('canManageBookings')
+        || (isSignedIn() && resource.data.uid == request.auth.uid)
+        || bookingSlotLinkedBookingMatchesSignedInUser();
     }
 
     match /waitlist/{waitlistId} {

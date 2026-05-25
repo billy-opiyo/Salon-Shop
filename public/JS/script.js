@@ -3495,6 +3495,27 @@ function isBookingActionable(booking = {}) {
 	return scheduledAt > Date.now()
 }
 
+function getCurrentUserEmailForOwnership() {
+	return String(auth?.currentUser?.email || "")
+		.trim()
+		.toLowerCase()
+}
+
+function isDashboardBookingOwnedByCurrentUser(booking = {}) {
+	const currentUid = String(auth?.currentUser?.uid || "").trim()
+	if (!currentUid) return false
+
+	const bookingUid = String(booking?.uid || "").trim()
+	if (bookingUid && bookingUid === currentUid) return true
+
+	const currentEmail = getCurrentUserEmailForOwnership()
+	const bookingEmail = String(booking?.email || "")
+		.trim()
+		.toLowerCase()
+
+	return Boolean(currentEmail && bookingEmail && bookingEmail === currentEmail)
+}
+
 function stopDashboardRescheduleAvailabilityListener() {
 	if (typeof dashboardRescheduleAvailabilityUnsubscribe === "function") {
 		dashboardRescheduleAvailabilityUnsubscribe()
@@ -3721,7 +3742,7 @@ async function cancelDashboardBooking(bookingId) {
 		}
 
 		const booking = { id: bookingDoc.id, ...(bookingDoc.data() || {}) }
-		if (String(booking.uid || "") !== String(auth.currentUser.uid || "")) {
+		if (!isDashboardBookingOwnedByCurrentUser(booking)) {
 			throw new Error("You can only cancel your own booking.")
 		}
 		if (!isBookingActionable(booking)) {
@@ -3737,6 +3758,7 @@ async function cancelDashboardBooking(bookingId) {
 			bookingRef,
 			{
 				status: "cancelled",
+				uid: auth.currentUser.uid,
 				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
 			},
 			{ merge: true },
@@ -3793,7 +3815,7 @@ async function saveDashboardRescheduleChanges() {
 
 			const booking = { id: bookingDoc.id, ...(bookingDoc.data() || {}) }
 			const normalizedCurrentStatus = normalizeBookingStatus(booking.status)
-			if (String(booking.uid || "") !== String(auth.currentUser.uid || "")) {
+			if (!isDashboardBookingOwnedByCurrentUser(booking)) {
 				throw new Error("You can only reschedule your own booking.")
 			}
 			if (!isBookingActionable(booking)) {
@@ -3834,6 +3856,7 @@ async function saveDashboardRescheduleChanges() {
 							? ""
 							: getStylistDisplayName(nextStylistKey),
 					slotId: nextSlotId,
+					uid: auth.currentUser.uid,
 					status:
 						normalizedCurrentStatus === "pending" ? "pending" : "confirmed",
 					updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
