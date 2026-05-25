@@ -1178,6 +1178,66 @@ const timeSlots = [
 	"7:00 PM",
 ]
 
+const BOOKING_SLOT_UTC_OFFSET_HOURS = 3
+const EXPIRED_SLOT_CLEANUP_THROTTLE_MS = 5 * 60 * 1000
+
+function parseTimeSlotToMinutes(timeText = "") {
+	const match = String(timeText || "")
+		.trim()
+		.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+	if (!match) return null
+
+	let hours = Number(match[1])
+	const minutes = Number(match[2])
+	const period = String(match[3] || "").toUpperCase()
+	if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+	if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return null
+
+	if (period === "PM" && hours !== 12) hours += 12
+	if (period === "AM" && hours === 12) hours = 0
+
+	return hours * 60 + minutes
+}
+
+function getBookingSlotStartMs(dateValue = "", timeValue = "") {
+	const rawDate = String(dateValue || "").trim()
+	const minutesFromMidnight = parseTimeSlotToMinutes(timeValue)
+	if (!rawDate || minutesFromMidnight === null) return 0
+
+	const dateParts = rawDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+	if (!dateParts) return 0
+
+	const year = Number(dateParts[1])
+	const month = Number(dateParts[2])
+	const day = Number(dateParts[3])
+	if (!year || !month || !day) return 0
+
+	const hours = Math.floor(minutesFromMidnight / 60)
+	const minutes = minutesFromMidnight % 60
+	const utcMs = Date.UTC(
+		year,
+		month - 1,
+		day,
+		hours - BOOKING_SLOT_UTC_OFFSET_HOURS,
+		minutes,
+		0,
+		0,
+	)
+
+	return Number.isFinite(utcMs) ? utcMs : 0
+}
+
+function isBookingSlotExpired(slotData = {}, referenceMs = Date.now()) {
+	const dateValue = String(
+		slotData.date || slotData.bookingDate || slotData.preferredDate || "",
+	).trim()
+	const timeValue = String(
+		slotData.time || slotData.bookingTime || slotData.preferredTime || "",
+	).trim()
+	const slotStartMs = getBookingSlotStartMs(dateValue, timeValue)
+	return Boolean(slotStartMs && slotStartMs <= referenceMs)
+}
+
 const CUSTOM_SERVICE_OPTION_VALUE = "__custom_service__"
 const SERVICE_SETTINGS_DOC_PATH = ["siteSettings", "serviceCategories"]
 const SERVICE_CATEGORY_DEFINITIONS = [
@@ -1221,6 +1281,7 @@ let functionsService = null
 let activeAvailabilityUnsubscribe = null
 let currentBookedSlotEntries = []
 let pendingWaitlistBooking = null
+const expiredSlotCleanupRequestTimes = new Map()
 let serviceCategorySettingsUnsubscribe = null
 let authMode = "signin"
 let authObserverAttached = false
@@ -1924,6 +1985,13 @@ async function callClientRescheduleBookingAction({
 		time: String(time || "").trim(),
 		stylistKey: normalizeStylistKey(stylistKey || "any"),
 	})
+}
+
+async function callClientReleaseExpiredBookingSlotAction(slotId = "") {
+	const releaseExpiredBookingSlot = getHttpsCallableFunction(
+		"clientReleaseExpiredBookingSlot",
+	)
+	return releaseExpiredBookingSlot({ slotId: String(slotId || "").trim() })
 }
 
 async function finalizeGoogleSignInResult(user, context = {}) {
@@ -5186,6 +5254,36 @@ function getCurrentBookingFormStylistKey() {
 	)
 }
 
+async function requestExpiredSlotCleanup(
+	slotId = "",
+	slotData = {},
+	{ force = false } = {},
+) {
+	const safeSlotId = String(slotId || "").trim()
+	if (!safeSlotId || !isBookingSlotExpired(slotData)) return false
+	if (!firebaseReady || !functionsService || !auth?.currentUser) return false
+
+	const nowMs = Date.now()
+	const lastRequestedAt = expiredSlotCleanupRequestTimes.get(safeSlotId) || 0
+	if (
+		!force &&
+		lastRequestedAt &&
+		nowMs - lastRequestedAt < EXPIRED_SLOT_CLEANUP_THROTTLE_MS
+	) {
+		return false
+	}
+
+	expiredSlotCleanupRequestTimes.set(safeSlotId, nowMs)
+
+	try {
+		await callClientReleaseExpiredBookingSlotAction(safeSlotId)
+		return true
+	} catch (error) {
+		console.warn("Expired booking slot cleanup request failed:", error)
+		return false
+	}
+}
+
 function getMatchingPendingWaitlistBooking() {
 	if (!pendingWaitlistBooking) return null
 
@@ -5423,7 +5521,19 @@ async function handleJoinWaitlistButtonClick() {
 			.collection("bookingSlots")
 			.doc(selectedSlotId)
 			.get()
-		if (!slotDoc.exists || slotDoc.data()?.taken !== true) {
+		const slotData = slotDoc.exists ? slotDoc.data() || {} : {}
+		if (
+			slotDoc.exists &&
+			slotData.taken === true &&
+			isBookingSlotExpired(slotData)
+		) {
+			await requestExpiredSlotCleanup(selectedSlotId, slotData, { force: true })
+		}
+		if (
+			!slotDoc.exists ||
+			slotData.taken !== true ||
+			isBookingSlotExpired(slotData)
+		) {
 			throw new Error(
 				"This slot just opened. Please select it from Time Slot and confirm your booking.",
 			)
@@ -5642,6 +5752,10 @@ function subscribeToAvailability(date, stylist) {
 			snapshot.forEach((doc) => {
 				const data = doc.data() || {}
 				const time = String(data.time || "").trim()
+				if (data.taken && isBookingSlotExpired(data)) {
+					void requestExpiredSlotCleanup(doc.id, data)
+					return
+				}
 				const docStylistKey = normalizeStylistKey(
 					data.stylistKey || data.stylist || "any",
 				)
@@ -7828,10 +7942,28 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 			}
 
 			const slotRef = db.collection("bookingSlots").doc(slotId)
+			const existingSlotDoc = await slotRef.get()
+			const existingSlotData = existingSlotDoc.exists
+				? existingSlotDoc.data() || {}
+				: {}
+			if (
+				existingSlotDoc.exists &&
+				existingSlotData.taken === true &&
+				isBookingSlotExpired(existingSlotData)
+			) {
+				await requestExpiredSlotCleanup(slotId, existingSlotData, {
+					force: true,
+				})
+			}
 
 			await db.runTransaction(async (transaction) => {
 				const slotDoc = await transaction.get(slotRef)
 				if (slotDoc.exists && slotDoc.data().taken) {
+					if (isBookingSlotExpired(slotDoc.data() || {})) {
+						throw new Error(
+							"This appointment time has already passed and is being released. Please select the time again.",
+						)
+					}
 					throw new Error(
 						"This time slot was just taken. Please choose another one.",
 					)

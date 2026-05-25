@@ -749,6 +749,73 @@ function getBookingAppointmentDate(booking = {}) {
 	return new Date(utcMs)
 }
 
+function getNairobiDateString(referenceMs = Date.now()) {
+	const offsetMs = NAIROBI_UTC_OFFSET_HOURS * 60 * 60 * 1000
+	return new Date(referenceMs + offsetMs).toISOString().slice(0, 10)
+}
+
+function isServerBookingSlotExpired(slotData = {}, referenceMs = Date.now()) {
+	const appointmentDate = getBookingAppointmentDate(slotData)
+	return Boolean(
+		appointmentDate &&
+		Number.isFinite(appointmentDate.getTime()) &&
+		appointmentDate.getTime() <= referenceMs,
+	)
+}
+
+async function releaseExpiredBookingSlotDocument(
+	slotRef,
+	{ nowMs = Date.now(), source = "manual" } = {},
+) {
+	if (!slotRef) return { released: false, reason: "missing-ref" }
+
+	let result = { released: false, reason: "not-found" }
+	const serverNow = admin.firestore.FieldValue.serverTimestamp()
+
+	await admin.firestore().runTransaction(async (transaction) => {
+		const slotSnap = await transaction.get(slotRef)
+		if (!slotSnap.exists) {
+			result = { released: false, reason: "not-found" }
+			return
+		}
+
+		const slotData = slotSnap.data() || {}
+		if (slotData.taken !== true) {
+			result = { released: false, reason: "already-open" }
+			return
+		}
+
+		if (!isServerBookingSlotExpired(slotData, nowMs)) {
+			result = { released: false, reason: "not-expired" }
+			return
+		}
+
+		const releasedBookingId = String(slotData.bookingId || "").trim()
+		transaction.set(
+			slotRef,
+			{
+				taken: false,
+				bookingId: "",
+				uid: "",
+				releasedAt: serverNow,
+				releasedBookingId,
+				releaseReason: "expired",
+				releaseSource: normalizeShortText(source || "manual", 40),
+				updatedAt: serverNow,
+			},
+			{ merge: true },
+		)
+
+		result = {
+			released: true,
+			reason: "expired",
+			bookingId: releasedBookingId,
+		}
+	})
+
+	return result
+}
+
 function formatBookingDateTimeForMessage(booking = {}) {
 	const appointmentDate = getBookingAppointmentDate(booking)
 	if (!appointmentDate) {
@@ -2114,6 +2181,31 @@ exports.clientCancelBooking = onCall(
 	},
 )
 
+exports.clientReleaseExpiredBookingSlot = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		getCallableClientContext(request)
+
+		const slotId = String(request.data?.slotId || "").trim()
+		if (!slotId) {
+			throw new HttpsError("invalid-argument", "Slot ID is required")
+		}
+
+		const slotRef = admin.firestore().collection("bookingSlots").doc(slotId)
+		const result = await releaseExpiredBookingSlotDocument(slotRef, {
+			source: "client",
+		})
+
+		return {
+			ok: true,
+			slotId,
+			...result,
+		}
+	},
+)
+
 exports.clientRescheduleBooking = onCall(
 	{
 		region: "us-central1",
@@ -2506,6 +2598,73 @@ exports.sendUpcomingBookingWhatsAppReminders = onSchedule(
 			sentCount,
 			failedCount,
 			skippedCount,
+		})
+	},
+)
+
+exports.releaseExpiredBookingSlots = onSchedule(
+	{
+		schedule: "every 15 minutes",
+		timeZone: NAIROBI_TIMEZONE,
+		region: "us-central1",
+	},
+	async () => {
+		const nowMs = Date.now()
+		const todayDate = getNairobiDateString(nowMs)
+		let releasedCount = 0
+		let skippedCount = 0
+		let failedCount = 0
+
+		const slotsSnap = await admin
+			.firestore()
+			.collection("bookingSlots")
+			.where("taken", "==", true)
+			.limit(500)
+			.get()
+
+		if (slotsSnap.empty) {
+			logger.info("No booked slots found for expiry cleanup")
+			return
+		}
+
+		for (const doc of slotsSnap.docs) {
+			const slotData = doc.data() || {}
+			const slotDate = String(slotData.date || "").trim()
+			if (slotDate && slotDate > todayDate) {
+				skippedCount += 1
+				continue
+			}
+
+			if (!isServerBookingSlotExpired(slotData, nowMs)) {
+				skippedCount += 1
+				continue
+			}
+
+			try {
+				const result = await releaseExpiredBookingSlotDocument(doc.ref, {
+					nowMs,
+					source: "schedule",
+				})
+				if (result.released) {
+					releasedCount += 1
+				} else {
+					skippedCount += 1
+				}
+			} catch (error) {
+				failedCount += 1
+				logger.error("Failed releasing expired booking slot", {
+					slotId: doc.id,
+					errorMessage: error?.message || "Unknown error",
+				})
+			}
+		}
+
+		logger.info("Expired booking slot cleanup completed", {
+			totalCandidates: slotsSnap.size,
+			releasedCount,
+			skippedCount,
+			failedCount,
+			todayDate,
 		})
 	},
 )

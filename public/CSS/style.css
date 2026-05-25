@@ -1505,6 +1505,11 @@ h6 {
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 12px;
+    min-width: 0;
+}
+
+.waitlist-panel__header > div {
+    min-width: 0;
 }
 
 .waitlist-panel__header strong {
@@ -1524,6 +1529,9 @@ h6 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex: 0 0 auto;
+    min-width: max-content;
+    max-width: none;
     padding: 4px 10px;
     border-radius: var(--radius-full);
     background: rgba(200, 150, 62, 0.16);
@@ -1533,6 +1541,8 @@ h6 {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
 }
 
 .waitlist-panel__controls {
@@ -6228,6 +6238,16 @@ h6 {
         color: #ffe0a0;
     }
 
+    .waitlist-panel__badge {
+        flex: 0 0 auto;
+        width: max-content;
+        max-width: none;
+        min-width: max-content;
+        overflow: visible;
+        text-overflow: clip;
+        letter-spacing: 0.025em;
+    }
+
     .review-auth-badge {
         padding: 5px 8px;
         font-size: 0.72rem;
@@ -8550,6 +8570,12 @@ body.reduced-motion *::after {
     .admin-status {
         min-width: max-content;
         width: max-content;
+    }
+
+    .waitlist-panel__badge {
+        width: max-content;
+        max-width: none;
+        min-width: max-content;
     }
 
     .dashboard-count-badge {
