@@ -1031,6 +1031,83 @@ function getWaitlistQueueSlotId(entry = {}) {
 	return String(entry.preferredSlotId || entry.slotId || "").trim()
 }
 
+async function getWaitlistQueueEntriesForSlot(slotId = "", db = admin.firestore()) {
+	const safeSlotId = String(slotId || "").trim()
+	if (!safeSlotId) return []
+
+	const entriesById = new Map()
+	const snapshots = await Promise.allSettled([
+		db.collection("waitlist").where("preferredSlotId", "==", safeSlotId).limit(300).get(),
+		db.collection("waitlist").where("slotId", "==", safeSlotId).limit(300).get(),
+	])
+
+	snapshots.forEach((result) => {
+		if (result.status !== "fulfilled") return
+		result.value.docs.forEach((doc) => {
+			if (entriesById.has(doc.id)) return
+			entriesById.set(doc.id, {
+				id: doc.id,
+				ref: doc.ref,
+				data: doc.data() || {},
+			})
+		})
+	})
+
+	return [...entriesById.values()]
+}
+
+function sortWaitlistQueueEntriesByCreatedAt(a = {}, b = {}) {
+	const createdDiff = toMillis(a.data?.createdAt) - toMillis(b.data?.createdAt)
+	if (createdDiff !== 0) return createdDiff
+	return String(a.id || "").localeCompare(String(b.id || ""))
+}
+
+async function calculateWaitlistQueueInfoForEntry({
+	slotId = "",
+	waitlistId = "",
+	targetStatus = "waiting",
+	db = admin.firestore(),
+} = {}) {
+	const safeSlotId = String(slotId || "").trim()
+	const safeWaitlistId = String(waitlistId || "").trim()
+	const normalizedTargetStatus = normalizeServerWaitlistStatus(targetStatus)
+
+	if (!safeSlotId || !safeWaitlistId) {
+		return {
+			active: false,
+			position: null,
+			label: "",
+			size: null,
+			status: normalizedTargetStatus,
+			slotId: safeSlotId,
+			waitlistId: safeWaitlistId,
+			source: "live-waitlist-calc",
+		}
+	}
+
+	const waitlistEntries = await getWaitlistQueueEntriesForSlot(safeSlotId, db)
+	const targetEntry = waitlistEntries.find((entry) => entry.id === safeWaitlistId)
+	const targetEntryStatus = targetEntry
+		? normalizeServerWaitlistStatus(targetEntry.data?.status)
+		: normalizedTargetStatus
+	const activeEntries = waitlistEntries
+		.filter((entry) => isActiveWaitlistQueueStatus(entry.data?.status))
+		.sort(sortWaitlistQueueEntriesByCreatedAt)
+	const activeIndex = activeEntries.findIndex((entry) => entry.id === safeWaitlistId)
+	const position = activeIndex >= 0 ? activeIndex + 1 : null
+
+	return {
+		active: Boolean(position),
+		position,
+		label: position ? formatOrdinalPosition(position) : "",
+		size: activeEntries.length,
+		status: targetEntryStatus,
+		slotId: safeSlotId,
+		waitlistId: safeWaitlistId,
+		source: "live-waitlist-calc",
+	}
+}
+
 async function commitFirestoreWritesInChunks(writes = []) {
 	const db = admin.firestore()
 	for (let index = 0; index < writes.length; index += 450) {
@@ -1047,26 +1124,11 @@ async function recalculateWaitlistQueuePositionsForSlot(slotId = "") {
 	if (!safeSlotId) return
 
 	const db = admin.firestore()
-	const waitlistSnapshot = await db
-		.collection("waitlist")
-		.where("preferredSlotId", "==", safeSlotId)
-		.limit(300)
-		.get()
-
-	const waitlistEntries = waitlistSnapshot.docs.map((doc) => ({
-		id: doc.id,
-		ref: doc.ref,
-		data: doc.data() || {},
-	}))
+	const waitlistEntries = await getWaitlistQueueEntriesForSlot(safeSlotId, db)
 
 	const activeEntries = waitlistEntries
 		.filter((entry) => isActiveWaitlistQueueStatus(entry.data.status))
-		.sort((a, b) => {
-			const createdDiff =
-				toMillis(a.data.createdAt) - toMillis(b.data.createdAt)
-			if (createdDiff !== 0) return createdDiff
-			return a.id.localeCompare(b.id)
-		})
+		.sort(sortWaitlistQueueEntriesByCreatedAt)
 
 	const positionByWaitlistId = new Map()
 	activeEntries.forEach((entry, index) => {
@@ -2119,6 +2181,122 @@ exports.adminMoveWaitlistBookingToConfirmed = onCall(
 			waitlistId,
 			slotId: convertedSlotId,
 			status: "confirmed",
+		}
+	},
+)
+
+exports.clientGetWaitlistQueueInfo = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const caller = getCallableClientContext(request)
+		const data = request.data || {}
+		const bookingId = String(data.bookingId || "").trim()
+		const suppliedWaitlistId = String(data.waitlistId || "").trim()
+		if (!bookingId && !suppliedWaitlistId) {
+			throw new HttpsError(
+				"invalid-argument",
+				"Booking ID or waitlist ID is required",
+			)
+		}
+
+		const db = admin.firestore()
+		let booking = null
+		let waitlistEntry = null
+		let waitlistId = suppliedWaitlistId
+		let slotId = ""
+		let waitlistStatus = "waiting"
+
+		if (bookingId) {
+			const bookingSnap = await db.collection("bookings").doc(bookingId).get()
+			if (!bookingSnap.exists) {
+				throw new HttpsError("not-found", "Booking no longer exists")
+			}
+
+			booking = bookingSnap.data() || {}
+			assertClientOwnsBooking(booking, caller)
+
+			const linkedWaitlistId = String(booking.waitlistId || "").trim()
+			if (
+				suppliedWaitlistId &&
+				linkedWaitlistId &&
+				suppliedWaitlistId !== linkedWaitlistId
+			) {
+				throw new HttpsError(
+					"permission-denied",
+					"This waitlist request is not linked to your booking",
+				)
+			}
+
+			waitlistId = linkedWaitlistId || suppliedWaitlistId
+			slotId = String(booking.preferredSlotId || booking.slotId || "").trim()
+			waitlistStatus = normalizeServerWaitlistStatus(
+				booking.waitlistStatus || "waiting",
+			)
+		}
+
+		if (!waitlistId) {
+			throw new HttpsError(
+				"failed-precondition",
+				"This booking is not linked to a waitlist request",
+			)
+		}
+
+		const waitlistSnap = await db.collection("waitlist").doc(waitlistId).get()
+		if (!waitlistSnap.exists) {
+			if (!booking) {
+				throw new HttpsError("not-found", "Waitlist request no longer exists")
+			}
+		} else {
+			waitlistEntry = waitlistSnap.data() || {}
+
+			const waitlistUid = String(waitlistEntry.uid || "").trim()
+			const waitlistEmail = String(waitlistEntry.email || "")
+				.trim()
+				.toLowerCase()
+			const linkedToOwnedBooking = Boolean(
+				booking && String(booking.waitlistId || "").trim() === waitlistId,
+			)
+			if (
+				!linkedToOwnedBooking &&
+				waitlistUid !== caller.uid &&
+				(!caller.email || waitlistEmail !== caller.email)
+			) {
+				throw new HttpsError(
+					"permission-denied",
+					"You can only view your own waitlist queue position",
+				)
+			}
+
+			slotId = slotId || getWaitlistQueueSlotId(waitlistEntry)
+			waitlistStatus = normalizeServerWaitlistStatus(
+				waitlistEntry.status || waitlistStatus,
+			)
+		}
+
+		if (!slotId && waitlistEntry) {
+			const preferredDate = String(waitlistEntry.preferredDate || "").trim()
+			const preferredTime = String(waitlistEntry.preferredTime || "").trim()
+			const stylistKey = normalizeServerStylistKey(
+				waitlistEntry.stylistKey || "any",
+			)
+			if (preferredDate && preferredTime) {
+				slotId = getServerSlotId(preferredDate, stylistKey, preferredTime)
+			}
+		}
+
+		const queueInfo = await calculateWaitlistQueueInfoForEntry({
+			slotId,
+			waitlistId,
+			targetStatus: waitlistStatus,
+			db,
+		})
+
+		return {
+			ok: true,
+			bookingId,
+			...queueInfo,
 		}
 	},
 )

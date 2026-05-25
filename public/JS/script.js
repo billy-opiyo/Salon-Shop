@@ -1994,6 +1994,20 @@ async function callClientReleaseExpiredBookingSlotAction(slotId = "") {
 	return releaseExpiredBookingSlot({ slotId: String(slotId || "").trim() })
 }
 
+async function callClientGetWaitlistQueueInfoAction({
+	bookingId = "",
+	waitlistId = "",
+} = {}) {
+	const getWaitlistQueueInfo = getHttpsCallableFunction(
+		"clientGetWaitlistQueueInfo",
+	)
+	const response = await getWaitlistQueueInfo({
+		bookingId: String(bookingId || "").trim(),
+		waitlistId: String(waitlistId || "").trim(),
+	})
+	return response?.data || null
+}
+
 async function finalizeGoogleSignInResult(user, context = {}) {
 	if (!user || user.isAnonymous) {
 		throw new Error("Google sign-in did not complete. Please try again.")
@@ -3430,11 +3444,30 @@ function formatOrdinalPosition(value = 0) {
 	}
 }
 
+function normalizeDashboardWaitlistStatus(status = "") {
+	const raw = String(status || "waiting")
+		.trim()
+		.toLowerCase()
+	if (raw === "waitlist" || raw === "waitlisted") return "waiting"
+	if (raw === "canceled") return "cancelled"
+	if (
+		[
+			"waiting",
+			"notified",
+			"contacted",
+			"booked",
+			"cancelled",
+			"notification_failed",
+		].includes(raw)
+	) {
+		return raw
+	}
+	return "waiting"
+}
+
 function isActiveDashboardWaitlistQueueStatus(status = "") {
 	return ["waiting", "notified", "contacted", "notification_failed"].includes(
-		String(status || "")
-			.trim()
-			.toLowerCase(),
+		normalizeDashboardWaitlistStatus(status),
 	)
 }
 
@@ -3452,6 +3485,115 @@ function getDashboardWaitlistQueueKey(booking = {}) {
 		.toLowerCase()
 }
 
+function getDashboardWaitlistQueueInfoFromBooking(booking = {}) {
+	const position = Number(booking.waitlistPosition || 0) || null
+	const label = String(booking.waitlistPositionLabel || "").trim()
+	const size = Number(booking.waitlistQueueSize || 0) || null
+	return {
+		position,
+		label,
+		size,
+		hasInfo: Boolean(position || label || size),
+	}
+}
+
+function applyDashboardWaitlistQueueInfo(booking = {}, queueInfo = {}) {
+	const status = normalizeDashboardWaitlistStatus(
+		queueInfo.status || booking.waitlistStatus || "waiting",
+	)
+	const active = isActiveDashboardWaitlistQueueStatus(status)
+	const position = active ? Number(queueInfo.position || 0) || null : null
+	const label = active ? String(queueInfo.label || "").trim() : ""
+	const size = active ? Number(queueInfo.size || 0) || null : null
+
+	return {
+		...booking,
+		waitlistStatus: status,
+		waitlistPosition: position,
+		waitlistPositionLabel: label || formatOrdinalPosition(position),
+		waitlistQueueSize: size,
+		__dashboardQueueInfoHydrated: true,
+	}
+}
+
+async function getDashboardWaitlistDocQueueInfo(waitlistId = "") {
+	const safeWaitlistId = String(waitlistId || "").trim()
+	if (!firebaseReady || !db || !safeWaitlistId) return null
+
+	const snapshot = await db.collection("waitlist").doc(safeWaitlistId).get()
+	if (!snapshot.exists) return null
+	const data = snapshot.data() || {}
+	return {
+		position: Number(data.queuePosition || 0) || null,
+		label: String(data.queuePositionLabel || "").trim(),
+		size: Number(data.queueSize || 0) || null,
+		status: normalizeDashboardWaitlistStatus(data.status),
+		source: "waitlist-doc",
+	}
+}
+
+function hasUsableDashboardQueueInfo(queueInfo = {}) {
+	return Boolean(
+		Number(queueInfo.position || 0) ||
+			String(queueInfo.label || "").trim() ||
+			Number(queueInfo.size || 0),
+	)
+}
+
+async function hydrateDashboardWaitlistQueueInfo(bookings = []) {
+	const items = Array.isArray(bookings)
+		? bookings.map((booking) => ({ ...booking }))
+		: []
+	const waitlistedBookings = items.filter(
+		(booking) =>
+			normalizeBookingStatus(booking.status) === "waitlisted" &&
+			String(booking.waitlistId || "").trim(),
+	)
+
+	if (!waitlistedBookings.length) return items
+
+	await Promise.all(
+		waitlistedBookings.map(async (booking) => {
+			const waitlistId = String(booking.waitlistId || "").trim()
+			const bookingId = String(booking.id || "").trim()
+			let docQueueInfo = null
+			let liveQueueInfo = null
+
+			try {
+				docQueueInfo = await getDashboardWaitlistDocQueueInfo(waitlistId)
+			} catch (error) {
+				console.warn("Dashboard waitlist document lookup failed:", error)
+			}
+
+			try {
+				liveQueueInfo = await callClientGetWaitlistQueueInfoAction({
+					bookingId,
+					waitlistId,
+				})
+			} catch (error) {
+				console.warn("Live dashboard waitlist queue lookup failed:", error)
+			}
+
+			const preferredQueueInfo = hasUsableDashboardQueueInfo(liveQueueInfo)
+				? liveQueueInfo
+				: liveQueueInfo?.active === false
+					? liveQueueInfo
+					: hasUsableDashboardQueueInfo(docQueueInfo) || docQueueInfo?.status
+						? docQueueInfo
+						: null
+
+			if (preferredQueueInfo) {
+				Object.assign(
+					booking,
+					applyDashboardWaitlistQueueInfo(booking, preferredQueueInfo),
+				)
+			}
+		}),
+	)
+
+	return items
+}
+
 function enrichDashboardWaitlistPositions(bookings = []) {
 	const items = Array.isArray(bookings) ? [...bookings] : []
 	const queueMap = new Map()
@@ -3459,11 +3601,30 @@ function enrichDashboardWaitlistPositions(bookings = []) {
 	items.forEach((booking) => {
 		const status = normalizeBookingStatus(booking?.status)
 		if (status !== "waitlisted") return
-		if (
-			!isActiveDashboardWaitlistQueueStatus(booking.waitlistStatus || "waiting")
-		) {
+		booking.waitlistStatus = normalizeDashboardWaitlistStatus(
+			booking.waitlistStatus || "waiting",
+		)
+		if (!isActiveDashboardWaitlistQueueStatus(booking.waitlistStatus)) {
+			booking.waitlistPosition = null
+			booking.waitlistPositionLabel = ""
+			booking.waitlistQueueSize = null
 			return
 		}
+
+		const existingInfo = getDashboardWaitlistQueueInfoFromBooking(booking)
+		if (existingInfo.hasInfo) {
+			booking.waitlistPosition = existingInfo.position
+			booking.waitlistPositionLabel =
+				existingInfo.label || formatOrdinalPosition(existingInfo.position)
+			booking.waitlistQueueSize = existingInfo.size
+			return
+		}
+
+		// Linked waitlist bookings should use the real waitlist queue document / callable
+		// result. Falling back to only the current user's dashboard rows is what caused
+		// every entry to appear as "1st in queue of 1" while admin showed the full queue.
+		if (String(booking.waitlistId || "").trim()) return
+
 		const key = getDashboardWaitlistQueueKey(booking)
 		if (!queueMap.has(key)) queueMap.set(key, [])
 		queueMap.get(key).push(booking)
@@ -4222,6 +4383,9 @@ async function loadUserDashboardData(userOrUid) {
 			if (!latestPhone && data.phone) latestPhone = data.phone
 			dashboardBookingDocs.push({ id: doc.id, ...data })
 		})
+		dashboardBookingDocs = await hydrateDashboardWaitlistQueueInfo(
+			dashboardBookingDocs,
+		)
 
 		const reviewItems = []
 		const reviewDocs = [...(reviewsSnap?.docs || [])].sort(
