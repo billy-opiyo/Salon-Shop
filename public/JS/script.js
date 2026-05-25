@@ -3751,7 +3751,10 @@ async function cancelDashboardBooking(bookingId) {
 
 		if (booking.slotId) {
 			const slotRef = db.collection("bookingSlots").doc(String(booking.slotId))
-			transaction.delete(slotRef)
+			const slotDoc = await transaction.get(slotRef)
+			if (slotDoc.exists) {
+				transaction.delete(slotRef)
+			}
 		}
 
 		transaction.set(
@@ -3827,11 +3830,13 @@ async function saveDashboardRescheduleChanges() {
 				throw new Error("Selected slot is no longer available.")
 			}
 
+			let previousSlotRef = null
+			let previousSlotDoc = null
 			if (booking.slotId) {
-				const previousSlotRef = db
+				previousSlotRef = db
 					.collection("bookingSlots")
 					.doc(String(booking.slotId))
-				transaction.delete(previousSlotRef)
+				previousSlotDoc = await transaction.get(previousSlotRef)
 			}
 
 			transaction.set(nextSlotRef, {
@@ -3844,6 +3849,10 @@ async function saveDashboardRescheduleChanges() {
 				createdAt: firebase.firestore.FieldValue.serverTimestamp(),
 				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
 			})
+
+			if (previousSlotRef && previousSlotDoc?.exists) {
+				transaction.delete(previousSlotRef)
+			}
 
 			transaction.set(
 				bookingRef,

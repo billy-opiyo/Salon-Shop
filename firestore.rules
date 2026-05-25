@@ -178,6 +178,27 @@ service cloud.firestore {
         );
     }
 
+    function bookingSlotLockPayloadIsValid() {
+      return request.resource.data.keys().hasOnly([
+          'taken',
+          'date',
+          'time',
+          'stylistKey',
+          'bookingId',
+          'uid',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.taken == true
+        && request.resource.data.date is string
+        && request.resource.data.time is string
+        && request.resource.data.bookingId is string
+        && request.resource.data.date != ''
+        && request.resource.data.time != ''
+        && request.resource.data.bookingId != ''
+        && request.resource.data.uid == request.auth.uid;
+    }
+
     function bookingOwnerUpdateHasAllowedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'date',
@@ -278,31 +299,15 @@ service cloud.firestore {
     }
  
     match /bookingSlots/{slotId} {
-      allow create: if isSignedIn()
-        && request.resource.data.keys().hasOnly([
-          'taken',
-          'date',
-          'time',
-          'stylistKey',
-          'bookingId',
-          'uid',
-          'createdAt',
-          'updatedAt'
-        ])
-        && request.resource.data.taken == true
-        && request.resource.data.date is string
-        && request.resource.data.time is string
-        && request.resource.data.bookingId is string
-        && request.resource.data.date != ''
-        && request.resource.data.time != ''
-        && request.resource.data.bookingId != ''
-        && request.resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() && bookingSlotLockPayloadIsValid();
 
       // Needed for realtime availability query in the public booking form.
       allow read: if true;
 
-      // Prevent users from editing slot locks directly.
-      allow update: if false;
+      // Users may only turn an existing untaken placeholder slot into their own lock.
+      allow update: if isSignedIn()
+        && resource.data.taken != true
+        && bookingSlotLockPayloadIsValid();
       allow delete: if hasAdminPermission('canManageBookings')
         || (isSignedIn() && resource.data.uid == request.auth.uid)
         || bookingSlotLinkedBookingMatchesSignedInUser();
