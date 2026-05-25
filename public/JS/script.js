@@ -3077,6 +3077,22 @@ function closeAuthModal() {
 	}
 }
 
+function closeAuthProfileMenu({ delay = 0 } = {}) {
+	const closeMenu = () => {
+		if (authUi.profileMenu) authUi.profileMenu.classList.remove("open")
+		if (authUi.profileTrigger) {
+			authUi.profileTrigger.setAttribute("aria-expanded", "false")
+		}
+	}
+
+	if (delay > 0) {
+		window.setTimeout(closeMenu, delay)
+		return
+	}
+
+	closeMenu()
+}
+
 function getUserDisplayName(user) {
 	if (!user) return "Guest User"
 	if (user.displayName && user.displayName.trim())
@@ -3120,6 +3136,7 @@ function setDashboardPromptState() {
 	if (authUi.clientDashboard) authUi.clientDashboard.classList.add("hidden")
 	if (authUi.navDashboardLink) authUi.navDashboardLink.classList.add("hidden")
 	if (authUi.openBtn) authUi.openBtn.classList.remove("hidden")
+	closeAuthProfileMenu()
 	if (authUi.profileMenu) authUi.profileMenu.classList.add("hidden")
 	setHeaderProfileAvatar(null)
 	if (authUi.dashboardProfileName)
@@ -5026,10 +5043,17 @@ function bindAuthUiEvents() {
 			)
 		})
 
+		if (authUi.profileDropdown) {
+			authUi.profileDropdown.addEventListener("click", (event) => {
+				const selectedMenuOption = event.target.closest("a, button")
+				if (!selectedMenuOption) return
+				closeAuthProfileMenu({ delay: 150 })
+			})
+		}
+
 		document.addEventListener("click", (event) => {
 			if (!authUi.profileMenu?.contains(event.target)) {
-				authUi.profileMenu.classList.remove("open")
-				authUi.profileTrigger?.setAttribute("aria-expanded", "false")
+				closeAuthProfileMenu()
 			}
 		})
 	}
