@@ -8013,6 +8013,82 @@ const nav = document.getElementById("nav")
 const backToTop = document.getElementById("backToTop")
 const darkModeToggle = document.getElementById("darkModeToggle")
 
+function getHeaderScrollOffset() {
+	const headerHeight = header?.offsetHeight || 80
+	const rootStyles = getComputedStyle(document.documentElement)
+	const scrollGap = parseFloat(
+		rootStyles.getPropertyValue("--section-scroll-gap"),
+	)
+	return headerHeight + (Number.isFinite(scrollGap) ? scrollGap : 12)
+}
+
+function getSmoothScrollBehavior(behavior = "smooth") {
+	const reduceMotion = window.matchMedia?.(
+		"(prefers-reduced-motion: reduce)",
+	)?.matches
+	return reduceMotion ? "auto" : behavior
+}
+
+function scrollToElementWithHeaderOffset(
+	element,
+	{ behavior = "smooth", block = "start" } = {},
+) {
+	if (!element) return false
+
+	if (block === "center") {
+		element.scrollIntoView({
+			behavior: getSmoothScrollBehavior(behavior),
+			block,
+		})
+		return true
+	}
+
+	const targetTop =
+		window.scrollY + element.getBoundingClientRect().top - getHeaderScrollOffset()
+	window.scrollTo({
+		top: Math.max(0, targetTop),
+		behavior: getSmoothScrollBehavior(behavior),
+	})
+	return true
+}
+
+function getMainSectionScrollTarget(section) {
+	if (!section) return null
+	if (section.id === "home") return section
+	return section.querySelector(".section-subtitle, .section-title") || section
+}
+
+function updateHashWithoutNativeJump(hash) {
+	if (!hash || hash === "#" || window.location.hash === hash) return
+	if (window.history?.pushState) {
+		window.history.pushState(null, "", hash)
+	}
+}
+
+function scrollToMainSection(hash, options = {}) {
+	const sectionId = String(hash || "").replace(/^#/, "")
+	if (!sectionId) return false
+	const section = document.getElementById(sectionId)
+	if (!section) return false
+
+	const scrolled = scrollToElementWithHeaderOffset(
+		getMainSectionScrollTarget(section),
+		options,
+	)
+	if (scrolled && options.updateHash !== false) {
+		updateHashWithoutNativeJump(`#${sectionId}`)
+	}
+	return scrolled
+}
+
+function isBookingActionLink(anchor) {
+	return Boolean(
+		anchor?.matches?.(".book-btn") ||
+			anchor?.closest?.(".hero-buttons") ||
+			anchor?.closest?.(".header-actions"),
+	)
+}
+
 // Sticky header
 window.addEventListener("scroll", () => {
 	header.classList.toggle("scrolled", window.scrollY > 50)
@@ -8151,7 +8227,7 @@ function focusBookingFormCard({ behavior = "smooth", block = "start" } = {}) {
 			? bookingForm
 			: bookingSection
 
-	target?.scrollIntoView({ behavior, block })
+	scrollToElementWithHeaderOffset(target, { behavior, block })
 
 	if (target === bookingForm) {
 		bookingForm.classList.remove("booking-form--focus-flash")
@@ -8762,18 +8838,28 @@ if (contactSuccessPopupClose) {
 document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
 	anchor.addEventListener("click", function (e) {
 		const href = this.getAttribute("href")
+		if (!href || href === "#") return
 
-		if (href === "#booking") {
+		if (href === "#booking" && isBookingActionLink(this)) {
 			e.preventDefault()
-			focusBookingFormCard({ behavior: "smooth", block: "center" })
+			updateHashWithoutNativeJump(href)
+			focusBookingFormCard({ behavior: "smooth", block: "start" })
 			return
 		}
 
-		const target = document.querySelector(href)
-		if (target) {
+		if (scrollToMainSection(href, { behavior: "smooth" })) {
 			e.preventDefault()
-			target.scrollIntoView({ behavior: "smooth", block: "start" })
 		}
+	})
+})
+
+window.addEventListener("load", () => {
+	if (!window.location.hash) return
+	requestAnimationFrame(() => {
+		scrollToMainSection(window.location.hash, {
+			behavior: "auto",
+			updateHash: false,
+		})
 	})
 })
 
