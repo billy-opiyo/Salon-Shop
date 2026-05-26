@@ -326,6 +326,8 @@ h6 {
     position: sticky;
     top: var(--sticky-section-heading-top);
     z-index: 60;
+    width: fit-content;
+    max-width: 100%;
     padding: clamp(16px, 2.2vw, 24px) clamp(18px, 3vw, 30px);
     background: linear-gradient(180deg, rgba(10, 10, 10, 0.96), rgba(17, 17, 17, 0.88));
     border: 1px solid rgba(200, 150, 62, 0.22);
@@ -354,8 +356,46 @@ h6 {
     margin-bottom: 0;
 }
 
+.section-heading-copy {
+    margin: clamp(14px, 2vw, 18px) 0 clamp(32px, 5vw, 50px);
+}
+
+.gallery-header,
+.services-header,
+.booking-section-heading,
+.dashboard-heading,
+.testimonials-header,
+.blog-header,
+.contact-heading {
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+.gallery-header .section-subtitle,
+.services-header .section-subtitle,
+.booking-section-heading .section-subtitle,
+.dashboard-heading .section-subtitle,
+.testimonials-header .section-subtitle,
+.blog-header .section-subtitle,
+.contact-heading .section-subtitle {
+    justify-content: center;
+}
+
+.gallery-header+.section-heading-copy,
+.services-header+.section-heading-copy,
+.booking-section-heading+.section-heading-copy,
+.dashboard-heading+.section-heading-copy,
+.testimonials-header+.section-heading-copy,
+.blog-header+.section-heading-copy,
+.contact-heading+.section-heading-copy {
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
 .booking-section-heading {
-    margin-bottom: 30px;
+    margin-bottom: 0;
 }
 
 @media (max-width: 900px) {
@@ -384,15 +424,17 @@ h6 {
     }
 
     .main-section-heading .section-title {
-        margin-bottom: 12px;
+        margin-bottom: 0;
     }
 
-    .main-section-heading .section-desc {
+    .section-heading-copy {
         font-size: 0.96rem;
+        margin-top: 12px;
+        margin-bottom: 32px;
     }
 
     .booking-section-heading {
-        margin-bottom: 22px;
+        margin-bottom: 0;
     }
 }
 
@@ -531,6 +573,12 @@ h6 {
 
 .animate-on-scroll.visible {
     opacity: 1;
+    transform: translateY(0);
+}
+
+.gallery .animate-on-scroll,
+.services .animate-on-scroll,
+.client-dashboard .animate-on-scroll {
     transform: translateY(0);
 }
 
@@ -1285,7 +1333,7 @@ h6 {
 
 .services-header {
     text-align: center;
-    margin-bottom: 60px;
+    margin-bottom: 0;
 }
 
 .services-header .section-subtitle {
@@ -4674,7 +4722,7 @@ h6 {
 
 .gallery-header {
     text-align: center;
-    margin-bottom: 50px;
+    margin-bottom: 0;
 }
 
 .gallery-header .section-subtitle {
@@ -4767,7 +4815,7 @@ h6 {
 @keyframes fadeIn {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(0);
     }
 
     to {
@@ -5163,7 +5211,7 @@ h6 {
 
 .testimonials-header {
     text-align: center;
-    margin-bottom: 50px;
+    margin-bottom: 0;
 }
 
 .testimonials-header .section-subtitle {
@@ -5810,7 +5858,7 @@ h6 {
 
 .blog-header {
     text-align: center;
-    margin-bottom: 50px;
+    margin-bottom: 0;
 }
 
 .blog-header .section-subtitle {
@@ -6261,10 +6309,6 @@ h6 {
     .form-row {
         flex-direction: column;
         gap: 12px;
-    }
-
-    .gallery-header {
-        margin-bottom: 30px;
     }
 
     .gallery-filter-group {
@@ -6932,8 +6976,8 @@ body.light-mode input[type="datetime-local"]::-webkit-calendar-picker-indicator 
     position: fixed;
     bottom: 30px;
     right: 30px;
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     background: var(--primary);
     color: #0A0A0A;
     border-radius: 50%;
@@ -6946,6 +6990,11 @@ body.light-mode input[type="datetime-local"]::-webkit-calendar-picker-indicator 
     transition: var(--transition);
     z-index: 999;
     box-shadow: 0 8px 25px var(--shadow);
+}
+
+.back-to-top svg {
+    width: 20px;
+    height: 20px;
 }
 
 .back-to-top.visible {

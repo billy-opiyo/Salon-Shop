@@ -3548,10 +3548,7 @@ function focusDashboardAfterAuthIfRequested() {
 	shouldAutoFocusDashboardAfterAuth = false
 
 	if (authUi.clientDashboard) {
-		authUi.clientDashboard.scrollIntoView({
-			behavior: "smooth",
-			block: "start",
-		})
+		scrollToMainSection("#clientDashboard", { behavior: "smooth" })
 		authUi.clientDashboard.setAttribute("tabindex", "-1")
 		authUi.clientDashboard.focus({ preventScroll: true })
 	}
@@ -8188,7 +8185,11 @@ function scrollToElementWithHeaderOffset(
 function getMainSectionScrollTarget(section) {
 	if (!section) return null
 	if (section.id === "home") return section
-	return section.querySelector(".section-subtitle, .section-title") || section
+	return (
+		section.querySelector(".main-section-heading") ||
+		section.querySelector(".section-title") ||
+		section
+	)
 }
 
 function updateHashWithoutNativeJump(hash) {
