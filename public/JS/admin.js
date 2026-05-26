@@ -97,6 +97,7 @@ const ADMIN_GALLERY_SERVICE_FILTER_DEFINITIONS = [
 	{ key: "nail-services", label: "Nails" },
 	{ key: "makeup-services", label: "Makeup" },
 	{ key: "barber-services", label: "Barber" },
+	{ key: "massage-wellness", label: "Massage" },
 	{ key: "eyebrow-lash-services", label: "Eyebrows & Lash" },
 	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
 ]
@@ -123,6 +124,7 @@ const ADMIN_GALLERY_CATEGORY_KEYWORDS = {
 		"retouch",
 	],
 	"braids-services": ["braid", "twist", "cornrow", "knotless", "fulani", "loc"],
+	"massage-wellness": ["massage", "wellness", "therapy", "hot stone", "deep tissue"],
 }
 const ADMIN_REVIEW_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
@@ -1131,7 +1133,7 @@ async function saveAdminServiceCategorySettings() {
 function setAdminMessage(type, text, targetId = "adminMessage") {
 	const msg = document.getElementById(targetId)
 	if (!msg) return
-	const isGalleryToast = targetId === "adminGalleryMessage"
+	const shouldUseToast = type === "success" || type === "error"
 
 	const existingTimer = adminMessageTimers.get(targetId)
 	if (existingTimer) {
@@ -1169,7 +1171,7 @@ function setAdminMessage(type, text, targetId = "adminMessage") {
 		return
 	}
 
-	msg.className = isGalleryToast
+	msg.className = shouldUseToast
 		? `form-message ${type} form-message--toast`
 		: `form-message ${type}`
 	msg.textContent = text
@@ -3818,10 +3820,10 @@ function renderAdminWaitlist(docs = []) {
         </div>
         <div class="admin-booking-actions">
           <button class="admin-action-btn" data-waitlist-action="move-confirmed" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}" ${canMoveToConfirmed ? "" : "disabled"}>Move to Confirmed</button>
-          <button class="admin-action-btn" data-waitlist-action="waiting" data-id="${escapeHtml(item.id)}">Set Waiting</button>
-          <button class="admin-action-btn" data-waitlist-action="contacted" data-id="${escapeHtml(item.id)}">Mark Contacted</button>
-          <button class="admin-action-btn" data-waitlist-action="booked" data-id="${escapeHtml(item.id)}">Mark Booked</button>
-          <button class="admin-action-btn danger" data-waitlist-action="cancelled" data-id="${escapeHtml(item.id)}">Cancel Request</button>
+          <button class="admin-action-btn" data-waitlist-action="waiting" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Set Waiting</button>
+          <button class="admin-action-btn" data-waitlist-action="contacted" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Mark Contacted</button>
+          <button class="admin-action-btn" data-waitlist-action="booked" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Mark Booked</button>
+          <button class="admin-action-btn danger" data-waitlist-action="cancelled" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Cancel Request</button>
         </div>
       </article>
     `
@@ -3829,31 +3831,81 @@ function renderAdminWaitlist(docs = []) {
 		.join("")
 }
 
-async function updateWaitlistStatus(waitlistId, status) {
+function getLinkedBookingIdForWaitlist(waitlistId = "") {
+	const safeWaitlistId = String(waitlistId || "").trim()
+	if (!safeWaitlistId) return ""
+	const linkedBooking = adminBookingDocs.find(
+		(booking = {}) =>
+			String(booking.waitlistId || "").trim() === safeWaitlistId,
+	)
+	return String(linkedBooking?.id || "").trim()
+}
+
+async function updateLinkedWaitlistBookingStatus(
+	waitlistId,
+	status,
+	bookingId = "",
+	actorEmail = "admin",
+) {
+	const safeBookingId =
+		String(bookingId || "").trim() || getLinkedBookingIdForWaitlist(waitlistId)
+	if (!safeBookingId) return
+
+	const normalizedStatus = normalizeWaitlistStatus(status)
+	const serverNow = firebase.firestore.FieldValue.serverTimestamp()
+	const payload = {
+		waitlistStatus: normalizedStatus,
+		waitlistAdminUpdatedBy: actorEmail,
+		waitlistUpdatedAt: serverNow,
+		updatedAt: serverNow,
+	}
+
+	if (normalizedStatus === "cancelled") {
+		payload.status = "cancelled"
+		payload.isWaitlisted = false
+		payload.cancelledAt = serverNow
+		payload.cancelledBy = actorEmail
+	} else {
+		payload.status = "waitlisted"
+		payload.bookingType = "waitlist"
+		payload.isWaitlisted = true
+	}
+
+	await db.collection("bookings").doc(safeBookingId).set(payload, { merge: true })
+}
+
+async function updateWaitlistStatus(waitlistId, status, bookingId = "") {
 	const normalizedStatus = normalizeWaitlistStatus(status)
 	const actorEmail = auth?.currentUser?.email || "admin"
+	const serverNow = firebase.firestore.FieldValue.serverTimestamp()
 	const payload = {
 		status: normalizedStatus,
 		adminUpdatedBy: actorEmail,
-		updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+		updatedAt: serverNow,
 	}
 
 	if (normalizedStatus === "contacted") {
-		payload.contactedAt = firebase.firestore.FieldValue.serverTimestamp()
+		payload.contactedAt = serverNow
 		payload.contactedBy = actorEmail
 	}
 
 	if (normalizedStatus === "booked") {
-		payload.bookedAt = firebase.firestore.FieldValue.serverTimestamp()
+		payload.bookedAt = serverNow
 		payload.bookedBy = actorEmail
 	}
 
 	if (normalizedStatus === "cancelled") {
-		payload.cancelledAt = firebase.firestore.FieldValue.serverTimestamp()
+		payload.cancelledAt = serverNow
 		payload.cancelledBy = actorEmail
 	}
 
 	await db.collection("waitlist").doc(waitlistId).set(payload, { merge: true })
+	await updateLinkedWaitlistBookingStatus(
+		waitlistId,
+		normalizedStatus,
+		bookingId,
+		actorEmail,
+	)
 }
 
 function normalizeReviewStatus(status) {
@@ -6121,14 +6173,17 @@ function initializeAdminPanel() {
 	logoutBtn.addEventListener("click", async () => {
 		if (!auth) return
 		try {
+			setAdminButtonLoadingState(logoutBtn, true, {
+				loadingText: "Logging Out",
+			})
+			await new Promise((resolve) => setTimeout(resolve, 350))
 			await auth.signOut()
-			setAdminMessage(
-				"success",
-				"🔒 Logged out successfully.",
-				"adminAuthMessage",
-			)
+			window.location.assign("admin.html")
 		} catch (error) {
 			console.error("Admin signout failed:", error)
+			setAdminButtonLoadingState(logoutBtn, false, {
+				resetText: "Log Out",
+			})
 			setAdminMessage(
 				"error",
 				`❌ Logout failed: ${error.message || "unknown error"}`,
@@ -6818,7 +6873,11 @@ function initializeAdminPanel() {
 						"adminWaitlistMessage",
 					)
 				} else {
-					await updateWaitlistStatus(waitlistId, action)
+					await updateWaitlistStatus(
+						waitlistId,
+						action,
+						String(actionBtn.dataset.bookingId || "").trim(),
+					)
 					setAdminMessage(
 						"success",
 						`✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.`,

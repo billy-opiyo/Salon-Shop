@@ -6920,51 +6920,67 @@ button.btn-loading,
     transform: translateY(-6px);
 }
 
-#adminGalleryMessage.form-message--toast {
+.form-message.form-message--toast {
     position: fixed;
-    top: 24px;
-    left: 24px;
-    z-index: 2200;
-    width: min(420px, calc(100vw - 32px));
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    right: 16px;
+    z-index: 2600;
+    width: min(420px, calc(100vw - 24px));
     margin: 0;
     pointer-events: none;
     opacity: 0;
-    transform: translateX(-120%);
+    visibility: hidden;
+    transform: translateY(-14px) translateX(12px);
     transition:
+        opacity 0.32s ease,
         transform 0.32s ease,
-        opacity 0.32s ease;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(200, 150, 62, 0.1);
+        visibility 0.32s ease;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(200, 150, 62, 0.08);
 }
 
-#adminGalleryMessage.form-message--toast.is-visible {
+.form-message.form-message--toast.is-visible {
     opacity: 1;
-    transform: translateX(0);
+    visibility: visible;
+    transform: translateY(0) translateX(0);
 }
 
-#adminGalleryMessage.form-message--toast.is-leaving {
+.form-message.form-message--toast.is-leaving {
     opacity: 0;
-    transform: translateX(-120%);
+    visibility: hidden;
+    transform: translateY(-14px) translateX(12px);
 }
 
 .form-message.success {
-    background: rgba(72, 187, 120, 0.15);
-    color: #48bb78;
-    border: 1px solid rgba(72, 187, 120, 0.3);
+    background: color-mix(in srgb, var(--bg-card) 88%, rgba(200, 150, 62, 0.12));
+    color: var(--text-primary);
+    border: 1px solid color-mix(in srgb, var(--primary) 52%, transparent);
+    border-left: 4px solid var(--primary);
     display: block;
 }
 
 .form-message.error {
-    background: rgba(245, 101, 101, 0.15);
-    color: #f56565;
-    border: 1px solid rgba(245, 101, 101, 0.3);
+    background: color-mix(in srgb, var(--bg-card) 86%, rgba(225, 80, 90, 0.14));
+    color: var(--text-primary);
+    border: 1px solid color-mix(in srgb, #e15d66 55%, transparent);
+    border-left: 4px solid #e15d66;
     display: block;
 }
 
 @media (max-width: 600px) {
-    #adminGalleryMessage.form-message--toast {
-        top: 14px;
-        left: 8px;
-        width: min(420px, calc(100vw - 16px));
+    .form-message.form-message--toast {
+        top: calc(env(safe-area-inset-top, 0px) + 10px);
+        left: 10px;
+        right: 10px;
+        width: auto;
+        transform: translateY(-12px);
+    }
+
+    .form-message.form-message--toast.is-visible {
+        transform: translateY(0);
+    }
+
+    .form-message.form-message--toast.is-leaving {
+        transform: translateY(-12px);
     }
 }
 

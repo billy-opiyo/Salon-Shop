@@ -855,9 +855,12 @@ let showAllGallery = false
 let currentLightboxIndex = 0
 let galleryRealtimeUnsubscribe = null
 let dashboardFavoritesUnsubscribe = null
+let dashboardBookingsUnsubscribe = null
 let dashboardFavoriteStyles = []
 let activeDashboardUid = ""
+let activeDashboardBookingsKey = ""
 let dashboardBookingDocs = []
+let dashboardBookingsRenderToken = 0
 let dashboardRescheduleTarget = null
 let dashboardRescheduleAvailabilityUnsubscribe = null
 let gallerySlideshowTimers = []
@@ -1279,10 +1282,20 @@ function getReviewDraftsArray() {
 
 function showFormMessage(msg, type, text) {
 	if (!msg) return
-	msg.className = `form-message ${type}`
+	const normalizedType = String(type || "").trim()
+	const shouldUseToast =
+		normalizedType === "success" || normalizedType === "error"
+	msg.className = shouldUseToast
+		? `form-message ${normalizedType} form-message--toast`
+		: `form-message ${normalizedType}`
 	msg.textContent = text
 	msg.style.display = "block"
 	msg.classList.remove("is-leaving")
+	msg.setAttribute("role", normalizedType === "error" ? "alert" : "status")
+	msg.setAttribute(
+		"aria-live",
+		normalizedType === "error" ? "assertive" : "polite",
+	)
 	requestAnimationFrame(() => {
 		msg.classList.add("is-visible")
 	})
@@ -1298,6 +1311,8 @@ function clearFormMessage(msg) {
 	msg.className = "form-message"
 	msg.textContent = ""
 	msg.style.display = "none"
+	msg.removeAttribute("role")
+	msg.removeAttribute("aria-live")
 }
 
 function hideReviewMessage(msg, animated = false) {
@@ -3456,6 +3471,7 @@ function setHeaderProfileAvatar(user) {
 
 function setDashboardPromptState() {
 	stopDashboardFavoritesListener()
+	stopDashboardBookingsListener()
 	stopDashboardRescheduleAvailabilityListener()
 	closeDashboardRescheduleModal()
 	dashboardFavoriteStyles = []
@@ -4372,6 +4388,122 @@ function stopDashboardFavoritesListener() {
 	}
 }
 
+function stopDashboardBookingsListener() {
+	if (typeof dashboardBookingsUnsubscribe === "function") {
+		dashboardBookingsUnsubscribe()
+		dashboardBookingsUnsubscribe = null
+	}
+	activeDashboardBookingsKey = ""
+	dashboardBookingsRenderToken += 1
+}
+
+function startDashboardBookingsListener(uid, email = "") {
+	const safeUid = String(uid || "").trim()
+	const safeEmail = String(email || "")
+		.trim()
+		.toLowerCase()
+	if (!firebaseReady || !db || !safeUid) return
+
+	const listenerKey = `${safeUid}|${safeEmail}`
+	if (
+		activeDashboardBookingsKey === listenerKey &&
+		typeof dashboardBookingsUnsubscribe === "function"
+	) {
+		return
+	}
+
+	stopDashboardBookingsListener()
+	activeDashboardBookingsKey = listenerKey
+
+	let uidDocs = []
+	let emailDocs = []
+	const unsubscribers = []
+
+	const renderSnapshotDocs = async () => {
+		const renderToken = ++dashboardBookingsRenderToken
+		const bookingDocMap = new Map()
+		;[...uidDocs, ...emailDocs].forEach((item) => {
+			const id = String(item?.id || "").trim()
+			if (id) bookingDocMap.set(id, item)
+		})
+
+		const sortedDocs = [...bookingDocMap.values()].sort((a, b) => {
+			const updatedDiff = toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
+			if (updatedDiff !== 0) return updatedDiff
+			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
+		})
+
+		let latestPhone = ""
+		const nextBookings = sortedDocs.slice(0, 5).map((item) => {
+			if (!latestPhone && item.phone) latestPhone = item.phone
+			return { ...item }
+		})
+
+		try {
+			const hydratedBookings =
+				await hydrateDashboardWaitlistQueueInfo(nextBookings)
+			if (renderToken !== dashboardBookingsRenderToken) return
+			dashboardBookingDocs = hydratedBookings
+			renderDashboardBookingRows(dashboardBookingDocs)
+		} catch (error) {
+			console.warn("Dashboard realtime bookings hydration failed:", error)
+			if (renderToken !== dashboardBookingsRenderToken) return
+			dashboardBookingDocs = nextBookings
+			renderDashboardBookingRows(dashboardBookingDocs)
+		}
+
+		if (latestPhone && authUi.dashboardProfilePhone) {
+			authUi.dashboardProfilePhone.textContent = latestPhone
+		}
+	}
+
+	const attachBookingsListener = (query, source) =>
+		query.onSnapshot(
+			(snapshot) => {
+				const docs = snapshot.docs.map((doc) => ({
+					id: doc.id,
+					...(doc.data() || {}),
+				}))
+				if (source === "uid") uidDocs = docs
+				else emailDocs = docs
+				void renderSnapshotDocs()
+			},
+			(error) => {
+				console.warn(
+					"Dashboard " + source + " bookings realtime listener failed:",
+					error,
+				)
+			},
+		)
+
+	unsubscribers.push(
+		attachBookingsListener(
+			db.collection("bookings").where("uid", "==", safeUid).limit(20),
+			"uid",
+		),
+	)
+
+	if (safeEmail) {
+		unsubscribers.push(
+			attachBookingsListener(
+				db.collection("bookings").where("email", "==", safeEmail).limit(20),
+				"email",
+			),
+		)
+	}
+
+	dashboardBookingsUnsubscribe = () => {
+		unsubscribers.forEach((unsubscribe) => {
+			if (typeof unsubscribe !== "function") return
+			try {
+				unsubscribe()
+			} catch (_error) {
+				// no-op: listener may already be closed
+			}
+		})
+	}
+}
+
 function getFavoritePayload(style = {}) {
 	return {
 		id: String(style.id || "").trim(),
@@ -4499,6 +4631,7 @@ async function loadUserDashboardData(userOrUid) {
 
 	if (!firebaseReady || !db || !uid) return
 	startDashboardFavoritesListener(uid)
+	startDashboardBookingsListener(uid, email)
 
 	try {
 		const getDashboardCollectionSnapshot = async ({
