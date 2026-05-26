@@ -1522,7 +1522,7 @@ h6 {
     min-width: 0;
 }
 
-.waitlist-panel__header > div {
+.waitlist-panel__header>div {
     min-width: 0;
 }
 
@@ -6932,9 +6932,9 @@ button.btn-loading,
     visibility: hidden;
     transform: translateY(-14px) translateX(12px);
     transition:
-        opacity 0.32s ease,
-        transform 0.32s ease,
-        visibility 0.32s ease;
+        opacity 0.35s ease,
+        transform 0.35s ease,
+        visibility 0.35s ease;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(200, 150, 62, 0.08);
 }
 
@@ -6972,15 +6972,15 @@ button.btn-loading,
         left: 10px;
         right: 10px;
         width: auto;
-        transform: translateY(-12px);
+        transform: translateY(-14px) translateX(12px);
     }
 
     .form-message.form-message--toast.is-visible {
-        transform: translateY(0);
+        transform: translateY(0) translateX(0);
     }
 
     .form-message.form-message--toast.is-leaving {
-        transform: translateY(-12px);
+        transform: translateY(-14px) translateX(12px);
     }
 }
 

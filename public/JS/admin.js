@@ -124,7 +124,13 @@ const ADMIN_GALLERY_CATEGORY_KEYWORDS = {
 		"retouch",
 	],
 	"braids-services": ["braid", "twist", "cornrow", "knotless", "fulani", "loc"],
-	"massage-wellness": ["massage", "wellness", "therapy", "hot stone", "deep tissue"],
+	"massage-wellness": [
+		"massage",
+		"wellness",
+		"therapy",
+		"hot stone",
+		"deep tissue",
+	],
 }
 const ADMIN_REVIEW_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
@@ -145,6 +151,7 @@ let adminServiceCategoriesDraft = Object.fromEntries(
 	ADMIN_SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, true]),
 )
 let adminAccessProfile = null
+let adminPendingLogoutToast = false
 
 function closeAdminConfirmModal(result = false) {
 	const modal = document.getElementById("adminConfirmModal")
@@ -239,6 +246,21 @@ function setAdminPasswordVisibility(isVisible) {
 		icon.classList.toggle("fa-eye", !shouldShow)
 		icon.classList.toggle("fa-eye-slash", shouldShow)
 	}
+}
+
+function resetAdminLoginCredentials() {
+	const emailInput = document.getElementById("adminEmail")
+	const passwordInput = document.getElementById("adminPassword")
+
+	if (emailInput) {
+		emailInput.value = ""
+	}
+
+	if (passwordInput) {
+		passwordInput.value = ""
+	}
+
+	setAdminPasswordVisibility(false)
 }
 
 function canInitializeFirebase() {
@@ -1686,6 +1708,7 @@ function setAdminUnlockedState(value) {
 	adminUnlocked = value
 	if (!value) {
 		adminAccessProfile = null
+		resetAdminLoginCredentials()
 	}
 
 	const panel = document.getElementById("adminPanel")
@@ -1693,6 +1716,12 @@ function setAdminUnlockedState(value) {
 	const logoutBtn = document.getElementById("adminLogoutBtn")
 	const userState = document.getElementById("adminUserState")
 	const currentUser = auth?.currentUser || null
+
+	if (logoutBtn) {
+		setAdminButtonLoadingState(logoutBtn, false, {
+			resetText: "Log Out",
+		})
+	}
 
 	if (panel) panel.style.display = value ? "block" : "none"
 	if (loginForm) loginForm.style.display = value ? "none" : "grid"
@@ -3871,7 +3900,10 @@ async function updateLinkedWaitlistBookingStatus(
 		payload.isWaitlisted = true
 	}
 
-	await db.collection("bookings").doc(safeBookingId).set(payload, { merge: true })
+	await db
+		.collection("bookings")
+		.doc(safeBookingId)
+		.set(payload, { merge: true })
 }
 
 async function updateWaitlistStatus(waitlistId, status, bookingId = "") {
@@ -4179,6 +4211,14 @@ async function deleteReview(reviewId) {
 async function handleAuthStateChange(user) {
 	if (!user) {
 		setAdminUnlockedState(false)
+		if (adminPendingLogoutToast) {
+			setAdminMessage(
+				"success",
+				"✅ Logged Out Successfully",
+				"adminAuthMessage",
+			)
+		}
+		adminPendingLogoutToast = false
 		return
 	}
 
@@ -6176,11 +6216,14 @@ function initializeAdminPanel() {
 			setAdminButtonLoadingState(logoutBtn, true, {
 				loadingText: "Logging Out",
 			})
+			adminPendingLogoutToast = true
+			resetAdminLoginCredentials()
 			await new Promise((resolve) => setTimeout(resolve, 350))
 			await auth.signOut()
-			window.location.assign("admin.html")
 		} catch (error) {
+			adminPendingLogoutToast = false
 			console.error("Admin signout failed:", error)
+			resetAdminLoginCredentials()
 			setAdminButtonLoadingState(logoutBtn, false, {
 				resetText: "Log Out",
 			})
@@ -6189,6 +6232,10 @@ function initializeAdminPanel() {
 				`❌ Logout failed: ${error.message || "unknown error"}`,
 				"adminAuthMessage",
 			)
+		} finally {
+			setAdminButtonLoadingState(logoutBtn, false, {
+				resetText: "Log Out",
+			})
 		}
 	})
 
