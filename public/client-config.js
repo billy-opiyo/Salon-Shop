@@ -34,7 +34,7 @@
 	const whatsappUrl = "https://wa.me/254700123456"
 	const emailPrimary = "info@royalbraids.ke"
 	const emailBookings = "bookings@royalbraids.ke"
-	const formSubmitEmail = "billyopiyo597@gmail.com"
+	const contactNotificationEmail = "billyopiyo597@gmail.com"
 	const cloudinaryGalleryFolder = `${businessSlug}/gallery`
 
 	// Client-editable service catalog.
@@ -1731,7 +1731,7 @@
 			emailPrimaryHref: `mailto:${emailPrimary}`,
 			emailBookings,
 			emailBookingsHref: `mailto:${emailBookings}`,
-			formSubmitEmail,
+			notificationEmail: contactNotificationEmail,
 			formSubject: `New Contact Message - ${businessName}`,
 			locationShort: "Westlands, Nairobi",
 			addressHtml:
@@ -1781,7 +1781,7 @@
 			firebase: firebaseConfig,
 			cloudinaryFolder: cloudinaryGalleryFolder,
 			whatsappPublicUrl: whatsappUrl,
-			formSubmitProvider: "formsubmit.co",
+			contactEmailProvider: "firebase-functions-resend",
 			firebaseSecretNames: {
 				resendApiKey: "RESEND_API_KEY",
 				resendFromEmail: "RESEND_FROM_EMAIL",

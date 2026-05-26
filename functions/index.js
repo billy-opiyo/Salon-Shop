@@ -28,6 +28,9 @@ const CLIENT_BUSINESS_NAME =
 const CLIENT_TEAM_NAME =
 	String(CLIENT_CONFIG.teamName || `${CLIENT_BUSINESS_NAME} Team`).trim() ||
 	`${CLIENT_BUSINESS_NAME} Team`
+const CLIENT_CONTACT_NOTIFICATION_EMAIL = normalizeEmailAddress(
+	CLIENT_CONFIG.contactNotificationEmail || "",
+)
 const CLIENT_CLOUDINARY_FOLDER =
 	String(CLIENT_CONFIG.cloudinaryFolder || "royal-braids/uploads").trim() ||
 	"royal-braids/uploads"
@@ -142,6 +145,29 @@ function normalizeShortText(value = "", maxLen = 80) {
 	return String(value || "")
 		.trim()
 		.slice(0, maxLen)
+}
+
+function normalizeEmailAddress(value = "") {
+	const email = String(value || "")
+		.trim()
+		.toLowerCase()
+		.slice(0, 254)
+	return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : ""
+}
+
+function normalizeEmailSubjectLine(value = "", maxLen = 160) {
+	return normalizeShortText(value || "", maxLen).replace(/[\r\n]+/g, " ")
+}
+
+function escapeHtml(value = "") {
+	const replacements = {
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		'"': "&quot;",
+		"'": "&#39;",
+	}
+	return String(value || "").replace(/[&<>"']/g, (char) => replacements[char])
 }
 
 function getCallerEmailFromRequest(request) {
@@ -1031,14 +1057,25 @@ function getWaitlistQueueSlotId(entry = {}) {
 	return String(entry.preferredSlotId || entry.slotId || "").trim()
 }
 
-async function getWaitlistQueueEntriesForSlot(slotId = "", db = admin.firestore()) {
+async function getWaitlistQueueEntriesForSlot(
+	slotId = "",
+	db = admin.firestore(),
+) {
 	const safeSlotId = String(slotId || "").trim()
 	if (!safeSlotId) return []
 
 	const entriesById = new Map()
 	const snapshots = await Promise.allSettled([
-		db.collection("waitlist").where("preferredSlotId", "==", safeSlotId).limit(300).get(),
-		db.collection("waitlist").where("slotId", "==", safeSlotId).limit(300).get(),
+		db
+			.collection("waitlist")
+			.where("preferredSlotId", "==", safeSlotId)
+			.limit(300)
+			.get(),
+		db
+			.collection("waitlist")
+			.where("slotId", "==", safeSlotId)
+			.limit(300)
+			.get(),
 	])
 
 	snapshots.forEach((result) => {
@@ -1086,14 +1123,18 @@ async function calculateWaitlistQueueInfoForEntry({
 	}
 
 	const waitlistEntries = await getWaitlistQueueEntriesForSlot(safeSlotId, db)
-	const targetEntry = waitlistEntries.find((entry) => entry.id === safeWaitlistId)
+	const targetEntry = waitlistEntries.find(
+		(entry) => entry.id === safeWaitlistId,
+	)
 	const targetEntryStatus = targetEntry
 		? normalizeServerWaitlistStatus(targetEntry.data?.status)
 		: normalizedTargetStatus
 	const activeEntries = waitlistEntries
 		.filter((entry) => isActiveWaitlistQueueStatus(entry.data?.status))
 		.sort(sortWaitlistQueueEntriesByCreatedAt)
-	const activeIndex = activeEntries.findIndex((entry) => entry.id === safeWaitlistId)
+	const activeIndex = activeEntries.findIndex(
+		(entry) => entry.id === safeWaitlistId,
+	)
 	const position = activeIndex >= 0 ? activeIndex + 1 : null
 
 	return {
@@ -2968,6 +3009,137 @@ exports.updateContactRateLimit = onDocumentCreated(
 			uid: message.uid,
 			cooldownMs: CONTACT_RATE_LIMIT_COOLDOWN_MS,
 		})
+	},
+)
+
+exports.sendContactMessageNotificationEmail = onDocumentCreated(
+	{
+		document: "contactMessages/{messageId}",
+		secrets: [RESEND_API_KEY, RESEND_FROM_EMAIL],
+		region: "europe-west1",
+	},
+	async (event) => {
+		const snapshot = event.data
+		if (!snapshot) return
+
+		const messageId = String(event.params.messageId || "").trim()
+		const contact = snapshot.data() || {}
+		const notificationEmail = CLIENT_CONTACT_NOTIFICATION_EMAIL
+		const serverNow = admin.firestore.FieldValue.serverTimestamp()
+
+		if (!notificationEmail) {
+			logger.warn("Contact notification email is not configured", { messageId })
+			await snapshot.ref.set(
+				{
+					contactEmailStatus: "skipped_no_recipient",
+					contactEmailTriedAt: serverNow,
+					contactEmailError:
+						"functions/client-config.js contactNotificationEmail is missing or invalid",
+				},
+				{ merge: true },
+			)
+			return
+		}
+
+		const fromEmail = String(RESEND_FROM_EMAIL.value() || "").trim()
+		if (!fromEmail) {
+			throw new Error("RESEND_FROM_EMAIL secret is not configured")
+		}
+
+		const customerName = normalizeShortText(
+			contact.name || "Website visitor",
+			120,
+		)
+		const customerEmailRaw = normalizeShortText(contact.email || "", 160)
+		const customerEmail = normalizeEmailAddress(customerEmailRaw)
+		const subject =
+			normalizeEmailSubjectLine(contact.subject || "", 160) ||
+			"New contact message"
+		const contactMessage = normalizeShortText(contact.message || "", 3000)
+		const submittedAt = new Date().toLocaleString("en-KE", {
+			timeZone: NAIROBI_TIMEZONE,
+			dateStyle: "medium",
+			timeStyle: "short",
+		})
+
+		const textContent = [
+			`New contact-form message for ${CLIENT_BUSINESS_NAME}`,
+			"",
+			`Message ID: ${messageId || "N/A"}`,
+			`Name: ${customerName || "N/A"}`,
+			`Email: ${customerEmailRaw || "N/A"}`,
+			`Subject: ${subject}`,
+			`Submitted: ${submittedAt}`,
+			"",
+			"Message:",
+			contactMessage || "N/A",
+			"",
+			"This email was sent by Firebase Functions + Resend from the website contact form.",
+		].join("\n")
+
+		const htmlContent = `
+			<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
+				<h2 style="margin-bottom: 8px;">New Contact Message 📩</h2>
+				<p>A visitor sent a message from the <strong>${escapeHtml(CLIENT_BUSINESS_NAME)}</strong> website.</p>
+				<table style="border-collapse: collapse; margin: 16px 0; width: 100%; max-width: 680px;">
+					<tr><td style="padding: 8px 10px; font-weight: bold; border: 1px solid #e5e7eb;">Message ID</td><td style="padding: 8px 10px; border: 1px solid #e5e7eb;">${escapeHtml(messageId || "N/A")}</td></tr>
+					<tr><td style="padding: 8px 10px; font-weight: bold; border: 1px solid #e5e7eb;">Name</td><td style="padding: 8px 10px; border: 1px solid #e5e7eb;">${escapeHtml(customerName || "N/A")}</td></tr>
+					<tr><td style="padding: 8px 10px; font-weight: bold; border: 1px solid #e5e7eb;">Email</td><td style="padding: 8px 10px; border: 1px solid #e5e7eb;">${escapeHtml(customerEmailRaw || "N/A")}</td></tr>
+					<tr><td style="padding: 8px 10px; font-weight: bold; border: 1px solid #e5e7eb;">Subject</td><td style="padding: 8px 10px; border: 1px solid #e5e7eb;">${escapeHtml(subject)}</td></tr>
+					<tr><td style="padding: 8px 10px; font-weight: bold; border: 1px solid #e5e7eb;">Submitted</td><td style="padding: 8px 10px; border: 1px solid #e5e7eb;">${escapeHtml(submittedAt)}</td></tr>
+				</table>
+				<div style="margin-top: 16px; padding: 14px 16px; border-left: 4px solid #C8963E; background: #f9fafb; white-space: pre-line;">${escapeHtml(contactMessage || "N/A")}</div>
+				<p style="margin-top: 18px; color: #6b7280; font-size: 13px;">Sent by Firebase Functions + Resend. No FormSubmit activation is required.</p>
+			</div>
+		`
+
+		const resend = getResendClient()
+		const emailPayload = {
+			to: notificationEmail,
+			from: fromEmail,
+			subject: `${CLIENT_BUSINESS_NAME} Contact Form: ${subject}`,
+			text: textContent,
+			html: htmlContent,
+		}
+
+		if (customerEmail) {
+			emailPayload.replyTo = customerEmail
+		}
+
+		try {
+			await resend.emails.send(emailPayload)
+			await snapshot.ref.set(
+				{
+					contactEmailStatus: "sent",
+					contactEmailRecipient: notificationEmail,
+					contactEmailError: "",
+					contactEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+					contactEmailTriedAt: admin.firestore.FieldValue.serverTimestamp(),
+				},
+				{ merge: true },
+			)
+			logger.info("Contact notification email sent", {
+				messageId,
+				to: notificationEmail,
+			})
+		} catch (error) {
+			const errorMessage = error?.message || "Unknown error"
+			logger.error("Failed to send contact notification email", {
+				messageId,
+				to: notificationEmail,
+				errorMessage,
+			})
+
+			await snapshot.ref.set(
+				{
+					contactEmailStatus: "failed",
+					contactEmailRecipient: notificationEmail,
+					contactEmailError: errorMessage,
+					contactEmailTriedAt: admin.firestore.FieldValue.serverTimestamp(),
+				},
+				{ merge: true },
+			)
+		}
 	},
 )
 

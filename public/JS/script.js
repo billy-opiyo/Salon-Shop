@@ -8896,23 +8896,7 @@ document
 				throw new Error("Please fill in all contact fields before sending.")
 			}
 
-			const formSubmitEndpoint = String(
-				form.getAttribute("action") || "",
-			).trim()
-			if (!formSubmitEndpoint) {
-				throw new Error(
-					"Contact email endpoint is missing. Please contact support.",
-				)
-			}
-
-			const formSubmitPayload = new FormData(form)
-
 			await db.collection("contactMessages").add(payload)
-			await fetch(formSubmitEndpoint, {
-				method: "POST",
-				body: formSubmitPayload,
-				mode: "no-cors",
-			})
 
 			form.reset()
 			showContactSuccessPopup()

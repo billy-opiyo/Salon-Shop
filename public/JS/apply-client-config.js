@@ -115,10 +115,9 @@
 		const form = document.getElementById("contactForm")
 		if (!form) return
 
-		const formSubmitEmail = getValue(config, "contact.formSubmitEmail")
-		if (formSubmitEmail) {
-			form.setAttribute("action", `https://formsubmit.co/${formSubmitEmail}`)
-		}
+		form.removeAttribute("action")
+		form.setAttribute("method", "POST")
+		form.dataset.emailProvider = "firebase-functions-resend"
 
 		const subjectInput = form.querySelector('input[name="_subject"]')
 		const subject = getValue(config, "contact.formSubject")

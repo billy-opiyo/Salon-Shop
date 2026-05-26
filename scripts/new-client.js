@@ -135,7 +135,8 @@ async function main() {
 		throw new Error(`Missing file: ${functionsConfigPath}`)
 	}
 
-	const { clientNameRaw, slug, phoneRaw, emailRaw } = await collectClientOptions()
+	const { clientNameRaw, slug, phoneRaw, emailRaw } =
+		await collectClientOptions()
 	const clientName = toDisplayKey(clientNameRaw)
 
 	const phoneDigits = phoneRaw.replace(/\D/g, "")
@@ -165,8 +166,16 @@ async function main() {
 	publicConfig = replaceConstString(publicConfig, "phonePrimaryHref", phoneHref)
 	publicConfig = replaceConstString(publicConfig, "whatsappUrl", whatsappHref)
 	publicConfig = replaceConstString(publicConfig, "emailPrimary", emailRaw)
-	publicConfig = replaceConstString(publicConfig, "emailBookings", bookingsEmail)
-	publicConfig = replaceConstString(publicConfig, "formSubmitEmail", emailRaw)
+	publicConfig = replaceConstString(
+		publicConfig,
+		"emailBookings",
+		bookingsEmail,
+	)
+	publicConfig = replaceConstString(
+		publicConfig,
+		"contactNotificationEmail",
+		emailRaw,
+	)
 
 	functionsConfig = replaceSimple(
 		functionsConfig,
@@ -177,6 +186,11 @@ async function main() {
 		functionsConfig,
 		/teamName:\s*"[^"]*"/,
 		`teamName: "${clientName} Team"`,
+	)
+	functionsConfig = replaceSimple(
+		functionsConfig,
+		/contactNotificationEmail:\s*"[^"]*"/,
+		`contactNotificationEmail: "${emailRaw}"`,
 	)
 	functionsConfig = replaceSimple(
 		functionsConfig,
