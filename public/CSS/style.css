@@ -34,7 +34,7 @@
     --section-padding: clamp(52px, 8vw, 96px);
     --section-scroll-gap: clamp(8px, 1.5vw, 14px);
     --scroll-offset: calc(var(--nav-height) + var(--section-scroll-gap));
-    --sticky-section-heading-top: calc(var(--nav-height) - 1px);
+    --sticky-section-heading-top: var(--scroll-offset);
 }
 
 * {
@@ -356,6 +356,50 @@ h6 {
 
 .booking-section-heading {
     margin-bottom: 30px;
+}
+
+@media (max-width: 900px) {
+    .main-section-heading {
+        padding: 14px 18px;
+        border-radius: 16px;
+    }
+}
+
+@media (max-width: 600px) {
+    :root {
+        --section-scroll-gap: 6px;
+    }
+
+    .main-section-heading {
+        padding: 12px 14px;
+        border-radius: 14px;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    }
+
+    .main-section-heading .section-subtitle {
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 0.75rem;
+        letter-spacing: 2px;
+    }
+
+    .main-section-heading .section-title {
+        margin-bottom: 12px;
+    }
+
+    .main-section-heading .section-desc {
+        font-size: 0.96rem;
+    }
+
+    .booking-section-heading {
+        margin-bottom: 22px;
+    }
+}
+
+@media (max-width: 360px) {
+    .main-section-heading {
+        padding: 10px 12px;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
