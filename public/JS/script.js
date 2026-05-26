@@ -1,7 +1,224 @@
 //<!-- ========== JAVASCRIPT ========== -->
 
 // ============ DATA ============
-const servicesData = [
+const clientConfig = window.CLIENT_CONFIG || {}
+const clientCatalog = clientConfig.catalog || {}
+
+function getClientCatalogArray(key = "") {
+	const value = clientCatalog?.[key]
+	return Array.isArray(value) ? value : []
+}
+
+function slugifyConfigKey(value = "") {
+	return String(value || "")
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+}
+
+function normalizeClientCatalogServiceCategory(item = {}) {
+	const source =
+		typeof item === "object" && item && !Array.isArray(item)
+			? item
+			: { label: String(item || "") }
+	const label = String(source.label || source.name || "").trim()
+	const key = slugifyConfigKey(source.key || source.id || source.slug || label)
+	if (!key || !label) return null
+	return {
+		...source,
+		key,
+		label,
+		shortLabel: String(source.shortLabel || source.shortName || label).trim(),
+		galleryLabel: String(
+			source.galleryLabel || source.galleryName || source.shortLabel || label,
+		).trim(),
+	}
+}
+
+function getClientCatalogServiceCategories(fallbackCategories = []) {
+	const configuredCategories = getClientCatalogArray("serviceCategories")
+		.map((item) => normalizeClientCatalogServiceCategory(item))
+		.filter(Boolean)
+	return configuredCategories.length
+		? configuredCategories
+		: fallbackCategories
+				.map((item) => normalizeClientCatalogServiceCategory(item))
+				.filter(Boolean)
+}
+
+function normalizeClientCatalogServiceRecord(service = {}) {
+	const source =
+		typeof service === "object" && service && !Array.isArray(service)
+			? service
+			: { name: String(service || "") }
+	const name = String(
+		source.name || source.serviceName || source.title || "",
+	).trim()
+	if (!name) return null
+	return {
+		...source,
+		name,
+		desc: String(source.desc || source.description || "").trim(),
+		price: String(
+			source.price || source.amount || source.serviceAmount || "",
+		).trim(),
+		duration: String(source.duration || source.time || "").trim(),
+		icon: String(source.icon || "scissors").trim() || "scissors",
+		category:
+			String(
+				source.category ||
+					source.categoryKey ||
+					source.serviceCategory ||
+					"braids-services",
+			).trim() || "braids-services",
+		categoryLabel: String(source.categoryLabel || "").trim(),
+		subServices: Array.isArray(source.subServices)
+			? source.subServices
+					.map((item) => normalizeClientCatalogSubServiceRecord(item))
+					.filter(Boolean)
+			: [],
+	}
+}
+
+function normalizeClientCatalogSubServiceRecord(subService = {}) {
+	const source =
+		typeof subService === "object" && subService && !Array.isArray(subService)
+			? subService
+			: { name: String(subService || "") }
+	const name = String(
+		source.name || source.serviceName || source.title || "",
+	).trim()
+	if (!name) return null
+	return {
+		...source,
+		name,
+		desc: String(source.desc || source.description || "").trim(),
+		price: String(
+			source.price || source.amount || source.serviceAmount || "",
+		).trim(),
+		duration: String(source.duration || source.time || "").trim(),
+	}
+}
+
+function buildStylistLabel(name = "", title = "", fallbackLabel = "") {
+	const safeLabel = String(fallbackLabel || "").trim()
+	if (safeLabel) return safeLabel
+	const safeName = String(name || "").trim()
+	const safeTitle = String(title || "").trim()
+	if (safeName && safeTitle) return `${safeName} - ${safeTitle}`
+	return safeName || safeTitle
+}
+
+function normalizeClientCatalogStylist(item = {}) {
+	const source =
+		typeof item === "object" && item && !Array.isArray(item)
+			? item
+			: { name: String(item || "") }
+	const name = String(
+		source.name || source.displayName || source.label || "",
+	).trim()
+	const title = String(
+		source.title || source.role || source.specialty || "",
+	).trim()
+	const label = buildStylistLabel(name, title, source.label)
+	const key = slugifyConfigKey(
+		source.key || source.id || source.slug || name || label,
+	)
+	if (!key || !label) return null
+	return {
+		...source,
+		key,
+		name: name || label,
+		title,
+		label,
+		aliases: Array.isArray(source.aliases) ? source.aliases : [],
+	}
+}
+
+function getClientCatalogStylists(fallbackStylists = []) {
+	const configuredStylists = getClientCatalogArray("stylists")
+		.map((item) => normalizeClientCatalogStylist(item))
+		.filter(Boolean)
+	return configuredStylists.length
+		? configuredStylists
+		: fallbackStylists
+				.map((item) => normalizeClientCatalogStylist(item))
+				.filter(Boolean)
+}
+
+const fallbackServiceCategoryDefinitions = [
+	{
+		key: "braids-services",
+		label: "Braids Services",
+		shortLabel: "Braids",
+		galleryLabel: "Braids",
+	},
+	{
+		key: "hair-services",
+		label: "Hair Services",
+		shortLabel: "Hair",
+		galleryLabel: "Hair",
+	},
+	{
+		key: "beauty-spa-services",
+		label: "Beauty Spa Services",
+		shortLabel: "Beauty Spa",
+		galleryLabel: "Beauty Spa",
+	},
+	{
+		key: "nail-services",
+		label: "Nail Services",
+		shortLabel: "Nails",
+		galleryLabel: "Nails",
+	},
+	{
+		key: "makeup-services",
+		label: "Makeup Services",
+		shortLabel: "Makeup",
+		galleryLabel: "Makeup",
+	},
+	{
+		key: "barber-services",
+		label: "Barber Services",
+		shortLabel: "Barber",
+		galleryLabel: "Barber",
+	},
+	{
+		key: "massage-wellness",
+		label: "Massage & Wellness",
+		shortLabel: "Massage",
+		galleryLabel: "Massage",
+	},
+	{
+		key: "eyebrow-lash-services",
+		label: "Eyebrow & Lash Services",
+		shortLabel: "Eyebrows & Lash",
+		galleryLabel: "Eyebrows & Lash",
+	},
+	{
+		key: "bridal-event-packages",
+		label: "Bridal / Event Packages",
+		shortLabel: "Bridal / Events",
+		galleryLabel: "Bridal / Event Packages",
+	},
+]
+
+const clientServiceCategoryDefinitions = getClientCatalogServiceCategories(
+	fallbackServiceCategoryDefinitions,
+)
+
+const fallbackStylistDefinitions = [
+	{ key: "fatima", name: "Fatima Hassan", title: "Master Braider" },
+	{ key: "zainab", name: "Zainab Mohamed", title: "Senior Stylist" },
+	{ key: "grace", name: "Grace Wanjiku", title: "Natural Hair Expert" },
+	{ key: "amina", name: "Amina Diallo", title: "Braiding Specialist" },
+	{ key: "sarah", name: "Sarah Omondi", title: "Kids Specialist" },
+]
+
+const clientStylistDefinitions = getClientCatalogStylists(fallbackStylistDefinitions)
+
+const fallbackServicesData = [
 	// Braids Services
 	{
 		name: "Hair Braiding",
@@ -480,6 +697,13 @@ const servicesData = [
 	},
 ]
 
+const configuredServicesData = getClientCatalogArray("services")
+	.map((service) => normalizeClientCatalogServiceRecord(service))
+	.filter(Boolean)
+const servicesData = configuredServicesData.length
+	? configuredServicesData
+	: fallbackServicesData
+
 const fallbackGalleryData = [
 	{
 		imageUrl: "IMG/box-braids-hairstyles-1x1-1.jpg",
@@ -649,27 +873,15 @@ const galleryFiltersState = {
 
 const GALLERY_SERVICE_FILTER_DEFINITIONS = [
 	{ key: "all", label: "All" },
-	{ key: "braids-services", label: "Braids" },
-	{ key: "hair-services", label: "Hair" },
-	{ key: "beauty-spa-services", label: "Beauty Spa" },
-	{ key: "nail-services", label: "Nails" },
-	{ key: "makeup-services", label: "Makeup" },
-	{ key: "barber-services", label: "Barber" },
-	{ key: "eyebrow-lash-services", label: "Eyebrows & Lash" },
-	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
+	...clientServiceCategoryDefinitions.map((item) => ({
+		key: item.key,
+		label: item.galleryLabel || item.shortLabel || item.label,
+	})),
 ]
 
-const GALLERY_SERVICE_DISPLAY_LABELS = {
-	all: "All",
-	"braids-services": "Braids",
-	"hair-services": "Hair",
-	"beauty-spa-services": "Beauty Spa",
-	"nail-services": "Nails",
-	"makeup-services": "Makeup",
-	"barber-services": "Barber",
-	"eyebrow-lash-services": "Eyebrows & Lash",
-	"bridal-event-packages": "Bridal / Event Packages",
-}
+const GALLERY_SERVICE_DISPLAY_LABELS = Object.fromEntries(
+	GALLERY_SERVICE_FILTER_DEFINITIONS.map((item) => [item.key, item.label]),
+)
 
 function getGalleryFeaturedCategoryLabel(categoryKey = "all") {
 	const normalized = String(categoryKey || "all")
@@ -1240,17 +1452,12 @@ function isBookingSlotExpired(slotData = {}, referenceMs = Date.now()) {
 
 const CUSTOM_SERVICE_OPTION_VALUE = "__custom_service__"
 const SERVICE_SETTINGS_DOC_PATH = ["siteSettings", "serviceCategories"]
-const SERVICE_CATEGORY_DEFINITIONS = [
-	{ key: "braids-services", label: "Braids Services" },
-	{ key: "hair-services", label: "Hair Services" },
-	{ key: "beauty-spa-services", label: "Beauty Spa Services" },
-	{ key: "nail-services", label: "Nail Services" },
-	{ key: "makeup-services", label: "Makeup Services" },
-	{ key: "barber-services", label: "Barber Services" },
-	{ key: "massage-wellness", label: "Massage & Wellness" },
-	{ key: "eyebrow-lash-services", label: "Eyebrow & Lash Services" },
-	{ key: "bridal-event-packages", label: "Bridal / Event Packages" },
-]
+const SERVICE_CATEGORY_DEFINITIONS = clientServiceCategoryDefinitions.map((item) => ({
+	key: item.key,
+	label: item.label,
+	shortLabel: item.shortLabel,
+	galleryLabel: item.galleryLabel,
+}))
 const SERVICE_CATEGORY_LABEL_MAP = Object.fromEntries(
 	SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, item.label]),
 )
@@ -3535,8 +3742,8 @@ async function getDashboardWaitlistDocQueueInfo(waitlistId = "") {
 function hasUsableDashboardQueueInfo(queueInfo = {}) {
 	return Boolean(
 		Number(queueInfo.position || 0) ||
-			String(queueInfo.label || "").trim() ||
-			Number(queueInfo.size || 0),
+		String(queueInfo.label || "").trim() ||
+		Number(queueInfo.size || 0),
 	)
 }
 
@@ -4383,9 +4590,8 @@ async function loadUserDashboardData(userOrUid) {
 			if (!latestPhone && data.phone) latestPhone = data.phone
 			dashboardBookingDocs.push({ id: doc.id, ...data })
 		})
-		dashboardBookingDocs = await hydrateDashboardWaitlistQueueInfo(
-			dashboardBookingDocs,
-		)
+		dashboardBookingDocs =
+			await hydrateDashboardWaitlistQueueInfo(dashboardBookingDocs)
 
 		const reviewItems = []
 		const reviewDocs = [...(reviewsSnap?.docs || [])].sort(
