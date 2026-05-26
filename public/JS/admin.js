@@ -228,6 +228,51 @@ function initializeAdminSectionTabs() {
 	setActiveAdminSection(defaultAdminSection)
 }
 
+function isAdminHomepageUrl(urlValue = "") {
+	if (!urlValue) return false
+
+	try {
+		const url = new URL(urlValue, window.location.href)
+		if (url.origin !== window.location.origin) return false
+
+		const path = url.pathname.replace(/\/+$/, "")
+		return path === "" || /\/(index\.html)?$/i.test(path)
+	} catch (error) {
+		return false
+	}
+}
+
+function initializeAdminHomepageNavigation() {
+	const homeLink = document.querySelector("[data-admin-home-link]")
+	if (!homeLink) return
+
+	homeLink.addEventListener("click", (event) => {
+		if (
+			event.defaultPrevented ||
+			event.button !== 0 ||
+			event.metaKey ||
+			event.ctrlKey ||
+			event.shiftKey ||
+			event.altKey
+		) {
+			return
+		}
+
+		event.preventDefault()
+
+		const fallbackUrl = homeLink.getAttribute("href") || "index.html"
+		const cameFromHomepage =
+			window.history.length > 1 && isAdminHomepageUrl(document.referrer)
+
+		if (cameFromHomepage) {
+			window.history.back()
+			return
+		}
+
+		window.location.assign(fallbackUrl)
+	})
+}
+
 function setAdminPasswordVisibility(isVisible) {
 	const passwordInput = document.getElementById("adminPassword")
 	const passwordToggle = document.getElementById("adminPasswordToggle")
@@ -6150,6 +6195,7 @@ function initializeAdminPanel() {
 	if (!loginForm || !logoutBtn || !bookingList || !securityList) return
 
 	initializeAdminSectionTabs()
+	initializeAdminHomepageNavigation()
 	bindGalleryPreviewEvents()
 	setAdminPasswordVisibility(false)
 

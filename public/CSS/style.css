@@ -34,6 +34,7 @@
     --section-padding: clamp(52px, 8vw, 96px);
     --section-scroll-gap: clamp(8px, 1.5vw, 14px);
     --scroll-offset: calc(var(--nav-height) + var(--section-scroll-gap));
+    --sticky-section-heading-top: calc(var(--nav-height) - 1px);
 }
 
 * {
@@ -319,6 +320,48 @@ h6 {
     color: var(--text-secondary);
     max-width: 600px;
     font-size: 1.05rem;
+}
+
+.main-section-heading {
+    position: sticky;
+    top: var(--sticky-section-heading-top);
+    z-index: 60;
+    padding: clamp(16px, 2.2vw, 24px) clamp(18px, 3vw, 30px);
+    background: linear-gradient(180deg, rgba(10, 10, 10, 0.96), rgba(17, 17, 17, 0.88));
+    border: 1px solid rgba(200, 150, 62, 0.22);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    isolation: isolate;
+    transition: background 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease, transform 0.28s ease;
+}
+
+.main-section-heading::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(200, 150, 62, 0.16), transparent 28%, transparent 72%, rgba(200, 150, 62, 0.1));
+    opacity: 0.8;
+    z-index: -1;
+}
+
+.main-section-heading .section-title:last-child,
+.main-section-heading .section-desc:last-child,
+.booking-section-heading>p:last-child {
+    margin-bottom: 0;
+}
+
+.booking-section-heading {
+    margin-bottom: 30px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .main-section-heading {
+        transition: none;
+    }
 }
 
 /* ============ ANIMATIONS ============ */
@@ -1405,6 +1448,10 @@ h6 {
 .booking-info p {
     color: var(--text-secondary);
     margin-bottom: 30px;
+}
+
+.booking-section-heading p {
+    margin-bottom: 0;
 }
 
 .booking-benefits {
@@ -6433,6 +6480,7 @@ body.light-mode .auth-btn:hover {
 body.light-mode .hero-stats,
 body.light-mode .service-card,
 body.light-mode .booking-form,
+body.light-mode .main-section-heading,
 body.light-mode .gallery-featured-block,
 body.light-mode .testimonial-card,
 body.light-mode .reviews-submit-form,
@@ -6457,6 +6505,16 @@ body.light-mode .contact,
 body.light-mode .client-dashboard,
 body.light-mode .footer {
     background: var(--bg-secondary);
+}
+
+body.light-mode .main-section-heading {
+    background: linear-gradient(180deg, rgba(255, 253, 249, 0.97), rgba(239, 230, 218, 0.92));
+    border-color: rgba(181, 136, 82, 0.36);
+    box-shadow: 0 16px 34px rgba(83, 56, 27, 0.14), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+
+body.light-mode .main-section-heading::before {
+    background: linear-gradient(90deg, rgba(200, 150, 62, 0.18), transparent 30%, transparent 70%, rgba(185, 126, 52, 0.12));
 }
 
 body.light-mode input,
