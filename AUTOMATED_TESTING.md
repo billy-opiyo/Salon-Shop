@@ -78,12 +78,14 @@ The Firestore emulator is configured on port `18080` to avoid common local confl
 - Public booking form flow that confirms an appointment and verifies booking + slot writes through a Firebase browser mock.
 - Public services/category rendering and “Book This Service” prefill behavior.
 - Public contact links and contact form submission flow through a Firebase browser mock.
+- Public feature coverage for theme persistence, review login gating, review sorting, and blog carousel/expand controls.
 - Public mobile/tablet responsive checks across important customer-facing sections.
 - Admin login page smoke test.
 - Admin login success flow that unlocks the dashboard and renders booking statistics through a Firebase browser mock.
 - Admin mobile responsive check.
 - Firestore rules tests for public/private reads, owner profile writes, admin records, security alerts, and login activity.
 - Firestore rules tests for client booking writes, booking slot locks, and contact message writes in the Firebase emulator.
+- Firestore rules tests for waitlist ownership/admin boundaries, review visibility/submission constraints, and per-user gallery favorites.
 - Client config unit tests.
 - Functions config Jest test.
 
