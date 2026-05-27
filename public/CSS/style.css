@@ -322,10 +322,10 @@ h6 {
     font-size: 1.05rem;
 }
 
-.main-section-heading {
-    position: sticky;
-    top: var(--sticky-section-heading-top);
-    z-index: 60;
+.main-section-heading,
+.admin-console-heading {
+    position: relative;
+    z-index: 1;
     width: fit-content;
     max-width: 100%;
     padding: clamp(16px, 2.2vw, 24px) clamp(18px, 3vw, 30px);
@@ -339,7 +339,14 @@ h6 {
     transition: background 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease, transform 0.28s ease;
 }
 
-.main-section-heading::before {
+.main-section-heading {
+    position: sticky;
+    top: var(--sticky-section-heading-top);
+    z-index: 60;
+}
+
+.main-section-heading::before,
+.admin-console-heading::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -351,7 +358,9 @@ h6 {
 }
 
 .main-section-heading .section-title:last-child,
+.admin-console-heading .section-title:last-child,
 .main-section-heading .section-desc:last-child,
+.admin-console-heading .section-desc:last-child,
 .booking-section-heading>p:last-child {
     margin-bottom: 0;
 }
@@ -399,7 +408,9 @@ h6 {
 }
 
 @media (max-width: 900px) {
-    .main-section-heading {
+
+    .main-section-heading,
+    .admin-console-heading {
         padding: 14px 18px;
         border-radius: 16px;
     }
@@ -410,20 +421,23 @@ h6 {
         --section-scroll-gap: 6px;
     }
 
-    .main-section-heading {
+    .main-section-heading,
+    .admin-console-heading {
         padding: 12px 14px;
         border-radius: 14px;
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
     }
 
-    .main-section-heading .section-subtitle {
+    .main-section-heading .section-subtitle,
+    .admin-console-heading .section-subtitle {
         gap: 8px;
         margin-bottom: 8px;
         font-size: 0.75rem;
         letter-spacing: 2px;
     }
 
-    .main-section-heading .section-title {
+    .main-section-heading .section-title,
+    .admin-console-heading .section-title {
         margin-bottom: 0;
     }
 
@@ -439,13 +453,17 @@ h6 {
 }
 
 @media (max-width: 360px) {
-    .main-section-heading {
+
+    .main-section-heading,
+    .admin-console-heading {
         padding: 10px 12px;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .main-section-heading {
+
+    .main-section-heading,
+    .admin-console-heading {
         transition: none;
     }
 }
@@ -1768,7 +1786,7 @@ h6 {
 
 /* ============ ADMIN BOOKINGS ============ */
 .admin-bookings {
-    padding: var(--section-padding) 0 0;
+    padding: 10px 0 0;
     background: var(--bg-primary);
 }
 
@@ -1777,7 +1795,13 @@ h6 {
     margin-bottom: 36px;
 }
 
-.admin-bookings-header .section-subtitle {
+.admin-console-heading {
+    margin: 0 auto clamp(14px, 2vw, 18px);
+    text-align: center;
+}
+
+.admin-bookings-header .section-subtitle,
+.admin-console-heading .section-subtitle {
     justify-content: center;
 }
 
@@ -1798,7 +1822,8 @@ h6 {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    margin-bottom: 18px;
+    width: min(100%, 560px);
+    margin: 0 auto 18px;
 }
 
 .admin-auth-card p {
@@ -1813,9 +1838,11 @@ h6 {
 
 .admin-auth-form {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: 12px;
-    align-items: end;
+    align-items: stretch;
+    width: min(100%, 460px);
+    margin: 0 auto;
 }
 
 .admin-auth-form .form-group {
@@ -1823,8 +1850,8 @@ h6 {
 }
 
 .admin-auth-form #adminLoginBtn {
-    grid-column: 1 / -1;
-    width: 37.5%;
+    grid-column: 1;
+    width: min(100%, 220px);
     justify-self: center;
 }
 
@@ -6569,6 +6596,7 @@ body.light-mode .hero-stats,
 body.light-mode .service-card,
 body.light-mode .booking-form,
 body.light-mode .main-section-heading,
+body.light-mode .admin-console-heading,
 body.light-mode .gallery-featured-block,
 body.light-mode .testimonial-card,
 body.light-mode .reviews-submit-form,
@@ -6595,13 +6623,15 @@ body.light-mode .footer {
     background: var(--bg-secondary);
 }
 
-body.light-mode .main-section-heading {
+body.light-mode .main-section-heading,
+body.light-mode .admin-console-heading {
     background: linear-gradient(180deg, rgba(255, 253, 249, 0.97), rgba(239, 230, 218, 0.92));
     border-color: rgba(181, 136, 82, 0.36);
     box-shadow: 0 16px 34px rgba(83, 56, 27, 0.14), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
 }
 
-body.light-mode .main-section-heading::before {
+body.light-mode .main-section-heading::before,
+body.light-mode .admin-console-heading::before {
     background: linear-gradient(90deg, rgba(200, 150, 62, 0.18), transparent 30%, transparent 70%, rgba(185, 126, 52, 0.12));
 }
 
