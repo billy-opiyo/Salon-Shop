@@ -124,7 +124,16 @@
 		if (subjectInput && subject) subjectInput.value = subject
 	}
 
+	function applyDynamicFallbacks() {
+		const footerYearFallback = document.getElementById("footerYearFallback")
+		if (footerYearFallback) {
+			footerYearFallback.textContent = String(new Date().getFullYear())
+		}
+	}
+
 	function applyClientConfig() {
+		applyDynamicFallbacks()
+
 		const config = window.CLIENT_CONFIG || {}
 		if (!Object.keys(config).length) return
 

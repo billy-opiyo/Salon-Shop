@@ -26,6 +26,7 @@
 	const timezone = "Africa/Nairobi"
 	const locale = "en-KE"
 	const currency = "KES"
+	const currentYear = new Date().getFullYear()
 
 	const phonePrimary = "+254 700 123 456"
 	const phonePrimaryHref = "tel:+254700123456"
@@ -1708,7 +1709,7 @@
 				"From signature braids, hair services and flawless twists to glowing beauty spa rituals, precision nails, radiant makeup, barber grooming, eyebrows & lash enhancements, and bridal-ready glam—step into a full beauty experience crafted to make you shine.",
 			footerDescription:
 				"Nairobi’s premier beauty destination for braids and beyond—offering expert hair styling, spa indulgence, nail artistry, makeup, barber grooming, lash enhancement, wellness care, and unforgettable bridal/event transformations.",
-			copyright: `© 2026 ${businessName}. All rights reserved.`,
+			copyright: `© ${currentYear} ${businessName}. All rights reserved.`,
 			craftedBy: `Crafted with ❤️ in ${city}, ${country}`,
 		},
 
