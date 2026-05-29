@@ -205,7 +205,9 @@ describe("Firestore security rules", () => {
 			createdAt: new Date(),
 		})
 
-		await assertFails(getDoc(doc(authedDb("client-a"), "securityAlerts/alert-1")))
+		await assertFails(
+			getDoc(doc(authedDb("client-a"), "securityAlerts/alert-1")),
+		)
 		await assertSucceeds(
 			getDoc(doc(authedDb("security-admin"), "securityAlerts/alert-1")),
 		)
@@ -269,15 +271,81 @@ describe("Firestore security rules", () => {
 		await assertSucceeds(getDoc(doc(bookingsAdminDb, "waitlist/wait-1")))
 
 		await assertFails(
-			updateDoc(
-				doc(otherClientDb, "waitlist/wait-1"),
-				{ status: "cancelled", updatedAt: new Date() },
-			),
+			updateDoc(doc(otherClientDb, "waitlist/wait-1"), {
+				status: "cancelled",
+				updatedAt: new Date(),
+			}),
 		)
 
 		await assertSucceeds(
 			updateDoc(doc(ownerDb, "waitlist/wait-1"), {
 				status: "cancelled",
+				updatedAt: new Date(),
+			}),
+		)
+	})
+
+	it("allows booking admins to sync waitlist metadata onto linked bookings", async () => {
+		await seedDoc("adminUsers/bookings-admin", {
+			active: true,
+			role: "admin",
+			permissions: { canManageBookings: true },
+		})
+		await seedDoc("adminUsers/content-admin", {
+			active: true,
+			role: "admin",
+			permissions: { canManageContent: true },
+		})
+		await seedDoc("bookings/waitlisted-booking", {
+			uid: "client-a",
+			email: "client-a@example.com",
+			status: "waitlisted",
+			waitlistId: "wait-1",
+			bookingType: "waitlist",
+			isWaitlisted: true,
+			waitlistStatus: "waiting",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		})
+
+		const bookingsAdminDb = authedDb("bookings-admin")
+		const contentAdminDb = authedDb("content-admin")
+		const ownerDb = authedDb("client-a")
+
+		await assertFails(
+			updateDoc(doc(ownerDb, "bookings/waitlisted-booking"), {
+				waitlistStatus: "contacted",
+				updatedAt: new Date(),
+			}),
+		)
+		await assertFails(
+			updateDoc(doc(contentAdminDb, "bookings/waitlisted-booking"), {
+				waitlistStatus: "contacted",
+				waitlistAdminUpdatedBy: "content-admin@example.com",
+				waitlistUpdatedAt: new Date(),
+				updatedAt: new Date(),
+			}),
+		)
+		await assertSucceeds(
+			updateDoc(doc(bookingsAdminDb, "bookings/waitlisted-booking"), {
+				status: "waitlisted",
+				bookingType: "waitlist",
+				isWaitlisted: true,
+				waitlistStatus: "contacted",
+				waitlistAdminUpdatedBy: "bookings-admin@example.com",
+				waitlistUpdatedAt: new Date(),
+				updatedAt: new Date(),
+			}),
+		)
+		await assertSucceeds(
+			updateDoc(doc(bookingsAdminDb, "bookings/waitlisted-booking"), {
+				status: "cancelled",
+				isWaitlisted: false,
+				waitlistStatus: "cancelled",
+				waitlistAdminUpdatedBy: "bookings-admin@example.com",
+				waitlistUpdatedAt: new Date(),
+				cancelledAt: new Date(),
+				cancelledBy: "bookings-admin@example.com",
 				updatedAt: new Date(),
 			}),
 		)
@@ -320,8 +388,12 @@ describe("Firestore security rules", () => {
 
 		await assertSucceeds(getDoc(doc(publicDb(), "reviews/review-approved")))
 		await assertFails(getDoc(doc(publicDb(), "reviews/review-pending")))
-		await assertSucceeds(getDoc(doc(authedDb("client-a"), "reviews/review-pending")))
-		await assertFails(getDoc(doc(authedDb("client-b"), "reviews/review-pending")))
+		await assertSucceeds(
+			getDoc(doc(authedDb("client-a"), "reviews/review-pending")),
+		)
+		await assertFails(
+			getDoc(doc(authedDb("client-b"), "reviews/review-pending")),
+		)
 		await assertSucceeds(
 			getDoc(doc(authedDb("content-admin"), "reviews/review-pending")),
 		)

@@ -272,11 +272,53 @@ service cloud.firestore {
       );
     }
 
-    function adminBookingUpdateIsValid() {
-      let changed = request.resource.data.diff(resource.data).changedKeys();
-      return changed.hasOnly(['status', 'updatedAt'])
+    function adminBasicBookingStatusUpdateIsValid() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return affected.hasOnly(['status', 'updatedAt'])
+        && affected.hasAny(['status'])
         && request.resource.data.status in ['pending', 'confirmed', 'completed', 'cancelled', 'waitlisted']
         && bookingStatusTransitionAllowed(resource.data.status, request.resource.data.status);
+    }
+
+    function adminWaitlistBookingSyncUpdateIsValid() {
+      let affected = request.resource.data.diff(resource.data).affectedKeys();
+      return resource.data.status == 'waitlisted'
+        && affected.hasOnly([
+          'status',
+          'updatedAt',
+          'waitlistStatus',
+          'waitlistAdminUpdatedBy',
+          'waitlistUpdatedAt',
+          'bookingType',
+          'isWaitlisted',
+          'cancelledAt',
+          'cancelledBy'
+        ])
+        && request.resource.data.status in ['waitlisted', 'cancelled']
+        && request.resource.data.waitlistStatus in [
+          'waiting',
+          'notified',
+          'contacted',
+          'booked',
+          'cancelled',
+          'notification_failed'
+        ]
+        && request.resource.data.waitlistAdminUpdatedBy is string
+        && request.resource.data.waitlistAdminUpdatedBy != ''
+        && bookingStatusTransitionAllowed(resource.data.status, request.resource.data.status)
+        && (
+          request.resource.data.status == 'cancelled'
+            ? request.resource.data.isWaitlisted == false
+              && request.resource.data.cancelledBy is string
+              && request.resource.data.cancelledBy != ''
+            : request.resource.data.bookingType == 'waitlist'
+              && request.resource.data.isWaitlisted == true
+        );
+    }
+
+    function adminBookingUpdateIsValid() {
+      return adminBasicBookingStatusUpdateIsValid()
+        || adminWaitlistBookingSyncUpdateIsValid();
     }
 
     match /bookings/{bookingId} {

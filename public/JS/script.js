@@ -1201,6 +1201,7 @@ let accountDeletePopupTimer = null
 let pendingDeleteAccountResolver = null
 let deleteAccountConfirmCloseTimer = null
 const formMessageTimers = new WeakMap()
+const formMessageToastPlacements = new WeakMap()
 const REVIEW_LOCAL_KEYS = {
 	profanityWords: "rb_admin_profanity_words",
 	reviewDrafts: "rb_review_drafts",
@@ -1326,6 +1327,11 @@ function showFormMessage(msg, type, text) {
 	const normalizedType = String(type || "").trim()
 	const shouldUseToast =
 		normalizedType === "success" || normalizedType === "error"
+	if (shouldUseToast) {
+		mountFormMessageToast(msg)
+	} else {
+		restoreFormMessageToast(msg)
+	}
 	msg.className = shouldUseToast
 		? `form-message ${normalizedType} form-message--toast`
 		: `form-message ${normalizedType}`
@@ -1342,6 +1348,46 @@ function showFormMessage(msg, type, text) {
 	})
 }
 
+function mountFormMessageToast(msg) {
+	if (!msg || !document.body) return
+
+	if (formMessageToastPlacements.has(msg)) {
+		if (msg.parentNode !== document.body) {
+			document.body.appendChild(msg)
+		}
+		return
+	}
+
+	const parent = msg.parentNode
+	const placeholder = document.createComment("form-message-toast-placeholder")
+	if (parent) {
+		parent.insertBefore(placeholder, msg)
+	}
+
+	formMessageToastPlacements.set(msg, { parent, placeholder })
+	document.body.appendChild(msg)
+}
+
+function restoreFormMessageToast(msg) {
+	if (!msg) return
+	const placement = formMessageToastPlacements.get(msg)
+	if (!placement) return
+
+	const { parent, placeholder } = placement
+	if (parent && placeholder?.parentNode === parent) {
+		parent.insertBefore(msg, placeholder)
+	} else if (parent) {
+		parent.appendChild(msg)
+	} else if (msg.parentNode === document.body) {
+		msg.remove()
+	}
+
+	if (placeholder?.parentNode) {
+		placeholder.parentNode.removeChild(placeholder)
+	}
+	formMessageToastPlacements.delete(msg)
+}
+
 function clearFormMessage(msg) {
 	if (!msg) return
 	const activeTimer = formMessageTimers.get(msg)
@@ -1349,6 +1395,7 @@ function clearFormMessage(msg) {
 		clearTimeout(activeTimer)
 		formMessageTimers.delete(msg)
 	}
+	restoreFormMessageToast(msg)
 	msg.className = "form-message"
 	msg.textContent = ""
 	msg.style.display = "none"

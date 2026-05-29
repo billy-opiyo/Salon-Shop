@@ -3977,12 +3977,27 @@ async function updateWaitlistStatus(waitlistId, status, bookingId = "") {
 	}
 
 	await db.collection("waitlist").doc(waitlistId).set(payload, { merge: true })
-	await updateLinkedWaitlistBookingStatus(
-		waitlistId,
-		normalizedStatus,
-		bookingId,
-		actorEmail,
-	)
+
+	const result = {
+		waitlistUpdated: true,
+		linkedBookingSynced: true,
+		linkedBookingError: null,
+	}
+
+	try {
+		await updateLinkedWaitlistBookingStatus(
+			waitlistId,
+			normalizedStatus,
+			bookingId,
+			actorEmail,
+		)
+	} catch (error) {
+		console.warn("Linked waitlist booking sync failed:", error)
+		result.linkedBookingSynced = false
+		result.linkedBookingError = error
+	}
+
+	return result
 }
 
 function normalizeReviewStatus(status) {
@@ -6966,14 +6981,18 @@ function initializeAdminPanel() {
 						"adminWaitlistMessage",
 					)
 				} else {
-					await updateWaitlistStatus(
+					const updateResult = await updateWaitlistStatus(
 						waitlistId,
 						action,
 						String(actionBtn.dataset.bookingId || "").trim(),
 					)
+					const syncWarning =
+						updateResult?.linkedBookingSynced === false
+							? ` ⚠️ Waitlist status was saved, but linked booking sync needs attention: ${updateResult.linkedBookingError?.message || "unknown error"}`
+							: ""
 					setAdminMessage(
 						"success",
-						`✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.`,
+						`✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.${syncWarning}`,
 						"adminWaitlistMessage",
 					)
 				}
