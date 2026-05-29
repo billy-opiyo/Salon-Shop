@@ -8901,9 +8901,6 @@ document
 
 			form.reset()
 			showContactSuccessPopup()
-			if (msg) {
-				showTimedFormMessage(msg, "success", "✅ Message sent successfully.")
-			}
 		} catch (error) {
 			console.error("Contact form submit failed:", error)
 			const friendlyMessage =

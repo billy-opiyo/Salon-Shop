@@ -35,6 +35,18 @@
     --section-scroll-gap: clamp(8px, 1.5vw, 14px);
     --scroll-offset: calc(var(--nav-height) + var(--section-scroll-gap));
     --sticky-section-heading-top: var(--scroll-offset);
+    --popup-viewport-gap: clamp(10px, 2.5vh, 24px);
+    --popup-safe-top: calc(env(safe-area-inset-top, 0px) + var(--popup-viewport-gap));
+    --popup-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--popup-viewport-gap));
+    --popup-safe-left: calc(env(safe-area-inset-left, 0px) + var(--popup-viewport-gap));
+    --popup-safe-right: calc(env(safe-area-inset-right, 0px) + var(--popup-viewport-gap));
+    --popup-max-block-size: calc(100vh - var(--popup-safe-top) - var(--popup-safe-bottom));
+}
+
+@supports (height: 100dvh) {
+    :root {
+        --popup-max-block-size: calc(100dvh - var(--popup-safe-top) - var(--popup-safe-bottom));
+    }
 }
 
 * {
@@ -4230,9 +4242,12 @@ h6 {
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: var(--popup-safe-top) var(--popup-safe-right) var(--popup-safe-bottom) var(--popup-safe-left);
     background: rgba(10, 10, 10, 0.72);
     backdrop-filter: blur(3px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .admin-confirm-modal.active {
@@ -4241,6 +4256,7 @@ h6 {
 
 .admin-confirm-dialog {
     width: min(460px, 96vw);
+    max-height: var(--popup-max-block-size);
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -4249,6 +4265,10 @@ h6 {
     display: grid;
     gap: 12px;
     animation: fadeInUp 0.22s ease;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    scrollbar-gutter: stable;
 }
 
 .admin-confirm-dialog h3 {
@@ -4260,6 +4280,7 @@ h6 {
     margin: 0;
     color: var(--text-secondary);
     font-size: 0.95rem;
+    overflow-wrap: anywhere;
 }
 
 .admin-confirm-actions {
@@ -7103,10 +7124,11 @@ button.btn-loading,
 
 .form-message.form-message--toast {
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 16px);
-    right: 16px;
+    top: var(--popup-safe-top);
+    right: var(--popup-safe-right);
     z-index: 2600;
-    width: min(420px, calc(100vw - 24px));
+    width: min(420px, calc(100vw - var(--popup-safe-left) - var(--popup-safe-right)));
+    max-height: var(--popup-max-block-size);
     margin: 0;
     pointer-events: none;
     opacity: 0;
@@ -7117,12 +7139,17 @@ button.btn-loading,
         transform 0.35s ease,
         visibility 0.35s ease;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(200, 150, 62, 0.08);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    scrollbar-gutter: stable;
 }
 
 .form-message.form-message--toast.is-visible {
     opacity: 1;
     visibility: visible;
     transform: translateY(0) translateX(0);
+    pointer-events: auto;
 }
 
 .form-message.form-message--toast.is-leaving {
@@ -7149,9 +7176,9 @@ button.btn-loading,
 
 @media (max-width: 600px) {
     .form-message.form-message--toast {
-        top: calc(env(safe-area-inset-top, 0px) + 10px);
-        left: 10px;
-        right: 10px;
+        top: var(--popup-safe-top);
+        left: var(--popup-safe-left);
+        right: var(--popup-safe-right);
         width: auto;
         transform: translateY(-14px) translateX(12px);
     }
@@ -7168,10 +7195,11 @@ button.btn-loading,
 /* ============ CONTACT SUCCESS POPUP ============ */
 .contact-success-popup {
     position: fixed;
-    top: 24px;
-    right: 24px;
+    top: var(--popup-safe-top);
+    right: var(--popup-safe-right);
     z-index: 1500;
-    width: min(420px, calc(100vw - 32px));
+    width: min(420px, calc(100vw - var(--popup-safe-left) - var(--popup-safe-right)));
+    max-height: var(--popup-max-block-size);
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-left: 4px solid var(--primary);
@@ -7186,7 +7214,10 @@ button.btn-loading,
     transform: translateY(-14px) translateX(12px);
     pointer-events: none;
     transition: opacity 0.35s ease, transform 0.35s ease, visibility 0.35s ease;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    scrollbar-gutter: stable;
 }
 
 .contact-success-popup__close {
@@ -7217,6 +7248,7 @@ button.btn-loading,
     opacity: 1;
     visibility: visible;
     transform: translateY(0) translateX(0);
+    pointer-events: auto;
 }
 
 .contact-success-popup::after {
@@ -7277,8 +7309,10 @@ button.btn-loading,
 
 @media (max-width: 600px) {
     .contact-success-popup {
-        top: 14px;
-        right: 8px;
+        top: var(--popup-safe-top);
+        left: var(--popup-safe-left);
+        right: var(--popup-safe-right);
+        width: auto;
     }
 }
 
@@ -8504,10 +8538,11 @@ body.light-mode #serviceSelect option[data-custom-category-header="true"] {
 
 .favorites-toast {
     position: fixed;
-    left: 20px;
-    bottom: 20px;
+    left: var(--popup-safe-left);
+    bottom: var(--popup-safe-bottom);
     z-index: 2300;
-    max-width: min(360px, calc(100vw - 32px));
+    max-width: min(360px, calc(100vw - var(--popup-safe-left) - var(--popup-safe-right)));
+    max-height: var(--popup-max-block-size);
     padding: 11px 14px;
     border-radius: 12px;
     background: rgba(10, 10, 10, 0.9);
@@ -8519,11 +8554,16 @@ body.light-mode #serviceSelect option[data-custom-category-header="true"] {
     transform: translateY(14px);
     pointer-events: none;
     transition: opacity 0.22s ease, transform 0.22s ease;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    scrollbar-gutter: stable;
 }
 
 .favorites-toast.show {
     opacity: 1;
     transform: translateY(0);
+    pointer-events: auto;
 }
 
 .dashboard-profile-item {
