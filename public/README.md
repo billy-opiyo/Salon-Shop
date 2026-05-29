@@ -111,6 +111,7 @@ This project is built to:
 ### Media + Automation
 
 - Cloudinary unsigned uploads (booking/gallery/review/blog images)
+- Sharp-powered local optimizer for static assets in `public/IMG`
 - Firebase Cloud Functions (`functions/index.js`)
 - Resend transactional email API
 - WhatsApp Cloud API for confirmations/reminders
@@ -431,6 +432,17 @@ cd functions
 npm install
 cd ..
 ```
+
+### Optimize Static Images
+
+Static images in `public/IMG` can be compressed/resized locally with Sharp before deployment:
+
+```bash
+npm run optimize:images:dry-run
+npm run optimize:images
+```
+
+The workflow preserves existing image paths so HTML, JS, service-worker, and client-config references continue to work.
 
 ### Firebase Checklist
 

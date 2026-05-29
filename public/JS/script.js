@@ -216,7 +216,9 @@ const fallbackStylistDefinitions = [
 	{ key: "sarah", name: "Sarah Omondi", title: "Kids Specialist" },
 ]
 
-const clientStylistDefinitions = getClientCatalogStylists(fallbackStylistDefinitions)
+const clientStylistDefinitions = getClientCatalogStylists(
+	fallbackStylistDefinitions,
+)
 
 const fallbackServicesData = [
 	// Braids Services
@@ -1008,22 +1010,61 @@ function resetGallerySubFilters() {
 }
 
 const preloadedBeforeImageUrls = new Set()
+const scheduledBeforeImagePreloadUrls = new Set()
+
+function getBrowserConnectionInfo() {
+	return (
+		navigator.connection ||
+		navigator.mozConnection ||
+		navigator.webkitConnection ||
+		null
+	)
+}
+
+function shouldReduceNonCriticalMedia() {
+	const connection = getBrowserConnectionInfo()
+	const effectiveType = String(connection?.effectiveType || "").toLowerCase()
+	return Boolean(connection?.saveData) || /(^|-)2g$/.test(effectiveType)
+}
+
+function runWhenBrowserIdle(callback, timeout = 2000) {
+	if (typeof callback !== "function") return
+	if (typeof window.requestIdleCallback === "function") {
+		window.requestIdleCallback(callback, { timeout })
+		return
+	}
+	window.setTimeout(callback, Math.min(Math.max(timeout, 1), 2000))
+}
 
 function preloadGalleryBeforeImages(items = []) {
+	if (shouldReduceNonCriticalMedia()) return
+
 	items.forEach((item) => {
 		const beforeUrl = String(item?.beforeImageUrl || "").trim()
 		if (!item?.hasBeforeAfter || !beforeUrl) return
 		if (preloadedBeforeImageUrls.has(beforeUrl)) return
+		if (scheduledBeforeImagePreloadUrls.has(beforeUrl)) return
 
-		const img = new Image()
-		img.decoding = "async"
-		img.onload = () => {
-			preloadedBeforeImageUrls.add(beforeUrl)
-		}
-		img.onerror = () => {
-			preloadedBeforeImageUrls.delete(beforeUrl)
-		}
-		img.src = beforeUrl
+		scheduledBeforeImagePreloadUrls.add(beforeUrl)
+		runWhenBrowserIdle(() => {
+			if (preloadedBeforeImageUrls.has(beforeUrl)) {
+				scheduledBeforeImagePreloadUrls.delete(beforeUrl)
+				return
+			}
+
+			const img = new Image()
+			img.decoding = "async"
+			img.loading = "lazy"
+			img.onload = () => {
+				preloadedBeforeImageUrls.add(beforeUrl)
+				scheduledBeforeImagePreloadUrls.delete(beforeUrl)
+			}
+			img.onerror = () => {
+				preloadedBeforeImageUrls.delete(beforeUrl)
+				scheduledBeforeImagePreloadUrls.delete(beforeUrl)
+			}
+			img.src = beforeUrl
+		}, 2500)
 	})
 }
 
@@ -1467,12 +1508,14 @@ function isBookingSlotExpired(slotData = {}, referenceMs = Date.now()) {
 
 const CUSTOM_SERVICE_OPTION_VALUE = "__custom_service__"
 const SERVICE_SETTINGS_DOC_PATH = ["siteSettings", "serviceCategories"]
-const SERVICE_CATEGORY_DEFINITIONS = clientServiceCategoryDefinitions.map((item) => ({
-	key: item.key,
-	label: item.label,
-	shortLabel: item.shortLabel,
-	galleryLabel: item.galleryLabel,
-}))
+const SERVICE_CATEGORY_DEFINITIONS = clientServiceCategoryDefinitions.map(
+	(item) => ({
+		key: item.key,
+		label: item.label,
+		shortLabel: item.shortLabel,
+		galleryLabel: item.galleryLabel,
+	}),
+)
 const SERVICE_CATEGORY_LABEL_MAP = Object.fromEntries(
 	SERVICE_CATEGORY_DEFINITIONS.map((item) => [item.key, item.label]),
 )
@@ -4425,7 +4468,8 @@ function startDashboardBookingsListener(uid, email = "") {
 		})
 
 		const sortedDocs = [...bookingDocMap.values()].sort((a, b) => {
-			const updatedDiff = toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
+			const updatedDiff =
+				toTimestampMs(b.updatedAt) - toTimestampMs(a.updatedAt)
 			if (updatedDiff !== 0) return updatedDiff
 			return toTimestampMs(b.createdAt) - toTimestampMs(a.createdAt)
 		})
@@ -8174,7 +8218,9 @@ function scrollToElementWithHeaderOffset(
 	}
 
 	const targetTop =
-		window.scrollY + element.getBoundingClientRect().top - getHeaderScrollOffset()
+		window.scrollY +
+		element.getBoundingClientRect().top -
+		getHeaderScrollOffset()
 	window.scrollTo({
 		top: Math.max(0, targetTop),
 		behavior: getSmoothScrollBehavior(behavior),
@@ -8218,8 +8264,8 @@ function scrollToMainSection(hash, options = {}) {
 function isBookingActionLink(anchor) {
 	return Boolean(
 		anchor?.matches?.(".book-btn") ||
-			anchor?.closest?.(".hero-buttons") ||
-			anchor?.closest?.(".header-actions"),
+		anchor?.closest?.(".hero-buttons") ||
+		anchor?.closest?.(".header-actions"),
 	)
 }
 
@@ -8900,6 +8946,7 @@ document
 			await db.collection("contactMessages").add(payload)
 
 			form.reset()
+			if (msg) clearFormMessage(msg)
 			showContactSuccessPopup()
 		} catch (error) {
 			console.error("Contact form submit failed:", error)
@@ -8936,10 +8983,14 @@ function hideContactSuccessPopup() {
 
 function showContactSuccessPopup() {
 	if (!contactSuccessPopup) return
-	contactSuccessPopup.classList.add("show")
 	if (contactPopupTimeout) {
 		clearTimeout(contactPopupTimeout)
 	}
+	contactSuccessPopup.classList.remove("show")
+	// Force a reflow so repeated successful submissions restart the timer bar
+	// without creating duplicate/stacked success messages.
+	void contactSuccessPopup.offsetWidth
+	contactSuccessPopup.classList.add("show")
 	contactPopupTimeout = setTimeout(() => {
 		hideContactSuccessPopup()
 	}, 5000)
@@ -9016,12 +9067,44 @@ function initAnimatedHeaderLogo() {
 	const blendLeadMs = 90
 	const blendHoldMs = 220
 
-	logoImages.forEach((src) => {
-		const preload = new Image()
-		preload.src = src
-	})
-
+	logoImage.decoding = "async"
+	logoImage.loading = "eager"
 	logoImage.src = logoImages[imageIndex]
+
+	const prefersReducedMotion =
+		typeof window.matchMedia === "function" &&
+		window.matchMedia("(prefers-reduced-motion: reduce)").matches
+	if (prefersReducedMotion || shouldReduceNonCriticalMedia()) return
+
+	const preloadedLogoImageUrls = new Set([logoImages[imageIndex]])
+	const scheduledLogoImageUrls = new Set()
+	const preloadLogoImage = (index) => {
+		const src = logoImages[index]
+		if (
+			!src ||
+			preloadedLogoImageUrls.has(src) ||
+			scheduledLogoImageUrls.has(src)
+		) {
+			return
+		}
+
+		scheduledLogoImageUrls.add(src)
+		runWhenBrowserIdle(() => {
+			const preload = new Image()
+			preload.decoding = "async"
+			preload.loading = "lazy"
+			preload.onload = () => {
+				preloadedLogoImageUrls.add(src)
+				scheduledLogoImageUrls.delete(src)
+			}
+			preload.onerror = () => {
+				scheduledLogoImageUrls.delete(src)
+			}
+			preload.src = src
+		}, 3000)
+	}
+
+	preloadLogoImage((imageIndex + 1) % logoImages.length)
 
 	const runLogoFlip = () => {
 		if (isTransitioning) return
@@ -9042,6 +9125,7 @@ function initAnimatedHeaderLogo() {
 		window.setTimeout(() => {
 			imageIndex = (imageIndex + 1) % logoImages.length
 			logoImage.src = logoImages[imageIndex]
+			preloadLogoImage((imageIndex + 1) % logoImages.length)
 			logoImage.classList.remove("is-flip-out")
 			logoImage.classList.add("is-flip-in")
 

@@ -22,7 +22,10 @@ async function selectFirstAvailableTime(page) {
 		.poll(async () => page.locator("#timeSelect option").count())
 		.toBeGreaterThan(1)
 
-	const firstTime = await page.locator("#timeSelect option").nth(1).getAttribute("value")
+	const firstTime = await page
+		.locator("#timeSelect option")
+		.nth(1)
+		.getAttribute("value")
 	expect(firstTime).toBeTruthy()
 	await page.locator("#timeSelect").selectOption(firstTime)
 	return firstTime
@@ -44,7 +47,9 @@ test.describe("public website user flows", () => {
 		const bookingForm = page.locator("#bookingForm")
 		await bookingForm.locator('input[name="firstName"]').fill("Test")
 		await bookingForm.locator('input[name="lastName"]').fill("Customer")
-		await bookingForm.locator('input[name="email"]').fill("test.customer@example.com")
+		await bookingForm
+			.locator('input[name="email"]')
+			.fill("test.customer@example.com")
 		await bookingForm.locator('input[name="phone"]').fill("+254700000001")
 		await page.locator("#serviceSelect").selectOption("Knotless Braids")
 		await page.locator("#stylistSelect").selectOption("fatima")
@@ -62,7 +67,9 @@ test.describe("public website user flows", () => {
 			/Booking Confirmed/i,
 		)
 
-		const writes = await page.evaluate(() => window.__firebaseMockState.collections)
+		const writes = await page.evaluate(
+			() => window.__firebaseMockState.collections,
+		)
 		const bookings = Object.values(writes.bookings || {})
 		const bookingSlots = Object.values(writes.bookingSlots || {})
 
@@ -89,12 +96,24 @@ test.describe("public website user flows", () => {
 	}) => {
 		const pageErrors = await openPublicPageWithFirebaseMock(page)
 
-		await expect(page.locator("#servicesGrid .service-card").first()).toBeVisible()
-		await expect(page.getByRole("button", { name: "Braids Services" })).toBeVisible()
-		await expect(page.getByRole("button", { name: "Hair Services" })).toBeVisible()
-		await expect(page.getByRole("button", { name: "Beauty Spa Services" })).toBeVisible()
-		await expect(page.getByRole("button", { name: "Nail Services" })).toBeVisible()
-		await expect(page.getByRole("button", { name: "Makeup Services" })).toBeVisible()
+		await expect(
+			page.locator("#servicesGrid .service-card").first(),
+		).toBeVisible()
+		await expect(
+			page.getByRole("button", { name: "Braids Services" }),
+		).toBeVisible()
+		await expect(
+			page.getByRole("button", { name: "Hair Services" }),
+		).toBeVisible()
+		await expect(
+			page.getByRole("button", { name: "Beauty Spa Services" }),
+		).toBeVisible()
+		await expect(
+			page.getByRole("button", { name: "Nail Services" }),
+		).toBeVisible()
+		await expect(
+			page.getByRole("button", { name: "Makeup Services" }),
+		).toBeVisible()
 
 		await page.getByRole("button", { name: "Hair Services" }).click()
 		await expect(page.locator("#servicesGrid")).toContainText("Hair Styling")
@@ -110,7 +129,9 @@ test.describe("public website user flows", () => {
 		expect(pageErrors).toEqual([])
 	})
 
-	test("contact form and contact links are wired for customers", async ({ page }) => {
+	test("contact form and contact links are wired for customers", async ({
+		page,
+	}) => {
 		const pageErrors = await openPublicPageWithFirebaseMock(page)
 
 		await expect(page.locator('a[href^="tel:"]').first()).toHaveAttribute(
@@ -131,13 +152,19 @@ test.describe("public website user flows", () => {
 			.fill("This message verifies the customer contact form flow.")
 		await page.locator('#contactForm button[type="submit"]').click()
 
-		await expect(page.locator("#contactSuccessPopup")).toBeVisible()
-		await expect(page.locator("#contactFormMessage")).toContainText(
+		const contactSuccessPopup = page.locator("#contactSuccessPopup")
+		await expect(contactSuccessPopup).toBeVisible()
+		await expect(contactSuccessPopup).toContainText(
 			/Message sent successfully/i,
 		)
+		await expect(contactSuccessPopup).toContainText(/get back to you soon/i)
+		await expect(contactSuccessPopup).toBeHidden({ timeout: 7000 })
+		await expect(page.locator("#contactFormMessage")).toBeHidden()
 
 		const contactMessages = await page.evaluate(() =>
-			Object.values(window.__firebaseMockState.collections.contactMessages || {}),
+			Object.values(
+				window.__firebaseMockState.collections.contactMessages || {},
+			),
 		)
 		expect(contactMessages).toHaveLength(1)
 		expect(contactMessages[0]).toMatchObject({

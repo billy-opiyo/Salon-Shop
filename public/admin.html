@@ -4,6 +4,10 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Royal Braids Admin</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+		<link rel="preconnect" href="https://www.gstatic.com" crossorigin />
 		<link
 			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700;800&display=swap"
 			rel="stylesheet"
@@ -14,13 +18,26 @@
 		/>
 		<link rel="stylesheet" href="CSS/style.css" />
 		<link rel="icon" type="image/x-icon" href="IMG/Royal Braids logo.png" />
-		<script src="client-config.js"></script>
+		<script src="client-config.js" defer></script>
 		<script src="JS/apply-client-config.js" defer></script>
-		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+		<script
+			src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"
+			defer
+		></script>
+		<script
+			src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"
+			defer
+		></script>
+		<script
+			src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"
+			defer
+		></script>
+		<script
+			src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"
+			defer
+		></script>
 		<script src="JS/admin.js" defer></script>
+		<script src="JS/register-sw.js" defer></script>
 	</head>
 	<body>
 		<section class="admin-bookings" id="admin">
@@ -779,6 +796,8 @@
 													id="adminGalleryPreviewImage"
 													class="admin-gallery-preview-media"
 													alt="Gallery preview"
+													loading="lazy"
+													decoding="async"
 													style="display: none"
 												/>
 												<div

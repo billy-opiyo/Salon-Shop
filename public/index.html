@@ -26,6 +26,16 @@
 
 		<title>Royal Braids | Premium African Hair Braiding Salon</title>
 
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+		<link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+		<link
+			rel="preload"
+			as="image"
+			href="IMG/1000_F_595420115_RZi6MAsq90qVRMfFz37ZKBianocAltUu.jpg"
+			fetchpriority="high"
+		/>
 		<link
 			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700;800&display=swap"
 			rel="stylesheet"
@@ -36,12 +46,29 @@
 		/>
 		<link rel="stylesheet" href="CSS/style.css" />
 		<link rel="icon" type="image/x-icon" href="IMG/Royal Braids logo.png" />
-		<script src="client-config.js"></script>
+		<script src="client-config.js" defer></script>
 		<script src="JS/apply-client-config.js" defer></script>
+		<script
+			src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"
+			defer
+		></script>
+		<script
+			src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"
+			defer
+		></script>
+		<script
+			src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"
+			defer
+		></script>
+		<script
+			src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"
+			defer
+		></script>
 		<script
 			src="JS/script.js?v=20260524-waitlist-joined-feedback"
 			defer
 		></script>
+		<script src="JS/register-sw.js" defer></script>
 	</head>
 	<body>
 		<!-- ========== HEADER ========== -->
@@ -58,6 +85,10 @@
 								id="logoCubeImage"
 								src="IMG/logo.png"
 								alt="Royal Braids rotating logo"
+								loading="eager"
+								decoding="async"
+								width="72"
+								height="72"
 								data-client-attr="src:brand.logoSrc; alt:brand.logoAlt"
 							/>
 						</span>
@@ -130,6 +161,9 @@
 				<img
 					src="IMG/1000_F_595420115_RZi6MAsq90qVRMfFz37ZKBianocAltUu.jpg"
 					alt="African Hair Braiding Salon"
+					loading="eager"
+					decoding="async"
+					fetchpriority="high"
 					data-client-attr="src:brand.heroImage; alt:brand.heroImageAlt"
 				/>
 			</div>
@@ -241,6 +275,9 @@
 							<img
 								src="IMG/4-african-knotless-braids-with-beads.webp"
 								alt="African Braids"
+								loading="eager"
+								decoding="async"
+								fetchpriority="high"
 							/>
 						</div>
 						<div class="hero-badge">
@@ -1581,14 +1618,32 @@
 					>
 						<div class="lightbox-image-panel">
 							<span>Before</span>
-							<img src="" alt="Before style" id="lightboxBeforeImg" />
+							<img
+								src=""
+								alt="Before style"
+								id="lightboxBeforeImg"
+								loading="lazy"
+								decoding="async"
+							/>
 						</div>
 						<div class="lightbox-image-panel">
 							<span>After</span>
-							<img src="" alt="After style" id="lightboxAfterImg" />
+							<img
+								src=""
+								alt="After style"
+								id="lightboxAfterImg"
+								loading="lazy"
+								decoding="async"
+							/>
 						</div>
 					</div>
-					<img src="" alt="Gallery style" id="lightboxImg" />
+					<img
+						src=""
+						alt="Gallery style"
+						id="lightboxImg"
+						loading="lazy"
+						decoding="async"
+					/>
 				</div>
 				<div class="lightbox-details" id="lightboxDetails">
 					<h3 id="lightboxStyleName">Style Name</h3>
@@ -2050,7 +2105,8 @@
 				</svg>
 			</div>
 			<div class="contact-success-popup__content">
-				<h4>Message was sent successfully.</h4>
+				<h4>Message sent successfully.</h4>
+				<p>We'll get back to you soon.</p>
 			</div>
 		</div>
 
@@ -2101,9 +2157,5 @@
 				<polyline points="18 15 12 9 6 15"></polyline>
 			</svg>
 		</a>
-		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-		<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
 	</body>
 </html>
