@@ -5877,6 +5877,42 @@ h6 {
     min-height: 100px;
 }
 
+@media (min-width: 901px) {
+    .contact-form-section {
+        padding: 64px 0;
+    }
+
+    .contact-form-section .section-heading-copy {
+        margin-bottom: 28px;
+    }
+
+    .contact-form-section .newsletter-inner {
+        padding: 42px 48px;
+    }
+
+    .contact-form-section .newsletter-form {
+        max-width: 620px;
+    }
+
+    .contact-form-section .contact-form-grid {
+        gap: 12px 14px;
+        margin-bottom: 16px;
+    }
+
+    .contact-form-section .contact-form-grid .form-group {
+        gap: 5px;
+    }
+
+    .contact-form-section .contact-form-grid input,
+    .contact-form-section .contact-form-grid textarea {
+        padding: 12px 16px;
+    }
+
+    .contact-form-section .contact-form-grid textarea {
+        min-height: 84px;
+    }
+}
+
 .newsletter-form input {
     flex: 1;
 }
