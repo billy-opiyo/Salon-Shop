@@ -34,7 +34,7 @@
     --section-padding: clamp(52px, 8vw, 96px);
     --section-scroll-gap: clamp(8px, 1.5vw, 14px);
     --scroll-offset: calc(var(--nav-height) + var(--section-scroll-gap));
-    --sticky-section-heading-top: var(--scroll-offset);
+    --sticky-section-heading-top: var(--nav-height);
     --popup-viewport-gap: clamp(10px, 2.5vh, 24px);
     --popup-safe-top: calc(env(safe-area-inset-top, 0px) + var(--popup-viewport-gap));
     --popup-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--popup-viewport-gap));
@@ -5811,13 +5811,13 @@ h6 {
     background: radial-gradient(circle at top right, rgba(200, 150, 62, 0.1), transparent 50%);
 }
 
-.newsletter h2 {
+.newsletter-inner>h2 {
     font-size: 2rem;
     margin-bottom: 12px;
     position: relative;
 }
 
-.newsletter p {
+.newsletter-inner>p {
     color: var(--text-secondary);
     margin-bottom: 30px;
     position: relative;
