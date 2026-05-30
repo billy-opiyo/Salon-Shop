@@ -737,6 +737,9 @@ function renderAdminScheduleDetails(booking = null) {
 	}
 
 	const status = normalizeStatus(extractRawStatus(booking))
+	const isWaitlisted = status === "waitlisted"
+	const bookingId = String(booking.id || "").trim()
+	const waitlistId = String(booking.waitlistId || "").trim()
 	const customerName = getAdminBookingCustomerName(booking)
 	const specialRequest = String(
 		booking.notes || booking.specialRequest || "",
@@ -779,10 +782,23 @@ function renderAdminScheduleDetails(booking = null) {
 			<div class="admin-booking-actions admin-schedule-detail-actions">
 				<button class="admin-action-btn admin-schedule-prev-btn" data-schedule-nav="previous">← Previous Booking</button>
 				<button class="admin-action-btn admin-schedule-next-btn" data-schedule-nav="next">Next Booking →</button>
-				<button class="admin-action-btn" data-schedule-action="pending" data-id="${escapeHtml(booking.id || "")}">Set Pending</button>
-				<button class="admin-action-btn" data-schedule-action="confirmed" data-id="${escapeHtml(booking.id || "")}">Confirm</button>
-				<button class="admin-action-btn" data-schedule-action="completed" data-id="${escapeHtml(booking.id || "")}">Complete + Release Slot</button>
-				<button class="admin-action-btn danger" data-schedule-action="cancel-release" data-id="${escapeHtml(booking.id || "")}">Cancel + Release Slot</button>
+				${
+					isWaitlisted
+						? ""
+						: `<button class="admin-action-btn" data-schedule-action="pending" data-id="${escapeHtml(bookingId)}">Set Pending</button>`
+				}
+				${
+					isWaitlisted
+						? `<button class="admin-action-btn" data-schedule-action="move-waitlist-confirmed" data-id="${escapeHtml(bookingId)}" data-waitlist-id="${escapeHtml(waitlistId)}">Move to Confirmed</button>`
+						: `<button class="admin-action-btn" data-schedule-action="confirmed" data-id="${escapeHtml(bookingId)}">Confirm</button>`
+				}
+				${
+					isWaitlisted
+						? `<button class="admin-action-btn" disabled title="Move this waitlisted booking to confirmed before completing it.">Complete + Release Slot</button>
+						<button class="admin-action-btn danger" disabled title="Cancel waitlist requests from the Waitlist tab so the linked waitlist entry stays synced.">Cancel + Release Slot</button>`
+						: `<button class="admin-action-btn" data-schedule-action="completed" data-id="${escapeHtml(bookingId)}">Complete + Release Slot</button>
+						<button class="admin-action-btn danger" data-schedule-action="cancel-release" data-id="${escapeHtml(bookingId)}">Cancel + Release Slot</button>`
+				}
 			</div>
 		</article>
 	`
@@ -6635,11 +6651,34 @@ function initializeAdminPanel() {
 			const bookingId = button.dataset.id
 			if (!action || !bookingId) return
 
+			const scheduleBooking =
+				adminBookingDocs.find(
+					(item = {}) => String(item.id || "").trim() === bookingId,
+				) || null
+			const isWaitlistedScheduleBooking =
+				normalizeStatus(extractRawStatus(scheduleBooking || {})) === "waitlisted"
+
 			setAdminButtonLoadingState(button, true, {
 				loadingText: "Applying...",
 			})
 			try {
-				if (action === "cancel-release") {
+				if (action === "move-waitlist-confirmed") {
+					await callAdminMoveWaitlistBookingToConfirmedAction({
+						bookingId,
+						waitlistId:
+							String(button.dataset.waitlistId || "").trim() ||
+							String(scheduleBooking?.waitlistId || "").trim(),
+					})
+					setAdminMessage(
+						"success",
+						"✅ Waitlisted booking moved to confirmed and slot locked.",
+						"adminScheduleMessage",
+					)
+				} else if (isWaitlistedScheduleBooking) {
+					throw new Error(
+						"Waitlisted schedule bookings must be moved to confirmed using the safe slot-locking action first.",
+					)
+				} else if (action === "cancel-release") {
 					const result = await cancelBookingAndReleaseSlot(bookingId)
 					setAdminMessage(
 						"success",
@@ -6667,9 +6706,13 @@ function initializeAdminPanel() {
 				}
 			} catch (error) {
 				console.error("Schedule quick action failed:", error)
+				const scheduleActionErrorMessage =
+					action === "move-waitlist-confirmed"
+						? formatAdminWaitlistActionFailureMessage(error, "move-confirmed")
+						: `❌ Action failed: ${error.message || "unknown error"}`
 				setAdminMessage(
 					"error",
-					`❌ Action failed: ${error.message || "unknown error"}`,
+					scheduleActionErrorMessage,
 					"adminScheduleMessage",
 				)
 			} finally {
