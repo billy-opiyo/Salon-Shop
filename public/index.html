@@ -4,6 +4,18 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<script>
+			;(function () {
+				try {
+					var theme = localStorage.getItem("theme")
+					var isLight = theme === "light"
+					document.documentElement.classList.toggle("light-mode", isLight)
+					document.documentElement.style.colorScheme = isLight ? "light" : "dark"
+				} catch (error) {
+					document.documentElement.style.colorScheme = "dark"
+				}
+			})()
+		</script>
+		<script>
 			// Force localhost when opening via 127.0.0.1 to avoid Firebase Auth handler mismatches.
 			if (window.location.hostname === "127.0.0.1") {
 				const target = `${window.location.protocol}//localhost${window.location.port ? `:${window.location.port}` : ""}${window.location.pathname}${window.location.search}${window.location.hash}`

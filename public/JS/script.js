@@ -8372,20 +8372,66 @@ window.addEventListener("scroll", () => {
 })
 
 // ============ DARK MODE ============
-if (!localStorage.getItem("theme")) {
-	localStorage.setItem("theme", "dark")
+function getStoredTheme() {
+	try {
+		return localStorage.getItem("theme") === "light" ? "light" : "dark"
+	} catch (error) {
+		return "dark"
+	}
 }
-let isDark = localStorage.getItem("theme") !== "light"
-function applyTheme() {
-	document.body.classList.toggle("light-mode", !isDark)
-	darkModeToggle.classList.toggle("active", isDark)
+
+function storeTheme(theme) {
+	try {
+		localStorage.setItem("theme", theme)
+	} catch (error) {
+		// Ignore storage errors so the toggle still responds immediately.
+	}
 }
-applyTheme()
+
+let isDark = getStoredTheme() !== "light"
+let themeSwitchToken = 0
+function applyTheme({ instant = false } = {}) {
+	const isLight = !isDark
+	const switchToken = instant ? ++themeSwitchToken : themeSwitchToken
+	if (instant) {
+		document.documentElement.classList.add("theme-switching")
+		document.body?.classList.add("theme-switching")
+	}
+
+	document.documentElement.classList.toggle("light-mode", isLight)
+	document.documentElement.style.colorScheme = isLight ? "light" : "dark"
+	document.body?.classList.toggle("light-mode", isLight)
+	document.body && (document.body.style.colorScheme = isLight ? "light" : "dark")
+	darkModeToggle?.classList.toggle("active", isDark)
+	darkModeToggle?.setAttribute("aria-pressed", isDark ? "true" : "false")
+
+	if (instant) {
+		const finishThemeSwitch = () => {
+			if (switchToken !== themeSwitchToken) return
+			document.documentElement.classList.remove("theme-switching")
+			document.body?.classList.remove("theme-switching")
+		}
+
+		if (typeof requestAnimationFrame === "function") {
+			requestAnimationFrame(() => requestAnimationFrame(finishThemeSwitch))
+		} else {
+			setTimeout(finishThemeSwitch, 0)
+		}
+	}
+}
+applyTheme({ instant: true })
 applyAccessibilityPrefs(getStoredAccessibilityPrefs())
-darkModeToggle.addEventListener("click", () => {
+function toggleThemeInstantly() {
 	isDark = !isDark
-	localStorage.setItem("theme", isDark ? "dark" : "light")
-	applyTheme()
+	storeTheme(isDark ? "dark" : "light")
+	applyTheme({ instant: true })
+}
+
+darkModeToggle?.addEventListener("click", toggleThemeInstantly)
+darkModeToggle?.addEventListener("keydown", (event) => {
+	if (event.key !== "Enter" && event.key !== " ") return
+	event.preventDefault()
+	toggleThemeInstantly()
 })
 
 // ============ SCROLL ANIMATIONS ============

@@ -91,6 +91,17 @@ body {
     scrollbar-color: #e0ac4f #1b1712;
 }
 
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after,
+body.theme-switching,
+body.theme-switching *,
+body.theme-switching *::before,
+body.theme-switching *::after {
+    transition-delay: 0s !important;
+    transition-duration: 0s !important;
+}
+
 body::-webkit-scrollbar {
     width: 10px;
 }
@@ -872,7 +883,8 @@ h6 {
     border-radius: 13px;
     position: relative;
     cursor: pointer;
-    transition: var(--transition);
+    transition: background-color 0.08s ease, border-color 0.08s ease, box-shadow 0.08s ease;
+    will-change: background-color, border-color;
 }
 
 .dark-mode-toggle::after {
@@ -884,7 +896,8 @@ h6 {
     height: 20px;
     background: var(--primary);
     border-radius: 50%;
-    transition: var(--transition-bounce);
+    transition: left 0.08s ease, background-color 0.08s ease;
+    will-change: left;
 }
 
 .dark-mode-toggle.active::after {
@@ -898,7 +911,7 @@ h6 {
     width: 14px;
     height: 14px;
     z-index: 1;
-    transition: var(--transition-fast);
+    transition: opacity 0.08s ease, fill 0.08s ease;
 }
 
 .dark-mode-toggle .sun {
@@ -6613,6 +6626,7 @@ h6 {
 }
 
 /* ============ LIGHT MODE ============ */
+html.light-mode,
 body.light-mode {
     --bg-primary: #f7f2ea;
     --bg-secondary: #efe6da;
