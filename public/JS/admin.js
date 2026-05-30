@@ -1910,6 +1910,33 @@ function getWaitlistStatusLabel(status) {
 	return normalized
 }
 
+function isWaitlistSlotOccupiedError(error = {}) {
+	const code = String(error?.code || "")
+		.trim()
+		.toLowerCase()
+	const reason = String(error?.details?.reason || "")
+		.trim()
+		.toLowerCase()
+	const message = String(error?.message || "")
+		.trim()
+		.toLowerCase()
+
+	return (
+		reason === "slot-occupied" ||
+		message.includes("preferred slot is still occupied") ||
+		message.includes("slot is already taken") ||
+		(code.includes("already-exists") && message.includes("slot"))
+	)
+}
+
+function formatAdminWaitlistActionFailureMessage(error = {}, action = "") {
+	if (action === "move-confirmed" && isWaitlistSlotOccupiedError(error)) {
+		return "❌ Cannot move to confirmed: this client's preferred slot is still occupied by another booking. Cancel or release the existing confirmed booking first, then try Move to Confirmed again."
+	}
+
+	return `❌ Waitlist action failed: ${error.message || "unknown error"}`
+}
+
 function normalizeSecurityStatus(status = "") {
 	const raw = String(status || "success")
 		.trim()
@@ -3893,10 +3920,10 @@ function renderAdminWaitlist(docs = []) {
           <div><span>Inspiration Image:</span> ${item.inspirationImageUrl ? `<a class="admin-inline-link" href="${escapeHtml(item.inspirationImageUrl)}" target="_blank" rel="noopener">Open full image</a>` : "Not provided"}</div>
         </div>
         <div class="admin-booking-actions">
-          <button class="admin-action-btn" data-waitlist-action="move-confirmed" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}" ${canMoveToConfirmed ? "" : "disabled"}>Move to Confirmed</button>
+          <button class="admin-action-btn" data-tooltip="Converts this waitlisted booking to confirmed only when the preferred slot is available." data-waitlist-action="move-confirmed" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}" ${canMoveToConfirmed ? "" : "disabled"}>Move to Confirmed (Locks Slot)</button>
           <button class="admin-action-btn" data-waitlist-action="waiting" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Set Waiting</button>
           <button class="admin-action-btn" data-waitlist-action="contacted" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Mark Contacted</button>
-          <button class="admin-action-btn" data-waitlist-action="booked" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Mark Booked</button>
+          <button class="admin-action-btn" data-tooltip="Status-only action. It does not lock a booking slot." data-waitlist-action="booked" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Mark Booked / Close Waitlist</button>
           <button class="admin-action-btn danger" data-waitlist-action="cancelled" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Cancel Request</button>
         </div>
       </article>
@@ -6339,11 +6366,11 @@ function initializeAdminPanel() {
 			}
 		} catch (error) {
 			console.error("Admin action failed:", error)
-			setAdminMessage(
-				"error",
-				`❌ Action failed: ${error.message || "unknown error"}`,
-				"adminActionMessage",
-			)
+			const actionErrorMessage =
+				action === "move-waitlist-confirmed"
+					? formatAdminWaitlistActionFailureMessage(error, "move-confirmed")
+					: `❌ Action failed: ${error.message || "unknown error"}`
+			setAdminMessage("error", actionErrorMessage, "adminActionMessage")
 		} finally {
 			setAdminButtonLoadingState(button, false)
 		}
@@ -6990,9 +7017,13 @@ function initializeAdminPanel() {
 						updateResult?.linkedBookingSynced === false
 							? ` ⚠️ Waitlist status was saved, but linked booking sync needs attention: ${updateResult.linkedBookingError?.message || "unknown error"}`
 							: ""
+					const successMessage =
+						action === "booked"
+							? "✅ Waitlist request marked as booked/closed. This is a status-only update and does not lock a slot. Use Move to Confirmed when the preferred slot is available."
+							: `✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.`
 					setAdminMessage(
 						"success",
-						`✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.${syncWarning}`,
+						`${successMessage}${syncWarning}`,
 						"adminWaitlistMessage",
 					)
 				}
@@ -7000,7 +7031,7 @@ function initializeAdminPanel() {
 				console.error("Waitlist action failed:", error)
 				setAdminMessage(
 					"error",
-					`❌ Waitlist action failed: ${error.message || "unknown error"}`,
+					formatAdminWaitlistActionFailureMessage(error, action),
 					"adminWaitlistMessage",
 				)
 			} finally {

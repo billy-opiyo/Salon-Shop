@@ -9,6 +9,10 @@ const { defineSecret } = require("firebase-functions/params")
 const logger = require("firebase-functions/logger")
 const admin = require("firebase-admin")
 const CLIENT_CONFIG = require("./client-config")
+const {
+	WAITLIST_SLOT_OCCUPIED_MESSAGE,
+	buildWaitlistSlotOccupiedDetails,
+} = require("./waitlist-action-messages")
 
 const CLOUDINARY_CLOUD_NAME = defineSecret("CLOUDINARY_CLOUD_NAME")
 const CLOUDINARY_API_KEY = defineSecret("CLOUDINARY_API_KEY")
@@ -2128,7 +2132,12 @@ exports.adminMoveWaitlistBookingToConfirmed = onCall(
 				) {
 					throw new HttpsError(
 						"already-exists",
-						"This slot is already taken by another booking",
+						WAITLIST_SLOT_OCCUPIED_MESSAGE,
+						buildWaitlistSlotOccupiedDetails({
+							slotId: preferredSlotId,
+							currentBookingId: slotBookingId,
+							waitlistBookingId: bookingId,
+						}),
 					)
 				}
 			}
