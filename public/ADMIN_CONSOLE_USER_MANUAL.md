@@ -243,20 +243,25 @@ The console normalizes booking statuses into:
 
 ### 4.5 Booking Actions
 
-Each booking card may show these action buttons:
+Each booking card shows lifecycle-safe action buttons based on the booking's current status. The console now avoids showing actions that could desynchronize slot locks or linked waitlist records.
 
-#### Set Pending
+| Current status | Available booking-card actions |
+| --- | --- |
+| `pending` | **Confirm**, **Cancel + Release Slot** |
+| `confirmed` | **Complete + Release Slot**, **Cancel + Release Slot** |
+| `waitlisted` | **Move to Confirmed**; complete/cancel release buttons are disabled with guidance |
+| `completed` / `cancelled` | No quick lifecycle actions |
 
-Sets the booking status to `pending`.
+Important behavior:
 
-Use this when:
-
-- A booking needs review again.
-- The booking was accidentally confirmed/completed.
+- Slot-release actions are handled by the protected backend callable function `adminUpdateBookingStatusAndReleaseSlot`.
+- The backend verifies the admin has booking-management permission before applying the action.
+- The backend checks that the slot lock belongs to the booking before deleting `bookingSlots/{slotId}`.
+- Completion/cancellation slot-release actions are recorded in admin audit logs.
 
 #### Confirm
 
-Sets a normal booking status to `confirmed`.
+Sets a pending booking status to `confirmed`.
 
 Use this when:
 
@@ -275,21 +280,34 @@ Important behavior:
 - If the slot is still occupied, the console shows an error.
 - If the slot is occupied, cancel/release the existing booking first, then try again.
 
-#### Complete
+#### Complete + Release Slot
 
-Sets the booking status to `completed`.
+Completes a confirmed booking and releases its slot lock through the backend callable function.
 
-Use this after the appointment has been fulfilled.
+Important behavior:
+
+- Only confirmed bookings can be completed and released from this workflow.
+- Waitlisted bookings must be moved to confirmed first.
+- The booking status becomes `completed`.
+- `completedAt`, `completedBy`, `adminActionUpdatedBy`, and update metadata are written.
+- If the booking has a valid `slotId`, the matching `bookingSlots/{slotId}` document is deleted.
+- Slot-release metadata can include `releasedSlotId`, `slotReleasedAt`, `slotReleaseReason`, `slotReleaseSource`, and `slotReleasedBy`.
+- Releasing a slot can trigger backend waitlist notification automation for clients waiting for that slot.
+
+Use this after the appointment has been fulfilled and the slot should no longer stay locked as an active booking.
 
 #### Cancel + Release Slot
 
-Cancels the booking and releases its slot lock.
+Cancels a pending or confirmed booking and releases its slot lock through the backend callable function.
 
 Important behavior:
 
 - The booking status becomes `cancelled`.
-- If the booking has a `slotId`, the corresponding `bookingSlots/{slotId}` document is deleted.
+- `cancelledAt`, `cancelledBy`, `adminActionUpdatedBy`, and update metadata are written.
+- If the booking has a valid `slotId`, the matching `bookingSlots/{slotId}` document is deleted.
+- Slot-release metadata can include `releasedSlotId`, `slotReleasedAt`, `slotReleaseReason`, `slotReleaseSource`, and `slotReleasedBy`.
 - Releasing a slot can trigger backend waitlist notification automation for clients waiting for that slot.
+- Waitlisted bookings cannot be cancelled/released from the Bookings or Schedule card actions. Cancel waitlist requests from the **Waitlist** tab so the linked waitlist entry stays synchronized.
 
 Use this when:
 
@@ -304,8 +322,9 @@ Use this when:
 3. Check date, time, stylist, service, phone/email, and notes.
 4. If the salon can serve the booking, click **Confirm**.
 5. If the client cancels or the booking is invalid, click **Cancel + Release Slot**.
-6. After the appointment is served, click **Complete**.
-7. Use **Waitlisted Only** for requests that need slot availability follow-up.
+6. After a confirmed appointment is served, click **Complete + Release Slot**.
+7. For waitlisted bookings, use **Move to Confirmed** before completing, or manage cancellation from the **Waitlist** tab.
+8. Use **Waitlisted Only** for requests that need slot availability follow-up.
 
 ---
 
@@ -526,10 +545,11 @@ The details panel includes:
 
 - **Previous Booking** - selects the previous visible booking
 - **Next Booking** - selects the next visible booking
-- **Set Pending**
-- **Confirm**
-- **Complete**
-- **Cancel + Release Slot**
+- Lifecycle-safe booking actions based on status:
+  - Pending bookings: **Confirm**, **Cancel + Release Slot**
+  - Confirmed bookings: **Complete + Release Slot**, **Cancel + Release Slot**
+  - Waitlisted bookings: **Move to Confirmed** only; release actions are disabled until the booking is confirmed or handled from Waitlist
+  - Completed/cancelled bookings: no quick lifecycle action
 
 These status actions affect the same booking records as the **Bookings** tab.
 
@@ -539,7 +559,8 @@ These status actions affect the same booking records as the **Bookings** tab.
 2. Click **Today**.
 3. Choose **Day** for today’s appointments or **Week** for weekly planning.
 4. Review each booking by clicking events.
-5. Use quick actions to confirm, complete, or cancel/release slots as needed.
+5. Use quick actions to confirm pending bookings, complete confirmed bookings with slot release, or cancel/release pending/confirmed bookings as needed.
+6. For waitlisted bookings, move them to confirmed first or manage cancellation from the **Waitlist** tab.
 
 ---
 
@@ -1585,6 +1606,7 @@ The Admin Console relies on backend callable functions for protected actions, in
 - Admin security account restrictions
 - Admin user creation/update/listing
 - Moving waitlisted bookings to confirmed with slot locking
+- Completing or cancelling bookings while safely releasing slot locks
 
 If these functions are not deployed or configured, related UI actions may fail.
 
@@ -1752,8 +1774,9 @@ Ask the affected admin to:
 ### 18.1 Booking Safety
 
 - Use **Confirm** only when the salon can honor the appointment.
-- Use **Complete** only after the service is finished.
+- Use **Complete + Release Slot** only after the service is finished and the booking is confirmed.
 - Use **Cancel + Release Slot** carefully because it frees the slot and may notify waitlisted clients.
+- Do not complete or cancel waitlisted bookings from booking/schedule cards; move them to confirmed first or cancel the linked waitlist request from the **Waitlist** tab.
 - Do not use **Mark Booked / Close Waitlist** as a substitute for slot locking.
 
 ### 18.2 Waitlist Fairness

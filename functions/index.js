@@ -2326,6 +2326,175 @@ exports.adminMoveWaitlistBookingToConfirmed = onCall(
 	},
 )
 
+function normalizeAdminTerminalBookingStatus(value = "") {
+	const raw = String(value || "")
+		.trim()
+		.toLowerCase()
+	if (raw === "cancel-release" || raw === "cancel") return "cancelled"
+	const normalized = normalizeServerBookingStatus(raw)
+	return ["completed", "cancelled"].includes(normalized) ? normalized : ""
+}
+
+function assertAdminReleaseBookingTransitionAllowed(currentStatus, targetStatus) {
+	const current = normalizeServerBookingStatus(currentStatus)
+	const target = normalizeAdminTerminalBookingStatus(targetStatus)
+
+	if (!target) {
+		throw new HttpsError("invalid-argument", "Invalid booking release action")
+	}
+
+	if (current === "waitlisted") {
+		throw new HttpsError(
+			"failed-precondition",
+			"Move waitlisted bookings to confirmed first, or cancel them from the Waitlist tab so linked waitlist records stay synced",
+		)
+	}
+
+	if (target === "completed" && !["confirmed", "completed"].includes(current)) {
+		throw new HttpsError(
+			"failed-precondition",
+			"Only confirmed bookings can be completed and released",
+		)
+	}
+
+	if (
+		target === "cancelled" &&
+		!["pending", "confirmed", "cancelled"].includes(current)
+	) {
+		throw new HttpsError(
+			"failed-precondition",
+			"Only pending or confirmed bookings can be cancelled and released",
+		)
+	}
+}
+
+exports.adminUpdateBookingStatusAndReleaseSlot = onCall(
+	{
+		region: "us-central1",
+	},
+	async (request) => {
+		const actor = await assertCanManageBookings(request)
+		const data = request.data || {}
+		const bookingId = String(data.bookingId || "").trim()
+		const targetStatus = normalizeAdminTerminalBookingStatus(
+			data.status || data.action,
+		)
+
+		if (!bookingId) {
+			throw new HttpsError("invalid-argument", "Booking ID is required")
+		}
+
+		if (!targetStatus) {
+			throw new HttpsError(
+				"invalid-argument",
+				"Use completed or cancelled for slot release actions",
+			)
+		}
+
+		const db = admin.firestore()
+		const bookingRef = db.collection("bookings").doc(bookingId)
+		const actorLabel = actor.email || actor.uid
+		let releasedSlotId = ""
+		let beforeAudit = null
+		let afterAudit = null
+
+		await db.runTransaction(async (transaction) => {
+			const bookingSnap = await transaction.get(bookingRef)
+			if (!bookingSnap.exists) {
+				throw new HttpsError("not-found", "Booking no longer exists")
+			}
+
+			const booking = bookingSnap.data() || {}
+			const currentStatus = normalizeServerBookingStatus(booking.status)
+			assertAdminReleaseBookingTransitionAllowed(currentStatus, targetStatus)
+
+			const slotId = String(booking.slotId || "").trim()
+			beforeAudit = {
+				status: currentStatus,
+				slotId,
+				waitlistId: String(booking.waitlistId || "").trim(),
+				uid: String(booking.uid || "").trim(),
+				email: String(booking.email || "")
+					.trim()
+					.toLowerCase(),
+			}
+
+			if (slotId) {
+				const slotRef = db.collection("bookingSlots").doc(slotId)
+				const slotSnap = await transaction.get(slotRef)
+				if (slotSnap.exists) {
+					const slotData = slotSnap.data() || {}
+					if (!shouldReleaseSlotForBooking(slotData, bookingId, booking)) {
+						throw new HttpsError(
+							"failed-precondition",
+							"This slot is linked to another booking, so it was not released",
+						)
+					}
+
+					const slotBookingId = String(slotData.bookingId || "").trim()
+					if (slotData.taken === true || slotBookingId === bookingId) {
+						transaction.delete(slotRef)
+						releasedSlotId = slotId
+					}
+				}
+			}
+
+			const serverNow = admin.firestore.FieldValue.serverTimestamp()
+			const bookingPatch = {
+				status: targetStatus,
+				updatedAt: serverNow,
+				adminActionUpdatedBy: actorLabel,
+			}
+
+			if (targetStatus === "completed") {
+				bookingPatch.completedAt = serverNow
+				bookingPatch.completedBy = actorLabel
+			} else {
+				bookingPatch.cancelledAt = serverNow
+				bookingPatch.cancelledBy = actorLabel
+			}
+
+			if (releasedSlotId) {
+				bookingPatch.releasedSlotId = releasedSlotId
+				bookingPatch.slotReleasedAt = serverNow
+				bookingPatch.slotReleaseReason = targetStatus
+				bookingPatch.slotReleaseSource = "admin_action"
+				bookingPatch.slotReleasedBy = actorLabel
+			}
+
+			transaction.set(bookingRef, bookingPatch, { merge: true })
+
+			afterAudit = {
+				status: targetStatus,
+				slotId,
+				releasedSlotId,
+				slotReleaseReason: releasedSlotId ? targetStatus : "none",
+			}
+		})
+
+		await createAdminAuditLogEntry({
+			action:
+				targetStatus === "completed"
+					? "booking_completed_and_slot_released"
+					: "booking_cancelled_and_slot_released",
+			actorUid: actor.uid,
+			actorEmail: actor.email,
+			targetUid: beforeAudit?.uid || "",
+			targetEmail: beforeAudit?.email || "",
+			before: beforeAudit,
+			after: afterAudit,
+			metadata: { bookingId, releasedSlotId },
+		})
+
+		return {
+			ok: true,
+			bookingId,
+			status: targetStatus,
+			releasedSlotId,
+		}
+	},
+)
+
 exports.clientGetWaitlistQueueInfo = onCall(
 	{
 		region: "us-central1",

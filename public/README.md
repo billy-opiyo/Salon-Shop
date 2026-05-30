@@ -66,6 +66,10 @@ This project is built to:
 - Expanded **Admin operations**:
   - Schedule tab with day/week calendar view and quick booking actions
   - Waitlist tab with realtime queue monitoring, counters, sorting, and status transitions
+  - Lifecycle-safe booking action rendering across Bookings and Schedule
+  - `Complete + Release Slot` and `Cancel + Release Slot` now use protected backend callable slot-release handling
+  - Waitlisted bookings must be moved to confirmed first, or cancelled from Waitlist, so linked waitlist records remain synchronized
+  - Admin realtime listeners now start only for sections covered by the signed-in admin's permissions
   - Existing CRUD/moderation modules maintained for gallery, blogs, reviews, and messages
 - Added **Service Category Visibility Management**:
   - New **Services** tab in admin console for category ON/OFF controls
@@ -161,8 +165,8 @@ This project is built to:
 ### Admin App (`admin.html` + `admin.js`)
 
 1. Email/password admin login gated by `adminUsers/{uid}` role, active state, and permissions.
-2. Realtime listeners for bookings, gallery, blogs, reviews, and contact messages.
-3. Calendar-like schedule board (day/week), waitlist queue, and quick operational booking management.
+2. Permission-scoped realtime listeners for bookings, waitlist, gallery, blogs, reviews, contact messages, services, admin users, and security data.
+3. Calendar-like schedule board (day/week), waitlist queue, and lifecycle-safe operational booking management.
 
 ### Backend Automation
 
@@ -242,6 +246,7 @@ This project is built to:
 - Password visibility toggle
 - Section tabs: **Bookings, Schedule, Gallery, Blogs, Reviews, Messages, Waitlist, Services, Admins, Security**
 - Confirmation modal for destructive actions
+- Permission-scoped realtime listeners stop/not-start when the signed-in admin lacks the required section permission
 
 ### Admins (Role + Permission Management)
 
@@ -256,9 +261,15 @@ This project is built to:
 ### Bookings + Schedule
 
 - Realtime bookings list + status cards
-- Status actions (pending / confirmed / completed)
-- Cancel + release slot action
-- Day/week schedule board with quick-detail action panel
+- Lifecycle-safe booking actions based on current status:
+  - Pending: **Confirm** or **Cancel + Release Slot**
+  - Confirmed: **Complete + Release Slot** or **Cancel + Release Slot**
+  - Waitlisted: **Move to Confirmed** only; complete/cancel release buttons are disabled with guidance
+  - Completed/cancelled: no quick lifecycle action
+- Protected backend slot-release flow for admin completion/cancellation actions through `adminUpdateBookingStatusAndReleaseSlot`
+- Slot-release metadata on booking docs can include `releasedSlotId`, `slotReleasedAt`, `slotReleaseReason`, `slotReleaseSource`, and `slotReleasedBy`
+- Admin audit logging for booking completion/cancellation slot-release actions
+- Day/week schedule board with quick-detail action panel using the same lifecycle-safe rules
 
 ### Waitlist
 
@@ -398,6 +409,8 @@ File: `functions/index.js`
 - `trackBookingCanceled` (on booking update timeline/audit)
 - `notifyWaitlistOnSlotOpen` (on booking slot deletion)
 - `createCloudinarySignedUpload` (callable signed-upload helper)
+- `adminMoveWaitlistBookingToConfirmed` (callable waitlisted-booking conversion + preferred-slot locking)
+- `adminUpdateBookingStatusAndReleaseSlot` (callable admin completion/cancellation + safe slot release + audit logging)
 - `logLoginActivity` (callable login telemetry + risk/scoring + alert triggers)
 - `logAccountSecurityChange` (callable account security-change audit + optional alert)
 - `adminRestrictUserAccount` (callable admin security actions: block/logout/reset/clear)
@@ -638,6 +651,30 @@ Use this to verify the current **Admin → Waitlist** queue after creating at le
    - Switch Day/Week.
    - Open an event and run quick actions.
 5. Expected: public site reflects gallery/blog changes in realtime.
+
+### H2) Admin booking lifecycle + slot-release test
+
+Use this to verify the current **Bookings** and **Schedule** action rules after deploying `adminUpdateBookingStatusAndReleaseSlot`.
+
+1. Sign in to `admin.html` with an admin account that has `canManageBookings`.
+2. Create or locate test bookings with these statuses: `pending`, `confirmed`, `waitlisted`, and a terminal status (`completed` or `cancelled`).
+3. In **Bookings**, verify action visibility:
+   - Pending shows **Confirm** and **Cancel + Release Slot**.
+   - Confirmed shows **Complete + Release Slot** and **Cancel + Release Slot**.
+   - Waitlisted shows **Move to Confirmed** while complete/cancel release actions are disabled with explanatory tooltips/guidance.
+   - Completed/cancelled shows no quick lifecycle action.
+4. Repeat the same checks from **Schedule** by opening each booking in the schedule details panel.
+5. Run **Complete + Release Slot** on a confirmed test booking.
+6. Run **Cancel + Release Slot** on a pending or confirmed test booking.
+7. Expected in Firestore:
+   - Booking status updates to `completed` or `cancelled`.
+   - Matching `bookingSlots/{slotId}` is deleted only when it belongs to that booking.
+   - Booking release metadata appears when a slot is released: `releasedSlotId`, `slotReleasedAt`, `slotReleaseReason`, `slotReleaseSource`, and `slotReleasedBy`.
+   - Completion/cancellation actor metadata appears, such as `completedBy` or `cancelledBy`.
+   - Admin audit entries appear in `adminAuditLogs` for completion/cancellation slot-release actions.
+8. Permission regression:
+   - Sign in as an admin without `canManageBookings`.
+   - Expected: Bookings/Schedule/Waitlist tabs are hidden/blocked and related realtime listeners do not continue loading protected data.
 
 ### I) Backend automation verification
 

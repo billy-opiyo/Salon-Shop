@@ -361,6 +361,12 @@ function isCurrentSuperAdmin() {
 	return normalizeAdminRoleValue(adminAccessProfile?.role) === "super_admin"
 }
 
+function canStartAdminRealtimeListener(permissionKey = "") {
+	if (!firebaseReady || !db || !adminUnlocked) return false
+	const key = String(permissionKey || "").trim()
+	return key ? hasAdminAccessPermission(key) : true
+}
+
 function isAuthorizedAdminAccessProfile(profile = null) {
 	if (!profile || typeof profile !== "object") return false
 	if (profile.active !== true) return false
@@ -726,6 +732,47 @@ function selectNextAdminScheduleBooking() {
 	renderAdminSchedule()
 }
 
+function renderAdminBookingLifecycleActions({
+	bookingId = "",
+	waitlistId = "",
+	status = "pending",
+	actionAttribute = "data-action",
+} = {}) {
+	const normalizedStatus = normalizeStatus(status)
+	const safeBookingId = escapeHtml(String(bookingId || "").trim())
+	const safeWaitlistId = escapeHtml(String(waitlistId || "").trim())
+	const actionAttr =
+		actionAttribute === "data-schedule-action"
+			? "data-schedule-action"
+			: "data-action"
+
+	if (!safeBookingId) return ""
+
+	if (normalizedStatus === "waitlisted") {
+		return `
+			<button class="admin-action-btn" ${actionAttr}="move-waitlist-confirmed" data-id="${safeBookingId}" data-waitlist-id="${safeWaitlistId}">Move to Confirmed</button>
+			<button class="admin-action-btn" disabled title="Move this waitlisted booking to confirmed before completing it.">Complete + Release Slot</button>
+			<button class="admin-action-btn danger" disabled title="Cancel waitlist requests from the Waitlist tab so the linked waitlist entry stays synced.">Cancel + Release Slot</button>
+		`
+	}
+
+	if (normalizedStatus === "pending") {
+		return `
+			<button class="admin-action-btn" ${actionAttr}="confirmed" data-id="${safeBookingId}">Confirm</button>
+			<button class="admin-action-btn danger" ${actionAttr}="cancel-release" data-id="${safeBookingId}">Cancel + Release Slot</button>
+		`
+	}
+
+	if (normalizedStatus === "confirmed") {
+		return `
+			<button class="admin-action-btn" ${actionAttr}="completed" data-id="${safeBookingId}">Complete + Release Slot</button>
+			<button class="admin-action-btn danger" ${actionAttr}="cancel-release" data-id="${safeBookingId}">Cancel + Release Slot</button>
+		`
+	}
+
+	return `<button class="admin-action-btn" disabled title="This booking is already ${escapeHtml(getStatusLabel(normalizedStatus))} and cannot be changed from this view.">No quick actions available</button>`
+}
+
 function renderAdminScheduleDetails(booking = null) {
 	const details = document.getElementById("adminScheduleDetails")
 	if (!details) return
@@ -782,23 +829,12 @@ function renderAdminScheduleDetails(booking = null) {
 			<div class="admin-booking-actions admin-schedule-detail-actions">
 				<button class="admin-action-btn admin-schedule-prev-btn" data-schedule-nav="previous">← Previous Booking</button>
 				<button class="admin-action-btn admin-schedule-next-btn" data-schedule-nav="next">Next Booking →</button>
-				${
-					isWaitlisted
-						? ""
-						: `<button class="admin-action-btn" data-schedule-action="pending" data-id="${escapeHtml(bookingId)}">Set Pending</button>`
-				}
-				${
-					isWaitlisted
-						? `<button class="admin-action-btn" data-schedule-action="move-waitlist-confirmed" data-id="${escapeHtml(bookingId)}" data-waitlist-id="${escapeHtml(waitlistId)}">Move to Confirmed</button>`
-						: `<button class="admin-action-btn" data-schedule-action="confirmed" data-id="${escapeHtml(bookingId)}">Confirm</button>`
-				}
-				${
-					isWaitlisted
-						? `<button class="admin-action-btn" disabled title="Move this waitlisted booking to confirmed before completing it.">Complete + Release Slot</button>
-						<button class="admin-action-btn danger" disabled title="Cancel waitlist requests from the Waitlist tab so the linked waitlist entry stays synced.">Cancel + Release Slot</button>`
-						: `<button class="admin-action-btn" data-schedule-action="completed" data-id="${escapeHtml(bookingId)}">Complete + Release Slot</button>
-						<button class="admin-action-btn danger" data-schedule-action="cancel-release" data-id="${escapeHtml(bookingId)}">Cancel + Release Slot</button>`
-				}
+				${renderAdminBookingLifecycleActions({
+					bookingId,
+					waitlistId,
+					status,
+					actionAttribute: "data-schedule-action",
+				})}
 			</div>
 		</article>
 	`
@@ -1064,7 +1100,10 @@ function stopAdminServiceSettingsListener() {
 }
 
 function startAdminServiceSettingsListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageContent")) {
+		stopAdminServiceSettingsListener()
+		return
+	}
 
 	stopAdminServiceSettingsListener()
 
@@ -1363,6 +1402,22 @@ async function callAdminMoveWaitlistBookingToConfirmedAction(payload = {}) {
 
 	const callable = adminFunctionsService.httpsCallable(
 		"adminMoveWaitlistBookingToConfirmed",
+	)
+	const response = await callable(payload)
+	return response?.data || { ok: true }
+}
+
+async function callAdminUpdateBookingStatusAndReleaseSlotAction(payload = {}) {
+	if (
+		!firebaseReady ||
+		!adminFunctionsService ||
+		typeof adminFunctionsService.httpsCallable !== "function"
+	) {
+		throw new Error("Cloud Functions service is not ready yet.")
+	}
+
+	const callable = adminFunctionsService.httpsCallable(
+		"adminUpdateBookingStatusAndReleaseSlot",
 	)
 	const response = await callable(payload)
 	return response?.data || { ok: true }
@@ -4542,14 +4597,11 @@ function renderAdminBookings(docs) {
 						}
           </div>
           <div class="admin-booking-actions">
-            <button class="admin-action-btn" data-action="pending" data-id="${escapeHtml(b.id || "")}">Set Pending</button>
-            ${
-							isWaitlisted
-								? `<button class="admin-action-btn" data-action="move-waitlist-confirmed" data-id="${escapeHtml(b.id || "")}" data-waitlist-id="${escapeHtml(waitlistId)}">Move to Confirmed</button>`
-								: `<button class="admin-action-btn" data-action="confirmed" data-id="${escapeHtml(b.id || "")}">Confirm</button>`
-						}
-            <button class="admin-action-btn" data-action="completed" data-id="${escapeHtml(b.id || "")}">Complete + Release Slot</button>
-            <button class="admin-action-btn danger" data-action="cancel-release" data-id="${escapeHtml(b.id || "")}">Cancel + Release Slot</button>
+						${renderAdminBookingLifecycleActions({
+							bookingId: b.id,
+							waitlistId,
+							status,
+						})}
           </div>
         </div>
       `
@@ -5817,81 +5869,18 @@ async function updateBookingStatus(bookingId, status) {
 	)
 }
 
-function shouldReleaseAdminSlotForBooking(slotData = {}, bookingId = "", booking = {}) {
-	const safeBookingId = String(bookingId || "").trim()
-	const slotBookingId = String(slotData.bookingId || "").trim()
-	if (slotBookingId) return slotBookingId === safeBookingId
-
-	// Legacy slot documents may not include bookingId. In that case, release only
-	// when the uid is blank or matches the booking owner.
-	const slotUid = String(slotData.uid || "").trim()
-	const bookingUid = String(booking.uid || "").trim()
-	return !slotUid || !bookingUid || slotUid === bookingUid
-}
-
 async function updateBookingStatusAndReleaseSlot(bookingId, status) {
+	const safeBookingId = String(bookingId || "").trim()
 	const terminalStatus = normalizeStatus(status)
 	if (!["cancelled", "completed"].includes(terminalStatus)) {
 		throw new Error("Only cancelled or completed bookings can release a slot")
 	}
+	if (!safeBookingId) throw new Error("Booking ID is required")
 
-	const bookingRef = db.collection("bookings").doc(bookingId)
-	let releasedSlotId = ""
-
-	await db.runTransaction(async (transaction) => {
-		const bookingDoc = await transaction.get(bookingRef)
-		if (!bookingDoc.exists) {
-			throw new Error("Booking no longer exists")
-		}
-
-		const booking = bookingDoc.data() || {}
-		const slotId = String(booking.slotId || "").trim()
-		if (slotId) {
-			const slotRef = db.collection("bookingSlots").doc(slotId)
-			const slotDoc = await transaction.get(slotRef)
-			if (slotDoc.exists) {
-				const slotData = slotDoc.data() || {}
-				if (!shouldReleaseAdminSlotForBooking(slotData, bookingId, booking)) {
-					throw new Error(
-						"This slot is linked to another booking, so it was not released.",
-					)
-				}
-
-				transaction.delete(slotRef)
-				releasedSlotId = slotId
-			}
-		}
-
-		const serverNow = firebase.firestore.FieldValue.serverTimestamp()
-		const bookingPatch = {
-			status: terminalStatus,
-			updatedAt: serverNow,
-		}
-
-		if (terminalStatus === "completed") {
-			bookingPatch.completedAt = serverNow
-		} else if (terminalStatus === "cancelled") {
-			bookingPatch.cancelledAt = serverNow
-		}
-
-		if (releasedSlotId) {
-			bookingPatch.releasedSlotId = releasedSlotId
-			bookingPatch.slotReleasedAt = serverNow
-			bookingPatch.slotReleaseReason = terminalStatus
-		}
-
-		transaction.set(
-			bookingRef,
-			bookingPatch,
-			{ merge: true },
-		)
-	})
-
-	return {
-		bookingId,
+	return callAdminUpdateBookingStatusAndReleaseSlotAction({
+		bookingId: safeBookingId,
 		status: terminalStatus,
-		releasedSlotId,
-	}
+	})
 }
 
 async function cancelBookingAndReleaseSlot(bookingId) {
@@ -5903,7 +5892,10 @@ async function completeBookingAndReleaseSlot(bookingId) {
 }
 
 function startAdminBookingsListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageBookings")) {
+		stopAdminBookingsListener()
+		return
+	}
 
 	stopAdminBookingsListener()
 
@@ -5926,7 +5918,10 @@ function startAdminBookingsListener() {
 }
 
 function startAdminGalleryListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageContent")) {
+		stopAdminGalleryListener()
+		return
+	}
 
 	stopAdminGalleryListener()
 
@@ -5950,7 +5945,10 @@ function startAdminGalleryListener() {
 }
 
 function startAdminBlogsListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageContent")) {
+		stopAdminBlogsListener()
+		return
+	}
 
 	stopAdminBlogsListener()
 
@@ -5974,7 +5972,10 @@ function startAdminBlogsListener() {
 }
 
 function startAdminReviewsListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageContent")) {
+		stopAdminReviewsListener()
+		return
+	}
 
 	stopAdminReviewsListener()
 
@@ -5998,7 +5999,10 @@ function startAdminReviewsListener() {
 }
 
 function startAdminContactListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageContent")) {
+		stopAdminContactListener()
+		return
+	}
 
 	stopAdminContactListener()
 
@@ -6022,7 +6026,10 @@ function startAdminContactListener() {
 }
 
 function startAdminWaitlistListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageBookings")) {
+		stopAdminWaitlistListener()
+		return
+	}
 
 	stopAdminWaitlistListener()
 
@@ -6046,7 +6053,10 @@ function startAdminWaitlistListener() {
 }
 
 function startAdminSecurityListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageSecurity")) {
+		stopAdminSecurityListener()
+		return
+	}
 
 	stopAdminSecurityListener()
 
@@ -6071,7 +6081,10 @@ function startAdminSecurityListener() {
 }
 
 function startAdminUsersListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageSecurity")) {
+		stopAdminUsersListener()
+		return
+	}
 
 	stopAdminUsersListener()
 
@@ -6098,7 +6111,10 @@ function startAdminUsersListener() {
 }
 
 function startAdminSecurityAlertsListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageSecurity")) {
+		stopAdminSecurityAlertsListener()
+		return
+	}
 
 	stopAdminSecurityAlertsListener()
 
@@ -6123,7 +6139,10 @@ function startAdminSecurityAlertsListener() {
 }
 
 function startAdminAccountHistoryListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageSecurity")) {
+		stopAdminAccountHistoryListener()
+		return
+	}
 
 	stopAdminAccountHistoryListener()
 
@@ -6148,7 +6167,10 @@ function startAdminAccountHistoryListener() {
 }
 
 function startAdminSessionsListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageSecurity")) {
+		stopAdminSessionsListener()
+		return
+	}
 
 	stopAdminSessionsListener()
 
@@ -6201,7 +6223,10 @@ function startAdminSessionsListener() {
 }
 
 function startAdminTimelineListener() {
-	if (!firebaseReady || !db || !adminUnlocked) return
+	if (!canStartAdminRealtimeListener("canManageSecurity")) {
+		stopAdminTimelineListener()
+		return
+	}
 
 	stopAdminTimelineListener()
 
