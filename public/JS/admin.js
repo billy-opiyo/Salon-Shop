@@ -762,7 +762,7 @@ function renderAdminScheduleDetails(booking = null) {
 				<button class="admin-action-btn admin-schedule-next-btn" data-schedule-nav="next">Next Booking →</button>
 				<button class="admin-action-btn" data-schedule-action="pending" data-id="${escapeHtml(booking.id || "")}">Set Pending</button>
 				<button class="admin-action-btn" data-schedule-action="confirmed" data-id="${escapeHtml(booking.id || "")}">Confirm</button>
-				<button class="admin-action-btn" data-schedule-action="completed" data-id="${escapeHtml(booking.id || "")}">Complete</button>
+				<button class="admin-action-btn" data-schedule-action="completed" data-id="${escapeHtml(booking.id || "")}">Complete + Release Slot</button>
 				<button class="admin-action-btn danger" data-schedule-action="cancel-release" data-id="${escapeHtml(booking.id || "")}">Cancel + Release Slot</button>
 			</div>
 		</article>
@@ -4513,7 +4513,7 @@ function renderAdminBookings(docs) {
 								? `<button class="admin-action-btn" data-action="move-waitlist-confirmed" data-id="${escapeHtml(b.id || "")}" data-waitlist-id="${escapeHtml(waitlistId)}">Move to Confirmed</button>`
 								: `<button class="admin-action-btn" data-action="confirmed" data-id="${escapeHtml(b.id || "")}">Confirm</button>`
 						}
-            <button class="admin-action-btn" data-action="completed" data-id="${escapeHtml(b.id || "")}">Complete</button>
+            <button class="admin-action-btn" data-action="completed" data-id="${escapeHtml(b.id || "")}">Complete + Release Slot</button>
             <button class="admin-action-btn danger" data-action="cancel-release" data-id="${escapeHtml(b.id || "")}">Cancel + Release Slot</button>
           </div>
         </div>
@@ -5782,8 +5782,26 @@ async function updateBookingStatus(bookingId, status) {
 	)
 }
 
-async function cancelBookingAndReleaseSlot(bookingId) {
+function shouldReleaseAdminSlotForBooking(slotData = {}, bookingId = "", booking = {}) {
+	const safeBookingId = String(bookingId || "").trim()
+	const slotBookingId = String(slotData.bookingId || "").trim()
+	if (slotBookingId) return slotBookingId === safeBookingId
+
+	// Legacy slot documents may not include bookingId. In that case, release only
+	// when the uid is blank or matches the booking owner.
+	const slotUid = String(slotData.uid || "").trim()
+	const bookingUid = String(booking.uid || "").trim()
+	return !slotUid || !bookingUid || slotUid === bookingUid
+}
+
+async function updateBookingStatusAndReleaseSlot(bookingId, status) {
+	const terminalStatus = normalizeStatus(status)
+	if (!["cancelled", "completed"].includes(terminalStatus)) {
+		throw new Error("Only cancelled or completed bookings can release a slot")
+	}
+
 	const bookingRef = db.collection("bookings").doc(bookingId)
+	let releasedSlotId = ""
 
 	await db.runTransaction(async (transaction) => {
 		const bookingDoc = await transaction.get(bookingRef)
@@ -5791,21 +5809,62 @@ async function cancelBookingAndReleaseSlot(bookingId) {
 			throw new Error("Booking no longer exists")
 		}
 
-		const booking = bookingDoc.data()
-		if (booking?.slotId) {
-			const slotRef = db.collection("bookingSlots").doc(booking.slotId)
-			transaction.delete(slotRef)
+		const booking = bookingDoc.data() || {}
+		const slotId = String(booking.slotId || "").trim()
+		if (slotId) {
+			const slotRef = db.collection("bookingSlots").doc(slotId)
+			const slotDoc = await transaction.get(slotRef)
+			if (slotDoc.exists) {
+				const slotData = slotDoc.data() || {}
+				if (!shouldReleaseAdminSlotForBooking(slotData, bookingId, booking)) {
+					throw new Error(
+						"This slot is linked to another booking, so it was not released.",
+					)
+				}
+
+				transaction.delete(slotRef)
+				releasedSlotId = slotId
+			}
+		}
+
+		const serverNow = firebase.firestore.FieldValue.serverTimestamp()
+		const bookingPatch = {
+			status: terminalStatus,
+			updatedAt: serverNow,
+		}
+
+		if (terminalStatus === "completed") {
+			bookingPatch.completedAt = serverNow
+		} else if (terminalStatus === "cancelled") {
+			bookingPatch.cancelledAt = serverNow
+		}
+
+		if (releasedSlotId) {
+			bookingPatch.releasedSlotId = releasedSlotId
+			bookingPatch.slotReleasedAt = serverNow
+			bookingPatch.slotReleaseReason = terminalStatus
 		}
 
 		transaction.set(
 			bookingRef,
-			{
-				status: "cancelled",
-				updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-			},
+			bookingPatch,
 			{ merge: true },
 		)
 	})
+
+	return {
+		bookingId,
+		status: terminalStatus,
+		releasedSlotId,
+	}
+}
+
+async function cancelBookingAndReleaseSlot(bookingId) {
+	return updateBookingStatusAndReleaseSlot(bookingId, "cancelled")
+}
+
+async function completeBookingAndReleaseSlot(bookingId) {
+	return updateBookingStatusAndReleaseSlot(bookingId, "completed")
 }
 
 function startAdminBookingsListener() {
@@ -6340,10 +6399,21 @@ function initializeAdminPanel() {
 		})
 		try {
 			if (action === "cancel-release") {
-				await cancelBookingAndReleaseSlot(bookingId)
+				const result = await cancelBookingAndReleaseSlot(bookingId)
 				setAdminMessage(
 					"success",
-					"✅ Booking cancelled and slot released successfully.",
+					result.releasedSlotId
+						? "✅ Booking cancelled and slot released successfully."
+						: "✅ Booking cancelled. No locked slot was found to release.",
+					"adminActionMessage",
+				)
+			} else if (action === "completed") {
+				const result = await completeBookingAndReleaseSlot(bookingId)
+				setAdminMessage(
+					"success",
+					result.releasedSlotId
+						? "✅ Booking completed and slot released successfully."
+						: "✅ Booking completed. No locked slot was found to release.",
 					"adminActionMessage",
 				)
 			} else if (action === "move-waitlist-confirmed") {
@@ -6551,10 +6621,21 @@ function initializeAdminPanel() {
 			})
 			try {
 				if (action === "cancel-release") {
-					await cancelBookingAndReleaseSlot(bookingId)
+					const result = await cancelBookingAndReleaseSlot(bookingId)
 					setAdminMessage(
 						"success",
-						"✅ Booking cancelled and slot released successfully.",
+						result.releasedSlotId
+							? "✅ Booking cancelled and slot released successfully."
+							: "✅ Booking cancelled. No locked slot was found to release.",
+						"adminScheduleMessage",
+					)
+				} else if (action === "completed") {
+					const result = await completeBookingAndReleaseSlot(bookingId)
+					setAdminMessage(
+						"success",
+						result.releasedSlotId
+							? "✅ Booking completed and slot released successfully."
+							: "✅ Booking completed. No locked slot was found to release.",
 						"adminScheduleMessage",
 					)
 				} else {
