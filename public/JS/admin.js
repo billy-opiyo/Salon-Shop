@@ -432,9 +432,19 @@ function getStatusClass(status) {
 			return "admin-status-cancelled"
 		case "waitlisted":
 			return "admin-status-waitlisted"
+		case "expired":
+			return "admin-status-expired"
+		case "no_show":
+			return "admin-status-no-show"
 		default:
 			return "admin-status-pending"
 	}
+}
+
+function getStatusLabel(status) {
+	const normalized = normalizeStatus(status)
+	if (normalized === "no_show") return "no show"
+	return normalized
 }
 
 function normalizeStatus(status) {
@@ -445,14 +455,23 @@ function normalizeStatus(status) {
 	if (raw === "complete") return "completed"
 	if (raw === "canceled") return "cancelled"
 	if (raw === "waitlist" || raw === "waiting") return "waitlisted"
+	if (raw === "no-show" || raw === "no show" || raw === "noshow") {
+		return "no_show"
+	}
 	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
 		return "confirmed"
 	}
 
 	if (
-		["pending", "confirmed", "completed", "cancelled", "waitlisted"].includes(
-			raw,
-		)
+		[
+			"pending",
+			"confirmed",
+			"completed",
+			"cancelled",
+			"waitlisted",
+			"expired",
+			"no_show",
+		].includes(raw)
 	) {
 		return raw
 	}
@@ -736,7 +755,7 @@ function renderAdminScheduleDetails(booking = null) {
 					<div class="admin-booking-name">${escapeHtml(customerName)}</div>
 					<div class="admin-booking-id">Booking ID: ${escapeHtml(booking.id || "N/A")}</div>
 				</div>
-				<span class="admin-status-badge ${getStatusClass(status)}">${escapeHtml(status)}</span>
+				<span class="admin-status-badge ${getStatusClass(status)}">${escapeHtml(getStatusLabel(status))}</span>
 			</div>
 
 			<div class="admin-booking-meta">

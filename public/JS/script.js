@@ -1495,6 +1495,7 @@ const timeSlots = [
 
 const BOOKING_SLOT_UTC_OFFSET_HOURS = 3
 const EXPIRED_SLOT_CLEANUP_THROTTLE_MS = 5 * 60 * 1000
+const EXPIRED_BOOKING_RELEASE_GRACE_MS = 2 * 60 * 60 * 1000
 
 function parseTimeSlotToMinutes(timeText = "") {
 	const match = String(timeText || "")
@@ -1550,7 +1551,10 @@ function isBookingSlotExpired(slotData = {}, referenceMs = Date.now()) {
 		slotData.time || slotData.bookingTime || slotData.preferredTime || "",
 	).trim()
 	const slotStartMs = getBookingSlotStartMs(dateValue, timeValue)
-	return Boolean(slotStartMs && slotStartMs <= referenceMs)
+	return Boolean(
+		slotStartMs &&
+			slotStartMs + EXPIRED_BOOKING_RELEASE_GRACE_MS <= referenceMs,
+	)
 }
 
 const CUSTOM_SERVICE_OPTION_VALUE = "__custom_service__"
@@ -4003,13 +4007,22 @@ function normalizeBookingStatus(status = "") {
 	if (raw === "canceled") return "cancelled"
 	if (raw === "booked") return "confirmed"
 	if (raw === "waitlist" || raw === "waiting") return "waitlisted"
+	if (raw === "no-show" || raw === "no show" || raw === "noshow") {
+		return "no_show"
+	}
 	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
 		return "confirmed"
 	}
 	if (
-		["pending", "confirmed", "completed", "cancelled", "waitlisted"].includes(
-			raw,
-		)
+		[
+			"pending",
+			"confirmed",
+			"completed",
+			"cancelled",
+			"waitlisted",
+			"expired",
+			"no_show",
+		].includes(raw)
 	) {
 		return raw
 	}

@@ -54,6 +54,7 @@ const LOGIN_REPEAT_FAILURE_THRESHOLD = 3
 const LOGIN_LOCK_DURATION_MS = 30 * 60 * 1000
 const WHATSAPP_REMINDER_LEAD_TIME_HOURS = 2
 const WHATSAPP_REMINDER_WINDOW_MINUTES = 15
+const EXPIRED_BOOKING_RELEASE_GRACE_MS = 2 * 60 * 60 * 1000
 const SECURITY_ALERT_SEVERITY = {
 	multiple_failed_login_attempts: "high",
 	new_device_detected: "medium",
@@ -784,13 +785,25 @@ function getNairobiDateString(referenceMs = Date.now()) {
 	return new Date(referenceMs + offsetMs).toISOString().slice(0, 10)
 }
 
-function isServerBookingSlotExpired(slotData = {}, referenceMs = Date.now()) {
+function isServerBookingSlotExpired(
+	slotData = {},
+	referenceMs = Date.now(),
+	graceMs = EXPIRED_BOOKING_RELEASE_GRACE_MS,
+) {
 	const appointmentDate = getBookingAppointmentDate(slotData)
+	const safeGraceMs = Math.max(0, Number(graceMs || 0))
 	return Boolean(
 		appointmentDate &&
 		Number.isFinite(appointmentDate.getTime()) &&
-		appointmentDate.getTime() <= referenceMs,
+		appointmentDate.getTime() + safeGraceMs <= referenceMs,
 	)
+}
+
+function getAutoReleaseBookingStatus(status = "") {
+	const normalizedStatus = normalizeServerBookingStatus(status)
+	if (normalizedStatus === "pending") return "expired"
+	if (normalizedStatus === "confirmed") return "no_show"
+	return ""
 }
 
 async function releaseExpiredBookingSlotDocument(
@@ -800,9 +813,11 @@ async function releaseExpiredBookingSlotDocument(
 	if (!slotRef) return { released: false, reason: "missing-ref" }
 
 	let result = { released: false, reason: "not-found" }
+	const db = admin.firestore()
 	const serverNow = admin.firestore.FieldValue.serverTimestamp()
+	const releaseSource = normalizeShortText(source || "manual", 40)
 
-	await admin.firestore().runTransaction(async (transaction) => {
+	await db.runTransaction(async (transaction) => {
 		const slotSnap = await transaction.get(slotRef)
 		if (!slotSnap.exists) {
 			result = { released: false, reason: "not-found" }
@@ -821,6 +836,45 @@ async function releaseExpiredBookingSlotDocument(
 		}
 
 		const releasedBookingId = String(slotData.bookingId || "").trim()
+		let bookingStatus = ""
+		let nextBookingStatus = ""
+		let releaseReason = "expired"
+		let bookingRef = null
+		let bookingSnap = null
+
+		if (releasedBookingId) {
+			bookingRef = db.collection("bookings").doc(releasedBookingId)
+			bookingSnap = await transaction.get(bookingRef)
+
+			if (bookingSnap.exists) {
+				const bookingData = bookingSnap.data() || {}
+				bookingStatus = normalizeServerBookingStatus(bookingData.status)
+				nextBookingStatus = getAutoReleaseBookingStatus(bookingStatus)
+
+				if (bookingStatus === "completed") {
+					releaseReason = "completed"
+				} else if (bookingStatus === "cancelled") {
+					releaseReason = "cancelled"
+				} else if (bookingStatus === "expired" || bookingStatus === "no_show") {
+					releaseReason = bookingStatus
+				} else if (nextBookingStatus) {
+					releaseReason = nextBookingStatus
+				} else {
+					result = {
+						released: false,
+						reason: "booking-status-not-autoreleasable",
+						bookingId: releasedBookingId,
+						bookingStatus,
+					}
+					return
+				}
+			} else {
+				releaseReason = "expired_orphaned"
+			}
+		} else {
+			releaseReason = "expired_orphaned"
+		}
+
 		transaction.set(
 			slotRef,
 			{
@@ -829,17 +883,45 @@ async function releaseExpiredBookingSlotDocument(
 				uid: "",
 				releasedAt: serverNow,
 				releasedBookingId,
-				releaseReason: "expired",
-				releaseSource: normalizeShortText(source || "manual", 40),
+				releaseReason,
+				releaseSource,
+				bookingStatusBeforeRelease: bookingStatus,
+				bookingAutoStatus: nextBookingStatus,
 				updatedAt: serverNow,
 			},
 			{ merge: true },
 		)
 
+		if (bookingRef && bookingSnap?.exists) {
+			const bookingPatch = {
+				releasedSlotId: slotRef.id,
+				slotReleasedAt: serverNow,
+				slotReleaseReason: releaseReason,
+				slotReleaseSource: releaseSource,
+				updatedAt: serverNow,
+			}
+
+			if (nextBookingStatus) {
+				bookingPatch.status = nextBookingStatus
+				bookingPatch.previousStatusBeforeAutoRelease = bookingStatus
+				bookingPatch.autoReleasedAt = serverNow
+
+				if (nextBookingStatus === "expired") {
+					bookingPatch.expiredAt = serverNow
+				} else if (nextBookingStatus === "no_show") {
+					bookingPatch.noShowAt = serverNow
+				}
+			}
+
+			transaction.set(bookingRef, bookingPatch, { merge: true })
+		}
+
 		result = {
 			released: true,
-			reason: "expired",
+			reason: releaseReason,
 			bookingId: releasedBookingId,
+			bookingStatus,
+			nextBookingStatus,
 		}
 	})
 
@@ -879,13 +961,22 @@ function normalizeServerBookingStatus(status = "") {
 	if (raw === "canceled") return "cancelled"
 	if (raw === "booked") return "confirmed"
 	if (raw === "waitlist" || raw === "waiting") return "waitlisted"
+	if (raw === "no-show" || raw === "no show" || raw === "noshow") {
+		return "no_show"
+	}
 	if (raw === "in progress" || raw === "in_progress" || raw === "in-progress") {
 		return "confirmed"
 	}
 	if (
-		["pending", "confirmed", "completed", "cancelled", "waitlisted"].includes(
-			raw,
-		)
+		[
+			"pending",
+			"confirmed",
+			"completed",
+			"cancelled",
+			"waitlisted",
+			"expired",
+			"no_show",
+		].includes(raw)
 	) {
 		return raw
 	}
@@ -2893,6 +2984,9 @@ exports.releaseExpiredBookingSlots = onSchedule(
 			skippedCount,
 			failedCount,
 			todayDate,
+			releaseGraceMinutes: Math.round(
+				EXPIRED_BOOKING_RELEASE_GRACE_MS / (60 * 1000),
+			),
 		})
 	},
 )

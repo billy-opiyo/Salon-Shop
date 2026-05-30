@@ -3724,6 +3724,18 @@ h6 {
     border-color: rgba(245, 101, 101, 0.4);
 }
 
+.admin-status-expired {
+    background: rgba(107, 114, 128, 0.16);
+    color: #6b7280;
+    border-color: rgba(107, 114, 128, 0.42);
+}
+
+.admin-status-no-show {
+    background: rgba(249, 115, 22, 0.16);
+    color: #ea580c;
+    border-color: rgba(249, 115, 22, 0.44);
+}
+
 .admin-booking-meta {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4229,6 +4241,14 @@ h6 {
 
 .admin-schedule-event.admin-status-cancelled {
     border-left-color: #f56565;
+}
+
+.admin-schedule-event.admin-status-expired {
+    border-left-color: #6b7280;
+}
+
+.admin-schedule-event.admin-status-no-show {
+    border-left-color: #f97316;
 }
 
 .admin-schedule-details {
