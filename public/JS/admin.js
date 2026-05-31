@@ -273,6 +273,20 @@ function initializeAdminHomepageNavigation() {
 	})
 }
 
+function initializeAdminBackToTop() {
+	const backToTop = document.getElementById("backToTop")
+	if (!backToTop) return
+
+	const updateBackToTopVisibility = () => {
+		backToTop.classList.toggle("visible", window.scrollY > 500)
+	}
+
+	window.addEventListener("scroll", updateBackToTopVisibility, {
+		passive: true,
+	})
+	updateBackToTopVisibility()
+}
+
 function setAdminPasswordVisibility(isVisible) {
 	const passwordInput = document.getElementById("adminPassword")
 	const passwordToggle = document.getElementById("adminPasswordToggle")
@@ -6647,6 +6661,7 @@ function initializeAdminPanel() {
 
 	initializeAdminSectionTabs()
 	initializeAdminHomepageNavigation()
+	initializeAdminBackToTop()
 	bindGalleryPreviewEvents()
 	setAdminPasswordVisibility(false)
 
