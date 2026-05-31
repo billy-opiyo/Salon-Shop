@@ -287,6 +287,199 @@ function initializeAdminBackToTop() {
 	updateBackToTopVisibility()
 }
 
+function initializeAdminFloatingTooltips() {
+	if (window.__adminFloatingTooltipsInitialized) return
+	window.__adminFloatingTooltipsInitialized = true
+
+	const tooltipSelector = ".admin-action-btn[data-tooltip]"
+	const desktopQuery = window.matchMedia("(min-width: 601px)")
+	const viewportPadding = 12
+	let tooltipEl = null
+	let activeTarget = null
+
+	const hasDatasetValue = (element, key) =>
+		Boolean(element?.dataset) &&
+		Object.prototype.hasOwnProperty.call(element.dataset, key)
+
+	const ensureTooltipElement = () => {
+		if (tooltipEl) return tooltipEl
+		if (!document.body) return null
+
+		tooltipEl = document.createElement("div")
+		tooltipEl.id = "adminFloatingTooltip"
+		tooltipEl.className = "admin-floating-tooltip"
+		tooltipEl.setAttribute("role", "tooltip")
+		tooltipEl.setAttribute("aria-hidden", "true")
+		document.body.appendChild(tooltipEl)
+		return tooltipEl
+	}
+
+	const restoreTargetAttributes = () => {
+		if (!activeTarget) return
+
+		activeTarget.classList.remove("is-floating-tooltip-active")
+
+		if (hasDatasetValue(activeTarget, "adminTooltipNativeTitle")) {
+			activeTarget.setAttribute(
+				"title",
+				activeTarget.dataset.adminTooltipNativeTitle,
+			)
+			delete activeTarget.dataset.adminTooltipNativeTitle
+		}
+
+		if (hasDatasetValue(activeTarget, "adminTooltipDescribedby")) {
+			activeTarget.setAttribute(
+				"aria-describedby",
+				activeTarget.dataset.adminTooltipDescribedby,
+			)
+			delete activeTarget.dataset.adminTooltipDescribedby
+		} else {
+			activeTarget.removeAttribute("aria-describedby")
+		}
+	}
+
+	const hideTooltip = () => {
+		if (tooltipEl) {
+			tooltipEl.classList.remove("is-visible")
+			tooltipEl.setAttribute("aria-hidden", "true")
+		}
+
+		restoreTargetAttributes()
+		activeTarget = null
+	}
+
+	const positionTooltip = (target) => {
+		const tooltip = ensureTooltipElement()
+		if (!tooltip || !target?.isConnected) {
+			hideTooltip()
+			return
+		}
+
+		const targetRect = target.getBoundingClientRect()
+		const tooltipRect = tooltip.getBoundingClientRect()
+		const viewportWidth = window.innerWidth || document.documentElement.clientWidth
+		const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+		const targetCenter = targetRect.left + targetRect.width / 2
+		let placement = "top"
+		let top = targetRect.top - tooltipRect.height - 10
+
+		if (top < viewportPadding) {
+			placement = "bottom"
+			top = targetRect.bottom + 10
+		}
+
+		if (top + tooltipRect.height > viewportHeight - viewportPadding) {
+			top = Math.max(
+				viewportPadding,
+				viewportHeight - tooltipRect.height - viewportPadding,
+			)
+		}
+
+		let left = targetCenter - tooltipRect.width / 2
+		left = Math.max(
+			viewportPadding,
+			Math.min(left, viewportWidth - tooltipRect.width - viewportPadding),
+		)
+
+		const arrowLeft = Math.max(
+			12,
+			Math.min(targetCenter - left, tooltipRect.width - 12),
+		)
+
+		tooltip.dataset.placement = placement
+		tooltip.style.left = `${Math.round(left)}px`
+		tooltip.style.top = `${Math.round(top)}px`
+		tooltip.style.setProperty("--tooltip-arrow-left", `${Math.round(arrowLeft)}px`)
+	}
+
+	const showTooltip = (target) => {
+		if (!desktopQuery.matches || !target) {
+			hideTooltip()
+			return
+		}
+
+		const tooltipText = String(target.getAttribute("data-tooltip") || "").trim()
+		if (!tooltipText) {
+			hideTooltip()
+			return
+		}
+
+		const tooltip = ensureTooltipElement()
+		if (!tooltip) return
+
+		if (activeTarget !== target) {
+			restoreTargetAttributes()
+			activeTarget = target
+
+			if (target.hasAttribute("title")) {
+				target.dataset.adminTooltipNativeTitle = target.getAttribute("title") || ""
+				target.removeAttribute("title")
+			}
+
+			if (target.hasAttribute("aria-describedby")) {
+				target.dataset.adminTooltipDescribedby =
+					target.getAttribute("aria-describedby") || ""
+			}
+
+			target.classList.add("is-floating-tooltip-active")
+			target.setAttribute("aria-describedby", tooltip.id)
+		}
+
+		tooltip.textContent = tooltipText
+		tooltip.setAttribute("aria-hidden", "false")
+		tooltip.classList.add("is-visible")
+		positionTooltip(target)
+	}
+
+	const getTooltipTargetAtPoint = (event) => {
+		const pointedElement = document.elementFromPoint(event.clientX, event.clientY)
+		return pointedElement?.closest?.(tooltipSelector) || null
+	}
+
+	document.addEventListener(
+		"pointermove",
+		(event) => {
+			const target = desktopQuery.matches
+				? getTooltipTargetAtPoint(event)
+				: null
+
+			if (target) {
+				showTooltip(target)
+			} else if (activeTarget) {
+				hideTooltip()
+			}
+		},
+		true,
+	)
+
+	document.addEventListener("pointerdown", hideTooltip, true)
+	document.addEventListener(
+		"focusin",
+		(event) => {
+			const target = event.target?.closest?.(tooltipSelector) || null
+			showTooltip(target)
+		},
+		true,
+	)
+	document.addEventListener("focusout", hideTooltip, true)
+	window.addEventListener(
+		"scroll",
+		() => {
+			if (activeTarget) positionTooltip(activeTarget)
+		},
+		true,
+	)
+	window.addEventListener("resize", () => {
+		if (activeTarget) positionTooltip(activeTarget)
+	})
+
+	if (typeof desktopQuery.addEventListener === "function") {
+		desktopQuery.addEventListener("change", hideTooltip)
+	} else if (typeof desktopQuery.addListener === "function") {
+		desktopQuery.addListener(hideTooltip)
+	}
+}
+
 function setAdminPasswordVisibility(isVisible) {
 	const passwordInput = document.getElementById("adminPassword")
 	const passwordToggle = document.getElementById("adminPasswordToggle")
@@ -6662,6 +6855,7 @@ function initializeAdminPanel() {
 	initializeAdminSectionTabs()
 	initializeAdminHomepageNavigation()
 	initializeAdminBackToTop()
+	initializeAdminFloatingTooltips()
 	bindGalleryPreviewEvents()
 	setAdminPasswordVisibility(false)
 

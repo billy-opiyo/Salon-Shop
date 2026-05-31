@@ -3993,6 +3993,97 @@ h6 {
     transform: translateX(-50%) translateY(0);
 }
 
+.admin-action-btn[data-tooltip].is-floating-tooltip-active::after,
+.admin-action-btn[data-tooltip].is-floating-tooltip-active::before {
+    display: none;
+}
+
+.admin-floating-tooltip {
+    --tooltip-arrow-left: 50%;
+    position: fixed;
+    left: 0;
+    top: 0;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(420px, calc(100vw - 24px));
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(9, 9, 11, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.38), 0 0 0 1px rgba(200, 150, 62, 0.12);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.42;
+    overflow-wrap: break-word;
+    text-align: left;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    z-index: 99999;
+    transform: translateY(4px);
+    transition:
+        opacity 0.16s ease,
+        transform 0.16s ease,
+        visibility 0.16s ease;
+}
+
+.admin-floating-tooltip::before {
+    content: "";
+    position: absolute;
+    left: var(--tooltip-arrow-left);
+    bottom: -6px;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgba(9, 9, 11, 0.97);
+}
+
+.admin-floating-tooltip[data-placement="bottom"] {
+    transform: translateY(-4px);
+}
+
+.admin-floating-tooltip[data-placement="bottom"]::before {
+    top: -6px;
+    bottom: auto;
+    border-top: 0;
+    border-bottom: 6px solid rgba(9, 9, 11, 0.97);
+}
+
+.admin-floating-tooltip.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+@media (min-width: 601px) {
+
+    .admin-waitlist-list .admin-action-btn[data-waitlist-action="move-confirmed"]::after,
+    .admin-bookings-list.admin-bookings-list--waitlisted-filter .admin-action-btn[data-waitlist-action="move-confirmed"]::after {
+        left: 0;
+        width: min(420px, calc(100vw - 96px));
+        max-width: min(420px, calc(100vw - 96px));
+        transform: translateY(4px);
+    }
+
+    .admin-waitlist-list .admin-action-btn[data-waitlist-action="move-confirmed"]::before,
+    .admin-bookings-list.admin-bookings-list--waitlisted-filter .admin-action-btn[data-waitlist-action="move-confirmed"]::before {
+        left: 18px;
+        transform: translateY(4px);
+    }
+
+    .admin-waitlist-list .admin-action-btn[data-waitlist-action="move-confirmed"]:hover::after,
+    .admin-waitlist-list .admin-action-btn[data-waitlist-action="move-confirmed"]:focus-visible::after,
+    .admin-waitlist-list .admin-action-btn[data-waitlist-action="move-confirmed"]:hover::before,
+    .admin-waitlist-list .admin-action-btn[data-waitlist-action="move-confirmed"]:focus-visible::before,
+    .admin-bookings-list.admin-bookings-list--waitlisted-filter .admin-action-btn[data-waitlist-action="move-confirmed"]:hover::after,
+    .admin-bookings-list.admin-bookings-list--waitlisted-filter .admin-action-btn[data-waitlist-action="move-confirmed"]:focus-visible::after,
+    .admin-bookings-list.admin-bookings-list--waitlisted-filter .admin-action-btn[data-waitlist-action="move-confirmed"]:hover::before,
+    .admin-bookings-list.admin-bookings-list--waitlisted-filter .admin-action-btn[data-waitlist-action="move-confirmed"]:focus-visible::before {
+        transform: translateY(0);
+    }
+}
+
 @media (max-width: 600px) {
 
     .admin-booking-actions .admin-action-btn[data-tooltip]::after {
