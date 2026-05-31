@@ -1553,7 +1553,7 @@ function isBookingSlotExpired(slotData = {}, referenceMs = Date.now()) {
 	const slotStartMs = getBookingSlotStartMs(dateValue, timeValue)
 	return Boolean(
 		slotStartMs &&
-			slotStartMs + EXPIRED_BOOKING_RELEASE_GRACE_MS <= referenceMs,
+		slotStartMs + EXPIRED_BOOKING_RELEASE_GRACE_MS <= referenceMs,
 	)
 }
 
@@ -8401,7 +8401,8 @@ function applyTheme({ instant = false } = {}) {
 	document.documentElement.classList.toggle("light-mode", isLight)
 	document.documentElement.style.colorScheme = isLight ? "light" : "dark"
 	document.body?.classList.toggle("light-mode", isLight)
-	document.body && (document.body.style.colorScheme = isLight ? "light" : "dark")
+	document.body &&
+		(document.body.style.colorScheme = isLight ? "light" : "dark")
 	darkModeToggle?.classList.toggle("active", isDark)
 	darkModeToggle?.setAttribute("aria-pressed", isDark ? "true" : "false")
 
@@ -9148,7 +9149,7 @@ const mutationObserver = new MutationObserver((mutations) => {
 })
 mutationObserver.observe(document.body, { childList: true, subtree: true })
 
-// ============ HEADER LOGO 3D CUBE FLIP ROTATION ============
+// ============ HEADER LOGO SIMPLE ROTATION ============
 const DEFAULT_HEADER_LOGO_IMAGES = [
 	"IMG/logo.png",
 	"IMG/logo 1.png",
@@ -9202,10 +9203,8 @@ function getConfiguredHeaderLogoImages(currentSrc = "") {
 }
 
 function initAnimatedHeaderLogo() {
-	const logoCube = document.querySelector("#header .logo .logo-cube")
-	const cubeTrack = document.getElementById("logoCubeTrack")
 	const logoImage = document.getElementById("logoCubeImage")
-	if (!logoCube || !cubeTrack || !logoImage) return
+	if (!logoImage) return
 
 	const logoImages = getConfiguredHeaderLogoImages(
 		logoImage.getAttribute("src") || logoImage.currentSrc || "",
@@ -9213,94 +9212,28 @@ function initAnimatedHeaderLogo() {
 	if (!logoImages.length) return
 
 	let imageIndex = 0
-	let isTransitioning = false
-	const swapIntervalMs = 5000
-	const halfFlipMs = 560
-	const totalTransitionMs = 1400
-	const blendLeadMs = 90
-	const blendHoldMs = 220
+	const swapIntervalMs = 3500
 
 	logoImage.decoding = "async"
 	logoImage.loading = "eager"
 	logoImage.src = logoImages[imageIndex]
 	if (logoImages.length < 2) return
 
-	const prefersReducedMotion =
-		typeof window.matchMedia === "function" &&
-		window.matchMedia("(prefers-reduced-motion: reduce)").matches
-	if (prefersReducedMotion || shouldReduceNonCriticalMedia()) return
+	logoImages.slice(1).forEach((src) => {
+		const preload = new Image()
+		preload.decoding = "async"
+		preload.src = src
+	})
 
-	const preloadedLogoImageUrls = new Set([logoImages[imageIndex]])
-	const scheduledLogoImageUrls = new Set()
-	const preloadLogoImage = (index) => {
-		const src = logoImages[index]
-		if (
-			!src ||
-			preloadedLogoImageUrls.has(src) ||
-			scheduledLogoImageUrls.has(src)
-		) {
-			return
+	const rotateHeaderLogo = () => {
+		imageIndex = (imageIndex + 1) % logoImages.length
+		const nextLogo = logoImages[imageIndex]
+		if (nextLogo && logoImage.getAttribute("src") !== nextLogo) {
+			logoImage.src = nextLogo
 		}
-
-		scheduledLogoImageUrls.add(src)
-		runWhenBrowserIdle(() => {
-			const preload = new Image()
-			preload.decoding = "async"
-			preload.loading = "lazy"
-			preload.onload = () => {
-				preloadedLogoImageUrls.add(src)
-				scheduledLogoImageUrls.delete(src)
-			}
-			preload.onerror = () => {
-				scheduledLogoImageUrls.delete(src)
-			}
-			preload.src = src
-		}, 3000)
 	}
 
-	preloadLogoImage((imageIndex + 1) % logoImages.length)
-
-	const runLogoFlip = () => {
-		if (isTransitioning) return
-		isTransitioning = true
-
-		logoCube.classList.add("is-morphing")
-		logoImage.classList.remove("is-mid-blend")
-		logoImage.classList.remove("is-flip-in")
-		logoImage.classList.add("is-flip-out")
-
-		window.setTimeout(
-			() => {
-				logoImage.classList.add("is-mid-blend")
-			},
-			Math.max(0, halfFlipMs - blendLeadMs),
-		)
-
-		window.setTimeout(() => {
-			imageIndex = (imageIndex + 1) % logoImages.length
-			logoImage.src = logoImages[imageIndex]
-			preloadLogoImage((imageIndex + 1) % logoImages.length)
-			logoImage.classList.remove("is-flip-out")
-			logoImage.classList.add("is-flip-in")
-
-			window.setTimeout(() => {
-				logoImage.classList.remove("is-mid-blend")
-			}, blendHoldMs)
-
-			requestAnimationFrame(() => {
-				requestAnimationFrame(() => {
-					logoImage.classList.remove("is-flip-in")
-				})
-			})
-		}, halfFlipMs)
-
-		window.setTimeout(() => {
-			logoCube.classList.remove("is-morphing")
-			isTransitioning = false
-		}, totalTransitionMs)
-	}
-
-	window.setInterval(runLogoFlip, swapIntervalMs)
+	window.setInterval(rotateHeaderLogo, swapIntervalMs)
 }
 
 // ============ INITIALIZE ============

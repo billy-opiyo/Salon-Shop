@@ -1,5 +1,5 @@
 /* Royal Braids static asset service worker. */
-const CACHE_VERSION = "royal-braids-static-v20260531-logo-rotation"
+const CACHE_VERSION = "royal-braids-static-v20260531-simple-logo-rotation"
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`
 
 const APP_SHELL_ASSETS = [
