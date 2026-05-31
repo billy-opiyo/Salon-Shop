@@ -37,6 +37,15 @@
 	const emailBookings = "bookings@royalbraids.ke"
 	const contactNotificationEmail = "billyopiyo597@gmail.com"
 	const cloudinaryGalleryFolder = `${businessSlug}/gallery`
+	const brandLogoImages = [
+		"IMG/logo.png",
+		"IMG/logo 1.png",
+		"IMG/logo 2.jpg",
+		"IMG/logo 3.png",
+		"IMG/logo 4.png",
+		"IMG/logo 5.png",
+		"IMG/logo 6.jpg",
+	]
 
 	// Client-editable service catalog.
 	// Update these arrays for each salon instead of editing HTML or app JS.
@@ -1698,7 +1707,8 @@
 			adminTitle: `${businessName} Admin`,
 			shortNameHtml: businessShortNameHtml,
 			footerLogoHtml: businessLogoTextHtml,
-			logoSrc: "IMG/logo.png",
+			logoSrc: brandLogoImages[0],
+			logoImages: brandLogoImages,
 			favicon: "IMG/Royal Braids logo.png",
 			logoAlt: `${businessName} rotating logo`,
 			heroImage: "IMG/1000_F_595420115_RZi6MAsq90qVRMfFz37ZKBianocAltUu.jpg",
@@ -1764,7 +1774,8 @@
 		},
 
 		media: {
-			logoSrc: "IMG/logo.png",
+			logoSrc: brandLogoImages[0],
+			logoImages: brandLogoImages,
 			favicon: "IMG/Royal Braids logo.png",
 			heroImage: "IMG/1000_F_595420115_RZi6MAsq90qVRMfFz37ZKBianocAltUu.jpg",
 			galleryFolder: cloudinaryGalleryFolder,

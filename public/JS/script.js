@@ -9149,21 +9149,68 @@ const mutationObserver = new MutationObserver((mutations) => {
 mutationObserver.observe(document.body, { childList: true, subtree: true })
 
 // ============ HEADER LOGO 3D CUBE FLIP ROTATION ============
+const DEFAULT_HEADER_LOGO_IMAGES = [
+	"IMG/logo.png",
+	"IMG/logo 1.png",
+	"IMG/logo 2.jpg",
+	"IMG/logo 3.png",
+	"IMG/logo 4.png",
+	"IMG/logo 5.png",
+	"IMG/logo 6.jpg",
+]
+
+function normalizeHeaderLogoImageSource(item = "") {
+	const rawValue =
+		typeof item === "object" && item !== null
+			? item.src || item.url || item.imageUrl || item.path || item.href || ""
+			: item
+	return String(rawValue || "").trim()
+}
+
+function getConfiguredHeaderLogoImages(currentSrc = "") {
+	const configuredSources = []
+	const configuredLists = [
+		clientConfig?.brand?.logoImages,
+		clientConfig?.media?.logoImages,
+		clientConfig?.brand?.logos,
+		clientConfig?.media?.logos,
+	]
+
+	configuredLists.forEach((list) => {
+		if (Array.isArray(list)) {
+			configuredSources.push(...list)
+		} else if (typeof list === "string") {
+			configuredSources.push(list)
+		}
+	})
+
+	const primaryLogoSource = normalizeHeaderLogoImageSource(
+		clientConfig?.brand?.logoSrc || clientConfig?.media?.logoSrc || currentSrc,
+	)
+	const sourceList = configuredSources.length
+		? [primaryLogoSource, ...configuredSources]
+		: [primaryLogoSource, ...DEFAULT_HEADER_LOGO_IMAGES]
+	const seenSources = new Set()
+
+	return sourceList
+		.map((item) => normalizeHeaderLogoImageSource(item))
+		.filter((src) => {
+			if (!src || seenSources.has(src)) return false
+			seenSources.add(src)
+			return true
+		})
+}
+
 function initAnimatedHeaderLogo() {
 	const logoCube = document.querySelector("#header .logo .logo-cube")
 	const cubeTrack = document.getElementById("logoCubeTrack")
 	const logoImage = document.getElementById("logoCubeImage")
 	if (!logoCube || !cubeTrack || !logoImage) return
 
-	const logoImages = [
-		"IMG/logo.png",
-		"IMG/logo 1.png",
-		"IMG/logo 2.jpg",
-		"IMG/logo 3.png",
-		"IMG/logo 4.png",
-		"IMG/logo 5.png",
-		"IMG/logo 6.jpg",
-	]
+	const logoImages = getConfiguredHeaderLogoImages(
+		logoImage.getAttribute("src") || logoImage.currentSrc || "",
+	)
+	if (!logoImages.length) return
 
 	let imageIndex = 0
 	let isTransitioning = false
@@ -9176,6 +9223,7 @@ function initAnimatedHeaderLogo() {
 	logoImage.decoding = "async"
 	logoImage.loading = "eager"
 	logoImage.src = logoImages[imageIndex]
+	if (logoImages.length < 2) return
 
 	const prefersReducedMotion =
 		typeof window.matchMedia === "function" &&
