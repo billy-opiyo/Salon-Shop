@@ -489,7 +489,15 @@ function normalizeAdminBookingFilter(filter = "all") {
 	const raw = String(filter || "all")
 		.trim()
 		.toLowerCase()
-	return ["confirmed", "waitlisted"].includes(raw) ? raw : "all"
+	return [
+		"pending",
+		"confirmed",
+		"completed",
+		"cancelled",
+		"waitlisted",
+	].includes(raw)
+		? raw
+		: "all"
 }
 
 function extractRawStatus(booking = {}) {
@@ -4773,7 +4781,7 @@ function renderAdminBookings(docs) {
 		const emptyCopy =
 			adminBookingStatusFilter === "waitlisted"
 				? "No waitlist entries right now. Requests from the Waitlist tab will appear here too."
-				: "No confirmed bookings match this filter right now."
+				: `No ${getStatusLabel(adminBookingStatusFilter)} bookings match this filter right now.`
 		list.innerHTML = `<div class="admin-empty-state">${emptyCopy}</div>`
 		renderAdminSchedule()
 		return

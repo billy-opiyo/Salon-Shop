@@ -71,7 +71,9 @@ test.describe("admin page smoke tests", () => {
 		)
 		await expect(page.locator("#adminTotalCount")).toHaveText("1")
 		await expect(page.locator("#adminConfirmedCount")).toHaveText("1")
-		await expect(page.locator("#adminBookingsList")).toContainText("E2E Customer")
+		await expect(page.locator("#adminBookingsList")).toContainText(
+			"E2E Customer",
+		)
 		await expect(page.locator("#adminBookingsList")).toContainText(
 			"Knotless Braids",
 		)
@@ -79,6 +81,122 @@ test.describe("admin page smoke tests", () => {
 		await page.getByRole("tab", { name: "Schedule" }).click()
 		await expect(page.locator('[data-admin-section="schedule"]')).toBeVisible()
 		await expect(page.locator("#adminScheduleGrid")).toBeVisible()
+
+		expect(pageErrors).toEqual([])
+	})
+
+	test("admin booking status filters show matching bookings", async ({
+		page,
+	}) => {
+		await installFirebaseMock(page, {
+			adminUid: "admin-uid",
+			initialCollections: {
+				adminUsers: {
+					"admin-uid": {
+						active: true,
+						role: "admin",
+						email: "admin@royalbraids.test",
+						permissions: {
+							canManageBookings: true,
+							canManageContent: true,
+							canManageSecurity: true,
+						},
+					},
+				},
+				bookings: {
+					"booking-pending": {
+						firstName: "Pending",
+						lastName: "Client",
+						service: "Box Braids",
+						date: "2099-02-01",
+						time: "9:00 AM",
+						status: "pending",
+					},
+					"booking-confirmed": {
+						firstName: "Confirmed",
+						lastName: "Client",
+						service: "Knotless Braids",
+						date: "2099-02-02",
+						time: "10:00 AM",
+						status: "confirmed",
+					},
+					"booking-completed": {
+						firstName: "Completed",
+						lastName: "Client",
+						service: "Cornrows",
+						date: "2099-02-03",
+						time: "11:00 AM",
+						status: "completed",
+					},
+					"booking-cancelled": {
+						firstName: "Cancelled",
+						lastName: "Client",
+						service: "Twists",
+						date: "2099-02-04",
+						time: "12:00 PM",
+						status: "cancelled",
+					},
+				},
+			},
+		})
+		await blockExternalNetwork(page)
+		const pageErrors = watchForUnexpectedPageErrors(page)
+
+		await page.goto("/admin.html", { waitUntil: "domcontentloaded" })
+		await page.locator("#adminEmail").fill("admin@royalbraids.test")
+		await page.locator("#adminPassword").fill("correct-password")
+		await page.locator("#adminLoginBtn").click()
+
+		const bookingsList = page.locator("#adminBookingsList")
+		await expect(page.locator("#adminPanel")).toBeVisible()
+		await expect(page.locator("#adminTotalCount")).toHaveText("4")
+		await expect(page.locator("#adminPendingCount")).toHaveText("1")
+		await expect(page.locator("#adminConfirmedCount")).toHaveText("1")
+		await expect(page.locator("#adminCompletedCount")).toHaveText("1")
+		await expect(page.locator("#adminCancelledCount")).toHaveText("1")
+
+		const filters = [
+			{ label: "Pending", status: "pending", visible: "Pending Client" },
+			{
+				label: "Confirmed",
+				status: "confirmed",
+				visible: "Confirmed Client",
+			},
+			{
+				label: "Completed",
+				status: "completed",
+				visible: "Completed Client",
+			},
+			{
+				label: "Cancelled",
+				status: "cancelled",
+				visible: "Cancelled Client",
+			},
+		]
+
+		for (const filter of filters) {
+			const button = page.getByRole("button", { name: filter.label })
+			await button.click()
+			await expect(button).toHaveAttribute("aria-pressed", "true")
+			await expect(bookingsList).toHaveAttribute(
+				"data-booking-status-filter",
+				filter.status,
+			)
+			await expect(bookingsList).toContainText(filter.visible)
+
+			for (const other of filters.filter((item) => item !== filter)) {
+				await expect(bookingsList).not.toContainText(other.visible)
+			}
+		}
+
+		await page.getByRole("button", { name: "All Bookings" }).click()
+		await expect(bookingsList).toHaveAttribute(
+			"data-booking-status-filter",
+			"all",
+		)
+		for (const filter of filters) {
+			await expect(bookingsList).toContainText(filter.visible)
+		}
 
 		expect(pageErrors).toEqual([])
 	})

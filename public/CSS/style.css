@@ -2901,19 +2901,19 @@ h6 {
 .admin-bookings-list {
     display: grid;
     gap: 12px;
-    --admin-bookings-visible-cards: 4;
+    --admin-bookings-visible-cards: 3;
     --admin-booking-card-height: 210px;
     max-height: calc((var(--admin-booking-card-height) * var(--admin-bookings-visible-cards)) + (12px * (var(--admin-bookings-visible-cards) - 1)));
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 6px;
+    padding-right: 8px;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: var(--primary) var(--bg-secondary);
+    scrollbar-color: #e0ac4f #17120d;
 }
 
 .admin-bookings-list.admin-bookings-list--waitlisted-filter {
-    --admin-bookings-visible-cards: 3;
+    --admin-bookings-visible-cards: 4;
     --admin-booking-card-height: 210px;
     max-height: calc((var(--admin-booking-card-height) * var(--admin-bookings-visible-cards)) + (12px * (var(--admin-bookings-visible-cards) - 1)));
     overflow-y: auto;
@@ -2966,6 +2966,60 @@ h6 {
     border-color: rgba(232, 194, 122, 0.84);
     background: linear-gradient(135deg, var(--primary), var(--primary-light));
     box-shadow: 0 10px 20px rgba(200, 150, 62, 0.16);
+}
+
+.admin-booking-filter-btn[data-booking-status-filter="pending"] {
+    --booking-filter-status-bg: rgba(236, 201, 75, 0.15);
+    --booking-filter-status-color: #d4a10f;
+    --booking-filter-status-border: rgba(236, 201, 75, 0.4);
+    --booking-filter-status-shadow: rgba(236, 201, 75, 0.14);
+}
+
+.admin-booking-filter-btn[data-booking-status-filter="confirmed"] {
+    --booking-filter-status-bg: rgba(72, 187, 120, 0.15);
+    --booking-filter-status-color: #2f9e5a;
+    --booking-filter-status-border: rgba(72, 187, 120, 0.4);
+    --booking-filter-status-shadow: rgba(72, 187, 120, 0.14);
+}
+
+.admin-booking-filter-btn[data-booking-status-filter="completed"] {
+    --booking-filter-status-bg: rgba(66, 153, 225, 0.15);
+    --booking-filter-status-color: #3178c6;
+    --booking-filter-status-border: rgba(66, 153, 225, 0.4);
+    --booking-filter-status-shadow: rgba(66, 153, 225, 0.14);
+}
+
+.admin-booking-filter-btn[data-booking-status-filter="cancelled"] {
+    --booking-filter-status-bg: rgba(245, 101, 101, 0.15);
+    --booking-filter-status-color: #d64545;
+    --booking-filter-status-border: rgba(245, 101, 101, 0.4);
+    --booking-filter-status-shadow: rgba(245, 101, 101, 0.14);
+}
+
+.admin-booking-filter-btn[data-booking-status-filter="pending"]:hover,
+.admin-booking-filter-btn[data-booking-status-filter="pending"]:focus-visible,
+.admin-booking-filter-btn[data-booking-status-filter="confirmed"]:hover,
+.admin-booking-filter-btn[data-booking-status-filter="confirmed"]:focus-visible,
+.admin-booking-filter-btn[data-booking-status-filter="completed"]:hover,
+.admin-booking-filter-btn[data-booking-status-filter="completed"]:focus-visible,
+.admin-booking-filter-btn[data-booking-status-filter="cancelled"]:hover,
+.admin-booking-filter-btn[data-booking-status-filter="cancelled"]:focus-visible,
+.admin-booking-filter-btn[data-booking-status-filter="pending"].active,
+.admin-booking-filter-btn[data-booking-status-filter="confirmed"].active,
+.admin-booking-filter-btn[data-booking-status-filter="completed"].active,
+.admin-booking-filter-btn[data-booking-status-filter="cancelled"].active {
+    color: var(--booking-filter-status-color);
+    border-color: var(--booking-filter-status-border);
+    background: var(--booking-filter-status-bg);
+    box-shadow: 0 0 0 3px var(--booking-filter-status-shadow);
+}
+
+.admin-booking-filter-btn.waitlisted:hover,
+.admin-booking-filter-btn.waitlisted:focus-visible {
+    color: #c084fc;
+    border-color: rgba(168, 85, 247, 0.46);
+    background: rgba(168, 85, 247, 0.16);
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.14);
 }
 
 .admin-booking-filter-btn.waitlisted.active {
@@ -3464,22 +3518,24 @@ h6 {
 }
 
 .admin-bookings-list::-webkit-scrollbar {
-    width: 8px;
+    width: 10px;
 }
 
 .admin-bookings-list::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
+    background: linear-gradient(180deg, #120d08, #21170d 45%, #120d08);
     border-radius: var(--radius-full);
+    border: 1px solid rgba(200, 150, 62, 0.18);
 }
 
 .admin-bookings-list::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--primary-light), var(--primary));
+    background: linear-gradient(180deg, #fff0be, #e0ac4f 42%, #c8963e 72%, #9c6f25);
     border-radius: var(--radius-full);
-    border: 1px solid rgba(200, 150, 62, 0.35);
+    border: 1px solid rgba(255, 224, 154, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(120, 78, 20, 0.24);
 }
 
 .admin-bookings-list::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+    background: linear-gradient(180deg, #fff7d6, #efbf62 42%, #d6a74f 72%, #b9832f);
 }
 
 .admin-bookings-list.admin-bookings-list--waitlisted-filter::-webkit-scrollbar {
@@ -4417,9 +4473,11 @@ h6 {
     }
 
     .admin-bookings-list {
-        max-height: none;
-        overflow: visible;
-        padding-right: 0;
+        max-height: calc((var(--admin-booking-card-height) * var(--admin-bookings-visible-cards)) + (12px * (var(--admin-bookings-visible-cards) - 1)));
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 8px;
+        scrollbar-gutter: stable;
     }
 
     .admin-booking-item {
@@ -4627,9 +4685,12 @@ h6 {
 
     .admin-bookings-list {
         --admin-bookings-visible-cards: 3;
-        --admin-booking-card-height: auto;
+        --admin-booking-card-height: 230px;
         gap: 10px;
-        padding-right: 2px;
+        max-height: calc((var(--admin-booking-card-height) * var(--admin-bookings-visible-cards)) + (10px * (var(--admin-bookings-visible-cards) - 1)));
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 8px;
     }
 
     .admin-booking-item {
