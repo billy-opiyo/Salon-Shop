@@ -1001,6 +1001,13 @@ function getGalleryViewNounForService(categoryKey = "all") {
 	return getGalleryServiceLabel(normalized)
 }
 
+function updateGalleryToggleButtonLabel() {
+	const button = document.getElementById("viewAllGallery")
+	if (!button) return
+	const noun = getGalleryViewNounForService(galleryFiltersState.service)
+	button.textContent = showAllGallery ? `View Less ${noun}` : `View All ${noun}`
+}
+
 function resetGallerySubFilters() {
 	galleryFiltersState.subService = "all"
 	galleryFiltersState.length = "all"
@@ -6856,11 +6863,7 @@ function sortGalleryItems(items = [], sortBy = "recommended") {
 function setGallerySort(sortValue = "recommended") {
 	gallerySortBy = sortValue
 	showAllGallery = false
-	const button = document.getElementById("viewAllGallery")
-	if (button) {
-		const noun = getGalleryViewNounForService(galleryFiltersState.service)
-		button.textContent = `View All ${noun}`
-	}
+	updateGalleryToggleButtonLabel()
 	renderGallery()
 }
 
@@ -6938,6 +6941,7 @@ function renderGallery() {
 	if (actions) {
 		actions.style.display = filteredGalleryData.length > 8 ? "block" : "none"
 	}
+	updateGalleryToggleButtonLabel()
 
 	grid.innerHTML = dataToShow
 		.map((item, i) => {
@@ -6999,13 +7003,7 @@ function initializeGallerySlideshows() {
 function toggleGalleryView() {
 	showAllGallery = !showAllGallery
 	renderGallery()
-	const button = document.getElementById("viewAllGallery")
-	if (button) {
-		const noun = getGalleryViewNounForService(galleryFiltersState.service)
-		button.textContent = showAllGallery
-			? `View Less ${noun}`
-			: `View All ${noun}`
-	}
+	updateGalleryToggleButtonLabel()
 }
 
 function setGalleryFilter(group, value) {
@@ -7016,11 +7014,7 @@ function setGalleryFilter(group, value) {
 	}
 
 	showAllGallery = false
-	const button = document.getElementById("viewAllGallery")
-	if (button) {
-		const noun = getGalleryViewNounForService(galleryFiltersState.service)
-		button.textContent = `View All ${noun}`
-	}
+	updateGalleryToggleButtonLabel()
 	renderGalleryFilters()
 	renderFeaturedStyles()
 	renderGallery()
@@ -7053,11 +7047,7 @@ function openGalleryItemByIdOrName(idOrName) {
 	if (inFiltered && !showAllGallery) {
 		showAllGallery = true
 		renderGallery()
-		const button = document.getElementById("viewAllGallery")
-		if (button) {
-			const noun = getGalleryViewNounForService(galleryFiltersState.service)
-			button.textContent = `View Less ${noun}`
-		}
+		updateGalleryToggleButtonLabel()
 
 		visible = getVisibleGalleryData()
 		index = visible.findIndex((item) => isMatchingGalleryItem(item, idOrName))
@@ -7071,8 +7061,7 @@ function openGalleryItemByIdOrName(idOrName) {
 	showAllGallery = true
 	renderGalleryFilters()
 	renderGallery()
-	const button = document.getElementById("viewAllGallery")
-	if (button) button.textContent = "View Less Gallery"
+	updateGalleryToggleButtonLabel()
 
 	visible = getVisibleGalleryData()
 	index = visible.findIndex((item) => isMatchingGalleryItem(item, idOrName))
