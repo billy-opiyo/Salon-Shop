@@ -79,7 +79,7 @@
 			defer
 		></script>
 		<script
-			src="JS/script.js?v=20260531-waitlist-joined-feedback"
+			src="JS/script.js?v=20260531-waitlist-joined-feedback-mobile-time-picker-fix"
 			defer
 		></script>
 		<script src="JS/register-sw.js" defer></script>
@@ -738,9 +738,37 @@
 								</div>
 								<div class="form-group">
 									<label>Time Slot *</label>
-									<select name="time" required id="timeSelect">
-										<option value="">Select Time</option>
-									</select>
+									<div class="time-picker-field" data-time-picker="booking">
+										<input
+											type="text"
+											name="time"
+											required
+											id="timeSelect"
+											list="bookingTimeOptions"
+											placeholder="Select or type time"
+											autocomplete="off"
+											inputmode="text"
+											aria-controls="bookingTimeDropdown"
+											aria-expanded="false"
+										/>
+										<button
+											type="button"
+											class="time-picker-trigger"
+											id="timePickerTrigger"
+											aria-label="Show available times"
+											aria-controls="bookingTimeDropdown"
+											aria-expanded="false"
+										>
+											<i class="fa-regular fa-clock" aria-hidden="true"></i>
+										</button>
+										<datalist id="bookingTimeOptions"></datalist>
+										<div
+											class="time-picker-dropdown"
+											id="bookingTimeDropdown"
+											role="listbox"
+											hidden
+										></div>
+									</div>
 								</div>
 								<div
 									class="form-group full waitlist-panel hidden"

@@ -19,16 +19,27 @@ async function openPublicPageWithFirebaseMock(page, mockOptions = {}) {
 
 async function selectFirstAvailableTime(page) {
 	await expect
-		.poll(async () => page.locator("#timeSelect option").count())
-		.toBeGreaterThan(1)
+		.poll(async () =>
+			page
+				.locator("#bookingTimeDropdown .time-picker-option:not(.is-booked)")
+				.count(),
+		)
+		.toBeGreaterThan(0)
 
-	const firstTime = await page
-		.locator("#timeSelect option")
-		.nth(1)
-		.getAttribute("value")
+	await page.locator("#timePickerTrigger").click()
+	const firstOption = page
+		.locator("#bookingTimeDropdown .time-picker-option:not(.is-booked)")
+		.first()
+	await expect(firstOption).toBeVisible()
+	const firstTime = await firstOption.getAttribute("data-time")
 	expect(firstTime).toBeTruthy()
-	await page.locator("#timeSelect").selectOption(firstTime)
+	await firstOption.click()
+	await expect(page.locator("#timeSelect")).toHaveValue(firstTime)
 	return firstTime
+}
+
+function bookingSlotId(date, stylistKey, time) {
+	return `${date}__${stylistKey}__${time.replace(/\s+/g, "").replace(/[:]/g, "")}`
 }
 
 test.describe("public website user flows", () => {
@@ -88,6 +99,54 @@ test.describe("public website user flows", () => {
 			time: selectedTime,
 			stylistKey: "fatima",
 		})
+		expect(pageErrors).toEqual([])
+	})
+
+	test("booked times remain visible but disabled in time picker and selectable only in waitlist control", async ({
+		page,
+	}) => {
+		const bookedDate = futureDate(8)
+		const bookedTime = "9:00 AM"
+		const stylistKey = "fatima"
+		const slotId = bookingSlotId(bookedDate, stylistKey, bookedTime)
+		const pageErrors = await openPublicPageWithFirebaseMock(page, {
+			initialCollections: {
+				bookingSlots: {
+					[slotId]: {
+						taken: true,
+						date: bookedDate,
+						time: bookedTime,
+						stylistKey,
+						bookingId: "existing-booking-1",
+					},
+				},
+			},
+		})
+
+		await page.locator("#stylistSelect").selectOption(stylistKey)
+		await page.locator("#datePicker").fill(bookedDate)
+		await page.locator("#datePicker").dispatchEvent("change")
+		await page.locator("#timePickerTrigger").click()
+
+		const bookedTimeOption = page.locator(
+			`#bookingTimeDropdown .time-picker-option[data-time="${bookedTime}"]`,
+		)
+		await expect(bookedTimeOption).toBeVisible()
+		await expect(bookedTimeOption).toContainText(/Booked/i)
+		await expect(bookedTimeOption).toHaveClass(/is-booked/)
+		await expect(bookedTimeOption).toBeDisabled()
+		await expect(bookedTimeOption).toHaveAttribute("aria-disabled", "true")
+
+		await bookedTimeOption.evaluate((node) => node.click())
+		await expect(page.locator("#timeSelect")).not.toHaveValue(bookedTime)
+
+		await expect(page.locator("#waitlistPanel")).toBeVisible()
+		const waitlistOption = page.locator(
+			`#waitlistTimeSelect option[value="${slotId}"]`,
+		)
+		await expect(waitlistOption).toHaveCount(1)
+		await expect(waitlistOption).toContainText(bookedTime)
+
 		expect(pageErrors).toEqual([])
 	})
 

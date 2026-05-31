@@ -1603,6 +1603,9 @@ let auth = null
 let functionsService = null
 let activeAvailabilityUnsubscribe = null
 let currentBookedSlotEntries = []
+let currentBookingTimeSlotOptions = []
+let currentBookingTimeSlotMeta = new Map()
+let bookingTimePickerControlsBound = false
 let pendingWaitlistBooking = null
 const expiredSlotCleanupRequestTimes = new Map()
 let serviceCategorySettingsUnsubscribe = null
@@ -5865,6 +5868,242 @@ function getCurrentBookingFormStylistKey() {
 	)
 }
 
+function normalizeTimeSlotLookupKey(value = "") {
+	return String(value || "")
+		.trim()
+		.toLowerCase()
+		.replace(/\s+/g, "")
+		.replace(/\./g, "")
+}
+
+function getCanonicalTimeSlotValue(value = "") {
+	const lookupKey = normalizeTimeSlotLookupKey(value)
+	if (!lookupKey) return ""
+	return (
+		timeSlots.find((slot) => normalizeTimeSlotLookupKey(slot) === lookupKey) ||
+		""
+	)
+}
+
+function getBookingTimePickerElements() {
+	const input = document.getElementById("timeSelect")
+	return {
+		input,
+		datalist: document.getElementById("bookingTimeOptions"),
+		dropdown: document.getElementById("bookingTimeDropdown"),
+		trigger: document.getElementById("timePickerTrigger"),
+		field: input?.closest("[data-time-picker]") || input?.parentElement || null,
+	}
+}
+
+function getBookingTimeSlotMeta(value = "") {
+	const canonicalValue =
+		getCanonicalTimeSlotValue(value) || String(value || "").trim()
+	if (!canonicalValue) return null
+	return currentBookingTimeSlotMeta.get(
+		normalizeTimeSlotLookupKey(canonicalValue),
+	)
+}
+
+function setBookingTimeDropdownExpanded(isExpanded = false) {
+	const { input, dropdown, trigger } = getBookingTimePickerElements()
+	if (dropdown) dropdown.hidden = !isExpanded
+	if (input) input.setAttribute("aria-expanded", String(isExpanded))
+	if (trigger) trigger.setAttribute("aria-expanded", String(isExpanded))
+}
+
+function renderBookingTimeDropdownOptions(filterValue = "") {
+	const { input, dropdown } = getBookingTimePickerElements()
+	if (!dropdown) return
+
+	const selectedKey = normalizeTimeSlotLookupKey(input?.value || "")
+	const filterText = String(filterValue || "")
+		.trim()
+		.toLowerCase()
+	const visibleOptions = currentBookingTimeSlotOptions.filter((option) => {
+		if (!filterText) return true
+		return [option.value, option.label]
+			.filter(Boolean)
+			.some((item) => String(item).toLowerCase().includes(filterText))
+	})
+
+	dropdown.innerHTML = ""
+
+	if (!visibleOptions.length) {
+		const empty = document.createElement("span")
+		empty.className = "time-picker-empty"
+		empty.textContent = currentBookingTimeSlotOptions.length
+			? "No matching times"
+			: "No available times for this date/stylist"
+		dropdown.appendChild(empty)
+		return
+	}
+
+	visibleOptions.forEach((option) => {
+		const optionButton = document.createElement("button")
+		optionButton.type = "button"
+		optionButton.className = "time-picker-option"
+		if (option.booked && !option.waitlisted) {
+			optionButton.classList.add("is-booked")
+			optionButton.disabled = true
+			optionButton.dataset.booked = "true"
+			optionButton.setAttribute("aria-disabled", "true")
+		}
+		if (option.waitlisted) optionButton.classList.add("is-waitlisted")
+		if (
+			option.selectable &&
+			normalizeTimeSlotLookupKey(option.value) === selectedKey
+		) {
+			optionButton.classList.add("is-selected")
+		}
+		optionButton.dataset.time = option.value
+		optionButton.setAttribute("role", "option")
+		optionButton.setAttribute(
+			"aria-selected",
+			normalizeTimeSlotLookupKey(option.value) === selectedKey
+				? "true"
+				: "false",
+		)
+		optionButton.textContent = option.label || option.value
+		dropdown.appendChild(optionButton)
+	})
+}
+
+function openBookingTimeDropdown() {
+	const { input } = getBookingTimePickerElements()
+	renderBookingTimeDropdownOptions(input?.value || "")
+	setBookingTimeDropdownExpanded(true)
+}
+
+function closeBookingTimeDropdown() {
+	setBookingTimeDropdownExpanded(false)
+}
+
+function selectBookingTimeSlot(value = "") {
+	const { input } = getBookingTimePickerElements()
+	const canonicalValue = getCanonicalTimeSlotValue(value)
+	if (!input || !canonicalValue) return
+	const selectedMeta = getBookingTimeSlotMeta(canonicalValue)
+	if (selectedMeta && !selectedMeta.selectable) {
+		renderBookingTimeDropdownOptions(input.value)
+		return
+	}
+
+	input.value = canonicalValue
+	renderBookingTimeDropdownOptions(canonicalValue)
+	closeBookingTimeDropdown()
+	input.dispatchEvent(new Event("change", { bubbles: true }))
+	input.focus()
+}
+
+function validateBookingTimeSelection(
+	timeValue = "",
+	{ allowWaitlisted = false } = {},
+) {
+	const rawValue = String(timeValue || "").trim()
+	if (!rawValue) {
+		return { valid: false, message: "Please choose a time slot." }
+	}
+
+	const canonicalValue = getCanonicalTimeSlotValue(rawValue)
+	if (!canonicalValue) {
+		return {
+			valid: false,
+			message: "Please select one of the listed salon time slots.",
+		}
+	}
+
+	const meta = getBookingTimeSlotMeta(canonicalValue)
+	const matchesPendingWaitlist =
+		allowWaitlisted &&
+		pendingWaitlistBooking &&
+		normalizeTimeSlotLookupKey(pendingWaitlistBooking.time) ===
+			normalizeTimeSlotLookupKey(canonicalValue)
+
+	if (meta?.booked && !meta?.waitlisted && !matchesPendingWaitlist) {
+		return {
+			valid: false,
+			time: canonicalValue,
+			message:
+				"That time slot is already booked. Choose an available time or join the waitlist below.",
+		}
+	}
+
+	if (meta?.waitlisted && !allowWaitlisted) {
+		return {
+			valid: false,
+			time: canonicalValue,
+			message:
+				"This booked time is reserved for your waitlist confirmation. Choose an available time or confirm the waitlist request.",
+		}
+	}
+
+	return { valid: true, time: canonicalValue, meta }
+}
+
+function bindBookingTimePickerControls() {
+	if (bookingTimePickerControlsBound) return
+
+	const { input, dropdown, trigger, field } = getBookingTimePickerElements()
+	if (!input) return
+
+	bookingTimePickerControlsBound = true
+
+	input.addEventListener("input", () => {
+		const pendingSelection = getMatchingPendingWaitlistBooking()
+		if (
+			pendingSelection &&
+			normalizeTimeSlotLookupKey(input.value) !==
+				normalizeTimeSlotLookupKey(pendingSelection.time)
+		) {
+			clearPendingWaitlistBooking({ refreshSlots: true })
+			return
+		}
+
+		renderBookingTimeDropdownOptions(input.value)
+		setBookingTimeDropdownExpanded(true)
+	})
+
+	input.addEventListener("change", handleBookingTimeSelectionChange)
+	input.addEventListener("keydown", (event) => {
+		if (event.key === "ArrowDown") {
+			event.preventDefault()
+			openBookingTimeDropdown()
+			dropdown?.querySelector(".time-picker-option")?.focus()
+		} else if (event.key === "Escape") {
+			closeBookingTimeDropdown()
+		}
+	})
+
+	trigger?.addEventListener("click", () => {
+		if (dropdown && !dropdown.hidden) {
+			closeBookingTimeDropdown()
+		} else {
+			openBookingTimeDropdown()
+		}
+		input.focus()
+	})
+
+	dropdown?.addEventListener("click", (event) => {
+		const optionButton = event.target.closest(".time-picker-option")
+		if (!optionButton) return
+		selectBookingTimeSlot(optionButton.dataset.time || optionButton.textContent)
+	})
+
+	dropdown?.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			closeBookingTimeDropdown()
+			input.focus()
+		}
+	})
+
+	document.addEventListener("click", (event) => {
+		if (field && !field.contains(event.target)) {
+			closeBookingTimeDropdown()
+		}
+	})
+}
+
 async function requestExpiredSlotCleanup(
 	slotId = "",
 	slotData = {},
@@ -5977,10 +6216,10 @@ function renderWaitlistPanel(bookedEntries = []) {
 }
 
 function renderBookingTimeSlots(bookedEntries = []) {
-	const select = document.getElementById("timeSelect")
-	if (!select) return
+	const { input, datalist } = getBookingTimePickerElements()
+	if (!input) return
 
-	const previousSelection = String(select.value || "").trim()
+	const previousSelection = String(input.value || "").trim()
 	const bookedTimeSet = new Set(
 		bookedEntries
 			.map((entry) => String(entry?.time || "").trim())
@@ -5988,36 +6227,67 @@ function renderBookingTimeSlots(bookedEntries = []) {
 	)
 	const pendingSelection = getMatchingPendingWaitlistBooking()
 
-	select.innerHTML = '<option value="">Select Time</option>'
+	currentBookingTimeSlotOptions = []
+	currentBookingTimeSlotMeta = new Map()
+	if (datalist) datalist.innerHTML = ""
+
 	timeSlots.forEach((slot) => {
 		const isWaitlistedSelection = pendingSelection?.time === slot
 		const isBooked = bookedTimeSet.has(slot)
-		const opt = document.createElement("option")
-		opt.value = slot
-		opt.textContent = isWaitlistedSelection
+		const label = isWaitlistedSelection
 			? `${slot} — Waitlisted (booked)`
 			: isBooked
 				? `${slot} — Booked`
 				: slot
-		if (isWaitlistedSelection) {
-			opt.dataset.waitlisted = "true"
-			opt.dataset.slotId = pendingSelection.slotId
-			opt.dataset.stylistKey = pendingSelection.stylistKey || "any"
-		} else if (isBooked) {
-			opt.disabled = true
-			opt.dataset.booked = "true"
+		const meta = {
+			value: slot,
+			label,
+			booked: isBooked,
+			waitlisted: isWaitlistedSelection,
+			slotId: isWaitlistedSelection ? pendingSelection.slotId : "",
+			stylistKey: isWaitlistedSelection
+				? pendingSelection.stylistKey || "any"
+				: "",
+			selectable: !isBooked || isWaitlistedSelection,
 		}
-		select.appendChild(opt)
+
+		if (isWaitlistedSelection) {
+			meta.slotId = pendingSelection.slotId
+			meta.stylistKey = pendingSelection.stylistKey || "any"
+		}
+
+		currentBookingTimeSlotMeta.set(normalizeTimeSlotLookupKey(slot), meta)
+		currentBookingTimeSlotOptions.push(meta)
 	})
 
-	if (pendingSelection?.time) {
-		select.value = pendingSelection.time
-	} else if (previousSelection && !bookedTimeSet.has(previousSelection)) {
-		select.value = previousSelection
-	} else {
-		select.value = ""
+	if (datalist) {
+		currentBookingTimeSlotOptions
+			.filter((option) => option.selectable)
+			.forEach((option) => {
+				const datalistOption = document.createElement("option")
+				datalistOption.value = option.value
+				datalistOption.label = option.label
+				if (option.waitlisted) {
+					datalistOption.dataset.waitlisted = "true"
+					datalistOption.dataset.slotId = option.slotId
+					datalistOption.dataset.stylistKey = option.stylistKey || "any"
+				}
+				datalist.appendChild(datalistOption)
+			})
 	}
 
+	if (pendingSelection?.time) {
+		input.value = pendingSelection.time
+	} else {
+		const canonicalPreviousSelection =
+			getCanonicalTimeSlotValue(previousSelection)
+		const previousMeta = canonicalPreviousSelection
+			? getBookingTimeSlotMeta(canonicalPreviousSelection)
+			: null
+		input.value = previousMeta?.selectable ? canonicalPreviousSelection : ""
+	}
+
+	renderBookingTimeDropdownOptions(input.value)
 	renderWaitlistPanel(bookedEntries)
 }
 
@@ -6419,14 +6689,35 @@ function handleBookingAvailabilityInputChange() {
 }
 
 function handleBookingTimeSelectionChange() {
-	const timeSelect = document.getElementById("timeSelect")
-	const selectedOption = timeSelect?.options?.[timeSelect.selectedIndex]
-	if (
-		selectedOption?.dataset?.waitlisted !== "true" &&
-		pendingWaitlistBooking
-	) {
-		clearPendingWaitlistBooking({ refreshSlots: true })
+	const { input } = getBookingTimePickerElements()
+	if (!input) return
+
+	const canonicalSelection = getCanonicalTimeSlotValue(input.value)
+	if (canonicalSelection && input.value.trim() !== canonicalSelection) {
+		input.value = canonicalSelection
 	}
+
+	const selectedMeta = canonicalSelection
+		? getBookingTimeSlotMeta(canonicalSelection)
+		: null
+	if (selectedMeta && !selectedMeta.selectable) {
+		input.value = ""
+		renderBookingTimeDropdownOptions("")
+		return
+	}
+
+	const stillConfirmingPendingWaitlist =
+		selectedMeta?.waitlisted &&
+		pendingWaitlistBooking &&
+		normalizeTimeSlotLookupKey(canonicalSelection) ===
+			normalizeTimeSlotLookupKey(pendingWaitlistBooking.time)
+
+	if (pendingWaitlistBooking && !stillConfirmingPendingWaitlist) {
+		clearPendingWaitlistBooking({ refreshSlots: true })
+		return
+	}
+
+	renderBookingTimeDropdownOptions(input.value)
 }
 
 function setBookingSuccessContent(mode = "confirmed") {
@@ -8224,8 +8515,8 @@ function initializeCustomServiceInput() {
 }
 
 function populateTimeSlots() {
-	const select = document.getElementById("timeSelect")
-	if (!select) return
+	const input = document.getElementById("timeSelect")
+	if (!input) return
 	renderBookingTimeSlots([])
 }
 
@@ -8553,6 +8844,17 @@ document.getElementById("bookingForm").addEventListener("submit", function (e) {
 	if (pendingWaitlistSelection?.time) {
 		data.time = pendingWaitlistSelection.time
 	}
+
+	const timeValidation = validateBookingTimeSelection(data.time, {
+		allowWaitlisted: Boolean(pendingWaitlistSelection),
+	})
+	if (!timeValidation.valid) {
+		showTimedFormMessage(msg, "error", `⚠️ ${timeValidation.message}`)
+		return
+	}
+	data.time = timeValidation.time
+	const timeInput = document.getElementById("timeSelect")
+	if (timeInput) timeInput.value = data.time
 
 	const selectedStylistKey = normalizeStylistKey(data.stylist || "any")
 	const stylistKey = pendingWaitlistSelection
@@ -9258,6 +9560,7 @@ populateReviewServiceSelect()
 populateServiceSelect()
 initializeCustomServiceInput()
 populateTimeSlots()
+bindBookingTimePickerControls()
 bindWaitlistControls()
 initAnimatedHeaderLogo()
 
@@ -9267,7 +9570,6 @@ initializeFirebaseServices().then(async () => {
 
 	const stylistSelect = document.getElementById("stylistSelect")
 	const dateInput = document.getElementById("datePicker")
-	const timeSelect = document.getElementById("timeSelect")
 
 	if (stylistSelect) {
 		stylistSelect.addEventListener(
@@ -9277,9 +9579,6 @@ initializeFirebaseServices().then(async () => {
 	}
 	if (dateInput) {
 		dateInput.addEventListener("change", handleBookingAvailabilityInputChange)
-	}
-	if (timeSelect) {
-		timeSelect.addEventListener("change", handleBookingTimeSelectionChange)
 	}
 
 	startGalleryRealtimeListener()
