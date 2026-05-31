@@ -751,8 +751,6 @@ function renderAdminBookingLifecycleActions({
 	if (normalizedStatus === "waitlisted") {
 		return `
 			<button class="admin-action-btn" ${actionAttr}="move-waitlist-confirmed" data-id="${safeBookingId}" data-waitlist-id="${safeWaitlistId}">Move to Confirmed</button>
-			<button class="admin-action-btn" disabled title="Move this waitlisted booking to confirmed before completing it.">Complete + Release Slot</button>
-			<button class="admin-action-btn danger" disabled title="Cancel waitlist requests from the Waitlist tab so the linked waitlist entry stays synced.">Cancel + Release Slot</button>
 		`
 	}
 
@@ -3803,9 +3801,141 @@ function findAdminBookingForWaitlistEntry(waitlistItem = {}) {
 	})
 }
 
+function findAnyAdminBookingForWaitlistEntry(
+	waitlistItem = {},
+	bookings = adminBookingDocs,
+) {
+	const waitlistId = String(waitlistItem.id || "").trim()
+	const explicitBookingIds = [
+		waitlistItem.bookingId,
+		waitlistItem.convertedBookingId,
+	]
+		.map((value) => String(value || "").trim())
+		.filter(Boolean)
+	const bookingDocs = Array.isArray(bookings) ? bookings : []
+
+	return (
+		bookingDocs.find((booking = {}) => {
+			const bookingId = String(booking.id || "").trim()
+			if (bookingId && explicitBookingIds.includes(bookingId)) return true
+			return (
+				waitlistId && String(booking.waitlistId || "").trim() === waitlistId
+			)
+		}) || null
+	)
+}
+
+function buildAdminWaitlistFilterRows(bookings = []) {
+	const bookingDocs = Array.isArray(bookings) ? bookings : []
+	const waitlistEntries = Array.isArray(adminWaitlistDocs)
+		? sortAdminWaitlistEntries(adminWaitlistDocs)
+		: []
+
+	if (!waitlistEntries.length) {
+		return bookingDocs.filter((booking) =>
+			isAdminBookingVisibleInWaitlistFilter(booking),
+		)
+	}
+
+	return waitlistEntries.map((waitlistEntry) => {
+		const linkedBooking = findAnyAdminBookingForWaitlistEntry(
+			waitlistEntry,
+			bookingDocs,
+		)
+		return {
+			...(linkedBooking || {}),
+			id: String(linkedBooking?.id || "").trim(),
+			status: normalizeStatus(extractRawStatus(linkedBooking || {})),
+			__adminWaitlistEntry: waitlistEntry,
+			__adminLinkedBooking: linkedBooking || null,
+			__adminWaitlistFilterRecord: true,
+		}
+	})
+}
+
+function renderAdminWaitlistActionButtons(item = {}, linkedBooking = null) {
+	const status = normalizeWaitlistStatus(item.status)
+	const safeWaitlistId = escapeHtml(String(item.id || "").trim())
+	const linkedBookingId = String(linkedBooking?.id || "").trim()
+	const linkedBookingStatus = linkedBookingId
+		? normalizeStatus(extractRawStatus(linkedBooking || {}))
+		: ""
+	const linkedBookingIsWaitlisted =
+		Boolean(linkedBookingId) && linkedBookingStatus === "waitlisted"
+	const linkedBookingBlocksStatusOnlyActions =
+		Boolean(linkedBookingId) && !linkedBookingIsWaitlisted
+	const isQueued = isActiveAdminWaitlistQueueStatus(status)
+	const buttons = []
+
+	const addButton = (
+		action,
+		label,
+		{
+			className = "",
+			tooltip = "",
+			bookingId = linkedBookingId,
+			disabled = false,
+		} = {},
+	) => {
+		const safeAction = escapeHtml(action)
+		const classes = ["admin-action-btn", className].filter(Boolean).join(" ")
+		const tooltipAttr = tooltip
+			? ` data-tooltip="${escapeHtml(tooltip)}" title="${escapeHtml(tooltip)}"`
+			: ""
+		const disabledAttr = disabled ? " disabled" : ""
+		buttons.push(
+			`<button class="${escapeHtml(classes)}"${tooltipAttr}${disabledAttr} data-waitlist-action="${safeAction}" data-id="${safeWaitlistId}" data-booking-id="${escapeHtml(bookingId)}">${escapeHtml(label)}</button>`,
+		)
+	}
+
+	if (isQueued) {
+		if (linkedBookingIsWaitlisted) {
+			addButton("move-confirmed", "Move to Confirmed (Locks Slot)", {
+				tooltip:
+					"Converts this waitlisted booking to confirmed only when the preferred slot is available.",
+			})
+		} else {
+			const moveTooltip = linkedBookingId
+				? `Move to Confirmed is unavailable because the linked booking is already ${getStatusLabel(linkedBookingStatus)}.`
+				: "Move to Confirmed requires a linked waitlisted booking so the slot can be safely locked. Use Mark Booked only for status-only closure."
+			addButton("move-confirmed", "Move to Confirmed (Locks Slot)", {
+				tooltip: moveTooltip,
+				disabled: true,
+			})
+		}
+	}
+
+	if (!linkedBookingBlocksStatusOnlyActions && isQueued) {
+		if (status !== "waiting") {
+			addButton("waiting", "Set Waiting")
+		}
+
+		if (["waiting", "notified", "notification_failed"].includes(status)) {
+			addButton("contacted", "Mark Contacted")
+		}
+
+		if (!linkedBookingIsWaitlisted) {
+			addButton("booked", "Mark Booked / Close Waitlist", {
+				tooltip:
+					"Status-only action. It closes this waitlist entry without locking a booking slot.",
+			})
+		}
+
+		addButton("cancelled", "Cancel Request", { className: "danger" })
+	}
+
+	if (!buttons.length) {
+		return `<button class="admin-action-btn" disabled title="No valid waitlist actions are available for this row right now.">No quick actions available</button>`
+	}
+
+	return buttons.join("")
+}
+
 function normalizeWaitlistDoc(doc = {}) {
 	return {
 		id: String(doc.id || ""),
+		bookingId: String(doc.bookingId || "").trim(),
+		convertedBookingId: String(doc.convertedBookingId || "").trim(),
 		firstName: String(doc.firstName || "").trim(),
 		lastName: String(doc.lastName || "").trim(),
 		name: String(doc.name || "").trim(),
@@ -3915,10 +4045,7 @@ function renderAdminWaitlist(docs = []) {
 		docs.map(normalizeWaitlistDoc),
 	)
 	adminWaitlistDocs = normalizedItems
-
-	if (Array.isArray(adminBookingDocs) && adminBookingDocs.length) {
-		renderAdminBookings(adminBookingDocs)
-	}
+	renderAdminBookings(adminBookingDocs)
 
 	const items = sortAdminWaitlistEntries(normalizedItems)
 
@@ -3971,9 +4098,12 @@ function renderAdminWaitlist(docs = []) {
 						size: item.queueSize,
 					})
 				: ""
-			const linkedBooking = findAdminBookingForWaitlistEntry(item)
+			const linkedBooking = findAnyAdminBookingForWaitlistEntry(item)
 			const linkedBookingId = String(linkedBooking?.id || "").trim()
-			const canMoveToConfirmed = Boolean(isQueued && linkedBookingId)
+			const waitlistActions = renderAdminWaitlistActionButtons(
+				item,
+				linkedBooking,
+			)
 
 			return `
 	      <article class="admin-review-item admin-waitlist-card ${isQueued ? "admin-waitlist-card--queued" : ""}">
@@ -4010,11 +4140,7 @@ function renderAdminWaitlist(docs = []) {
           <div><span>Inspiration Image:</span> ${item.inspirationImageUrl ? `<a class="admin-inline-link" href="${escapeHtml(item.inspirationImageUrl)}" target="_blank" rel="noopener">Open full image</a>` : "Not provided"}</div>
         </div>
         <div class="admin-booking-actions">
-          <button class="admin-action-btn" data-tooltip="Converts this waitlisted booking to confirmed only when the preferred slot is available." data-waitlist-action="move-confirmed" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}" ${canMoveToConfirmed ? "" : "disabled"}>Move to Confirmed (Locks Slot)</button>
-          <button class="admin-action-btn" data-waitlist-action="waiting" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Set Waiting</button>
-          <button class="admin-action-btn" data-waitlist-action="contacted" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Mark Contacted</button>
-          <button class="admin-action-btn" data-tooltip="Status-only action. It does not lock a booking slot." data-waitlist-action="booked" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Mark Booked / Close Waitlist</button>
-          <button class="admin-action-btn danger" data-waitlist-action="cancelled" data-id="${escapeHtml(item.id)}" data-booking-id="${escapeHtml(linkedBookingId)}">Cancel Request</button>
+          ${waitlistActions}
         </div>
       </article>
     `
@@ -4115,6 +4241,69 @@ async function updateWaitlistStatus(waitlistId, status, bookingId = "") {
 	}
 
 	return result
+}
+
+async function handleAdminWaitlistActionButton(
+	actionBtn,
+	messageTargetId = "adminWaitlistMessage",
+) {
+	if (!actionBtn || !adminUnlocked || !auth?.currentUser) return
+
+	const action = actionBtn.dataset.waitlistAction
+	const waitlistId = actionBtn.dataset.id
+	if (!action || !waitlistId) return
+
+	setAdminButtonLoadingState(actionBtn, true, {
+		loadingText: "Applying...",
+	})
+
+	try {
+		if (action === "move-confirmed") {
+			const bookingId = String(actionBtn.dataset.bookingId || "").trim()
+			if (!bookingId) {
+				throw new Error(
+					"This waitlist row has no linked waitlisted booking yet.",
+				)
+			}
+			await callAdminMoveWaitlistBookingToConfirmedAction({
+				bookingId,
+				waitlistId,
+			})
+			setAdminMessage(
+				"success",
+				"✅ Waitlist request moved to confirmed booking and slot locked.",
+				messageTargetId,
+			)
+		} else {
+			const updateResult = await updateWaitlistStatus(
+				waitlistId,
+				action,
+				String(actionBtn.dataset.bookingId || "").trim(),
+			)
+			const syncWarning =
+				updateResult?.linkedBookingSynced === false
+					? ` ⚠️ Waitlist status was saved, but linked booking sync needs attention: ${updateResult.linkedBookingError?.message || "unknown error"}`
+					: ""
+			const successMessage =
+				action === "booked"
+					? "✅ Waitlist request marked as booked/closed. This is a status-only update and does not lock a slot. Use Move to Confirmed when the preferred slot is available."
+					: `✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.`
+			setAdminMessage(
+				"success",
+				`${successMessage}${syncWarning}`,
+				messageTargetId,
+			)
+		}
+	} catch (error) {
+		console.error("Waitlist action failed:", error)
+		setAdminMessage(
+			"error",
+			formatAdminWaitlistActionFailureMessage(error, action),
+			messageTargetId,
+		)
+	} finally {
+		setAdminButtonLoadingState(actionBtn, false)
+	}
 }
 
 function normalizeReviewStatus(status) {
@@ -4425,6 +4614,85 @@ async function handleAuthStateChange(user) {
 	}
 }
 
+function renderAdminWaitlistBookingFilterCard(row = {}) {
+	const waitlistEntry = row.__adminWaitlistEntry || null
+	if (!waitlistEntry) return ""
+
+	const linkedBooking = row.__adminLinkedBooking || null
+	const linkedBookingId = String(linkedBooking?.id || "").trim()
+	const customerName = getAdminWaitlistCustomerName(waitlistEntry)
+	const waitlistStatus = normalizeWaitlistStatus(waitlistEntry.status)
+	const waitlistStatusLabel = getWaitlistStatusLabel(waitlistStatus)
+	const isQueued = isActiveAdminWaitlistQueueStatus(waitlistStatus)
+	const queueInfo = isQueued
+		? {
+				label: waitlistEntry.queuePositionLabel,
+				size: waitlistEntry.queueSize,
+			}
+		: { label: "", size: null }
+	const queueSummary = isQueued ? formatAdminQueueSummary(queueInfo) : "N/A"
+	const queueChip = isQueued ? renderAdminWaitlistQueueChip(queueInfo) : ""
+	const stylistLabel =
+		waitlistEntry.stylist || waitlistEntry.stylistKey || "Any Available"
+	const notes = waitlistEntry.notes || "No notes provided."
+	const waitlistActions = renderAdminWaitlistActionButtons(
+		waitlistEntry,
+		linkedBooking,
+	)
+	const inspirationImageUrl = String(
+		waitlistEntry.inspirationImageUrl ||
+			linkedBooking?.inspirationImageUrl ||
+			linkedBooking?.inspirationImage ||
+			linkedBooking?.referenceImageUrl ||
+			"",
+	).trim()
+
+	return `
+		<div class="admin-booking-item admin-booking-item-waitlisted admin-booking-item-waitlist-record">
+			<div class="admin-booking-item-head">
+				<div>
+					<div class="admin-booking-name-row">
+						<div class="admin-booking-name">${escapeHtml(customerName)}</div>
+						<span class="admin-waitlist-chip">${escapeHtml(`Waitlist · ${waitlistStatusLabel}`)}</span>
+						${queueChip}
+					</div>
+					<div class="admin-booking-id">Waitlist ID: ${escapeHtml(waitlistEntry.id || "N/A")}</div>
+					${linkedBookingId ? `<div class="admin-booking-id">Linked Booking: ${escapeHtml(linkedBookingId)}</div>` : '<div class="admin-booking-id">Linked Booking: Not linked yet</div>'}
+				</div>
+				<span class="admin-status-badge ${getWaitlistStatusClass(waitlistStatus)}">${escapeHtml(waitlistStatusLabel)}</span>
+			</div>
+			<div class="admin-booking-meta">
+				<div><span>Waitlist Place:</span> ${escapeHtml(queueSummary)}</div>
+				<div><span>Waitlist Status:</span> ${escapeHtml(waitlistStatusLabel)}</div>
+				<div><span>Service:</span> ${escapeHtml(waitlistEntry.service || linkedBooking?.service || "N/A")}</div>
+				<div><span>Stylist:</span> ${escapeHtml(stylistLabel)}</div>
+				<div><span>Preferred Date:</span> ${escapeHtml(formatAdminDate(waitlistEntry.preferredDate || linkedBooking?.date || ""))}</div>
+				<div><span>Preferred Time:</span> ${escapeHtml(waitlistEntry.preferredTime || linkedBooking?.time || "N/A")}</div>
+				<div><span>Slot ID:</span> ${escapeHtml(waitlistEntry.preferredSlotId || linkedBooking?.preferredSlotId || "N/A")}</div>
+				<div><span>Email:</span> ${escapeHtml(waitlistEntry.email || linkedBooking?.email || "N/A")}</div>
+				<div><span>Phone:</span> ${escapeHtml(waitlistEntry.phone || linkedBooking?.phone || "N/A")}</div>
+				<div><span>Joined:</span> ${escapeHtml(formatAdminDate(waitlistEntry.createdAt))}</div>
+				<div><span>Updated:</span> ${escapeHtml(formatAdminDate(waitlistEntry.updatedAt))}</div>
+			</div>
+			<div class="admin-booking-special-request">
+				<span>Waitlist Notes:</span>
+				<p>${escapeHtml(notes)}</p>
+			</div>
+			<div class="admin-booking-inspiration">
+				<div><span>Inspiration Image:</span> ${inspirationImageUrl ? `<a href="${escapeHtml(inspirationImageUrl)}" target="_blank" rel="noopener">Open full image</a>` : "Not provided"}</div>
+				${
+					inspirationImageUrl
+						? `<a class="admin-booking-inspiration-link" href="${escapeHtml(inspirationImageUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(inspirationImageUrl)}" alt="Inspiration image for ${escapeHtml(customerName)}" class="admin-booking-inspiration-image" loading="lazy" decoding="async" fetchpriority="low" /></a>`
+						: ""
+				}
+			</div>
+			<div class="admin-booking-actions">
+				${waitlistActions}
+			</div>
+		</div>
+	`
+}
+
 function renderAdminBookings(docs) {
 	const list = document.getElementById("adminBookingsList")
 	if (!list) return
@@ -4449,9 +4717,11 @@ function renderAdminBookings(docs) {
 	const confirmed = normalizedDocs.filter(
 		(b) => b.status === "confirmed",
 	).length
-	const waitlisted = normalizedDocs.filter((b) =>
-		isAdminBookingVisibleInWaitlistFilter(b),
-	).length
+	const waitlisted =
+		Array.isArray(adminWaitlistDocs) && adminWaitlistDocs.length
+			? adminWaitlistDocs.length
+			: normalizedDocs.filter((b) => isAdminBookingVisibleInWaitlistFilter(b))
+					.length
 	const completed = normalizedDocs.filter(
 		(b) => b.status === "completed",
 	).length
@@ -4485,24 +4755,24 @@ function renderAdminBookings(docs) {
 		button.setAttribute("aria-pressed", isActive ? "true" : "false")
 	})
 
-	if (!normalizedDocs.length) {
+	const visibleDocs =
+		adminBookingStatusFilter === "all"
+			? normalizedDocs
+			: adminBookingStatusFilter === "waitlisted"
+				? buildAdminWaitlistFilterRows(normalizedDocs)
+				: normalizedDocs.filter((b) => b.status === adminBookingStatusFilter)
+
+	if (!normalizedDocs.length && !visibleDocs.length) {
 		list.innerHTML =
 			'<div class="admin-empty-state">No bookings yet. New bookings will appear in realtime.</div>'
 		renderAdminSchedule()
 		return
 	}
 
-	const visibleDocs =
-		adminBookingStatusFilter === "all"
-			? normalizedDocs
-			: adminBookingStatusFilter === "waitlisted"
-				? normalizedDocs.filter((b) => isAdminBookingVisibleInWaitlistFilter(b))
-				: normalizedDocs.filter((b) => b.status === adminBookingStatusFilter)
-
 	if (!visibleDocs.length) {
 		const emptyCopy =
 			adminBookingStatusFilter === "waitlisted"
-				? "No waitlisted bookings right now. Waitlisted entries will appear here separately from confirmed bookings."
+				? "No waitlist entries right now. Requests from the Waitlist tab will appear here too."
 				: "No confirmed bookings match this filter right now."
 		list.innerHTML = `<div class="admin-empty-state">${emptyCopy}</div>`
 		renderAdminSchedule()
@@ -4510,17 +4780,29 @@ function renderAdminBookings(docs) {
 	}
 
 	const sortedDocs = [...visibleDocs].sort((a, b) => {
-		const aUpdated = toTimestampMs(a.updatedAt)
-		const bUpdated = toTimestampMs(b.updatedAt)
+		const aUpdated = toTimestampMs(
+			a.__adminWaitlistEntry?.updatedAt || a.updatedAt,
+		)
+		const bUpdated = toTimestampMs(
+			b.__adminWaitlistEntry?.updatedAt || b.updatedAt,
+		)
 		if (aUpdated !== bUpdated) return bUpdated - aUpdated
 
-		const aCreated = toTimestampMs(a.createdAt)
-		const bCreated = toTimestampMs(b.createdAt)
+		const aCreated = toTimestampMs(
+			a.__adminWaitlistEntry?.createdAt || a.createdAt,
+		)
+		const bCreated = toTimestampMs(
+			b.__adminWaitlistEntry?.createdAt || b.createdAt,
+		)
 		return bCreated - aCreated
 	})
 
 	list.innerHTML = sortedDocs
 		.map((b) => {
+			if (b.__adminWaitlistFilterRecord) {
+				return renderAdminWaitlistBookingFilterCard(b)
+			}
+
 			const status = normalizeStatus(extractRawStatus(b))
 			const isWaitlisted = status === "waitlisted"
 			const linkedWaitlistEntry = isWaitlisted
@@ -6447,6 +6729,17 @@ function initializeAdminPanel() {
 	})
 
 	bookingList.addEventListener("click", async (event) => {
+		const waitlistActionBtn = event.target.closest(
+			"button[data-waitlist-action]",
+		)
+		if (waitlistActionBtn) {
+			await handleAdminWaitlistActionButton(
+				waitlistActionBtn,
+				"adminActionMessage",
+			)
+			return
+		}
+
 		const button = event.target.closest("button[data-action]")
 		if (!button || !adminUnlocked || !auth?.currentUser) return
 
@@ -6681,7 +6974,8 @@ function initializeAdminPanel() {
 					(item = {}) => String(item.id || "").trim() === bookingId,
 				) || null
 			const isWaitlistedScheduleBooking =
-				normalizeStatus(extractRawStatus(scheduleBooking || {})) === "waitlisted"
+				normalizeStatus(extractRawStatus(scheduleBooking || {})) ===
+				"waitlisted"
 
 			setAdminButtonLoadingState(button, true, {
 				loadingText: "Applying...",
@@ -7148,63 +7442,8 @@ function initializeAdminPanel() {
 	if (waitlistList) {
 		waitlistList.addEventListener("click", async (event) => {
 			const actionBtn = event.target.closest("button[data-waitlist-action]")
-			if (!actionBtn || !adminUnlocked || !auth?.currentUser) return
-
-			const action = actionBtn.dataset.waitlistAction
-			const waitlistId = actionBtn.dataset.id
-			if (!action || !waitlistId) return
-
-			setAdminButtonLoadingState(actionBtn, true, {
-				loadingText: "Applying...",
-			})
-
-			try {
-				if (action === "move-confirmed") {
-					const bookingId = String(actionBtn.dataset.bookingId || "").trim()
-					if (!bookingId) {
-						throw new Error(
-							"This waitlist row has no linked waitlisted booking yet.",
-						)
-					}
-					await callAdminMoveWaitlistBookingToConfirmedAction({
-						bookingId,
-						waitlistId,
-					})
-					setAdminMessage(
-						"success",
-						"✅ Waitlist request moved to confirmed booking and slot locked.",
-						"adminWaitlistMessage",
-					)
-				} else {
-					const updateResult = await updateWaitlistStatus(
-						waitlistId,
-						action,
-						String(actionBtn.dataset.bookingId || "").trim(),
-					)
-					const syncWarning =
-						updateResult?.linkedBookingSynced === false
-							? ` ⚠️ Waitlist status was saved, but linked booking sync needs attention: ${updateResult.linkedBookingError?.message || "unknown error"}`
-							: ""
-					const successMessage =
-						action === "booked"
-							? "✅ Waitlist request marked as booked/closed. This is a status-only update and does not lock a slot. Use Move to Confirmed when the preferred slot is available."
-							: `✅ Waitlist request marked as ${getWaitlistStatusLabel(action)}.`
-					setAdminMessage(
-						"success",
-						`${successMessage}${syncWarning}`,
-						"adminWaitlistMessage",
-					)
-				}
-			} catch (error) {
-				console.error("Waitlist action failed:", error)
-				setAdminMessage(
-					"error",
-					formatAdminWaitlistActionFailureMessage(error, action),
-					"adminWaitlistMessage",
-				)
-			} finally {
-				setAdminButtonLoadingState(actionBtn, false)
-			}
+			if (!actionBtn) return
+			await handleAdminWaitlistActionButton(actionBtn, "adminWaitlistMessage")
 		})
 	}
 
