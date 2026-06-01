@@ -3609,7 +3609,7 @@ function setDashboardPromptState() {
 	renderDashboardFavorites(
 		authUi.dashboardFavoritesList,
 		[],
-		"Log in to save favorite braid styles.",
+		"Log in to save favorite gallery styles.",
 	)
 	if (authUi.dashboardFavoritesCount)
 		authUi.dashboardFavoritesCount.textContent = "0"
@@ -4626,6 +4626,21 @@ function getFavoritePayload(style = {}) {
 	}
 }
 
+function getFavoriteLoginPrompt(style = {}) {
+	const directLabel = String(style.serviceLabel || "").trim()
+	const categoryLabel = String(
+		style.serviceCategory ? getGalleryServiceLabel(style.serviceCategory) : "",
+	).trim()
+	const label = directLabel || categoryLabel || "gallery"
+	const categoryText = label
+		.replace(/\s+services$/i, "")
+		.trim()
+		.toLowerCase()
+		.replace(/s$/, "")
+
+	return `🔐 Log in to save favorite ${categoryText || "gallery"} styles.`
+}
+
 async function toggleFavoriteStyle(style = {}, sourceButton = null) {
 	if (!firebaseReady || !db || !auth) return
 
@@ -4634,7 +4649,7 @@ async function toggleFavoriteStyle(style = {}, sourceButton = null) {
 		shouldAutoFocusDashboardAfterAuth = true
 		openAuthModal("signin")
 		if (authUi.message) {
-			showTimedAuthMessage("error", "🔐 Log in to save favorite braid styles.")
+			showTimedAuthMessage("error", getFavoriteLoginPrompt(style))
 		}
 		return
 	}
