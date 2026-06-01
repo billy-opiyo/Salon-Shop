@@ -79,15 +79,19 @@ The Firestore emulator is configured on port `18080` to avoid common local confl
 - Public services/category rendering and “Book This Service” prefill behavior.
 - Public contact links and contact form submission flow through a Firebase browser mock.
 - Public feature coverage for theme persistence, review login gating, review sorting, and blog carousel/expand controls.
+- Public account feature coverage for email signup, dashboard unlock, authenticated review submission, and gallery favorite login/save behavior.
 - Public mobile/tablet responsive checks across important customer-facing sections.
 - Admin login page smoke test.
 - Admin login success flow that unlocks the dashboard and renders booking statistics through a Firebase browser mock.
+- Admin feature coverage for review moderation writes, contact-message status updates, waitlist queue rendering, security-only permission gating, security metrics, alert rendering, and security filters.
 - Admin mobile responsive check.
 - Firestore rules tests for public/private reads, owner profile writes, admin records, security alerts, and login activity.
 - Firestore rules tests for client booking writes, booking slot locks, and contact message writes in the Firebase emulator.
 - Firestore rules tests for waitlist ownership/admin boundaries, review visibility/submission constraints, and per-user gallery favorites.
+- Firestore rules tests for cooldown enforcement, owner/admin booking status transitions, booking-slot deletes, content-admin writes, contact inbox protection, and user-session collection-group visibility.
 - Client config unit tests.
-- Functions config Jest test.
+- Client catalog consistency and public contact/media config unit tests.
+- Functions config and waitlist action-message Jest tests.
 
 These are intentionally safe starter tests. They do not submit real bookings or write to production Firebase.
 
@@ -97,3 +101,12 @@ The Firestore rules tests use the Firebase Emulator Suite to verify the real
 security rules that protect booking/contact writes.
 
 The Playwright smoke tests block external network requests so they do not depend on Google Fonts, CDN assets, Firebase Auth iframes, or live production Firebase during local/CI smoke testing.
+
+## Coverage map
+
+Use this checklist when adding new features so automated coverage stays balanced:
+
+- **Public E2E:** customer navigation, booking/waitlist, auth/dashboard, reviews, favorites, contact, blog/gallery/service rendering, and responsive layout.
+- **Admin E2E:** admin auth/permissions, booking lifecycle, schedule, content management, review moderation, contact inbox, waitlist queue actions, services settings, admin delegation, and security dashboards.
+- **Firestore rules:** public read boundaries, authenticated owner CRUD, admin permission boundaries, rate limits, server-managed collections, status transitions, and collection-group reads.
+- **Unit/Functions:** white-label config integrity, reusable pure helpers, message builders, and Cloud Function-adjacent pure modules that can be tested without network or production Firebase access.

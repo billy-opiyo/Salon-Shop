@@ -6,7 +6,15 @@ const {
 	assertSucceeds,
 	initializeTestEnvironment,
 } = require("@firebase/rules-unit-testing")
-const { doc, getDoc, setDoc, updateDoc } = require("firebase/firestore")
+const {
+	collectionGroup,
+	deleteDoc,
+	doc,
+	getDoc,
+	getDocs,
+	setDoc,
+	updateDoc,
+} = require("firebase/firestore")
 
 let testEnv
 
@@ -149,6 +157,44 @@ describe("Firestore security rules", () => {
 		)
 	})
 
+	it("enforces review and contact submission cooldown documents", async () => {
+		await seedDoc("rateLimits/client-a", {
+			reviewCooldownUntil: new Date(Date.now() + 60 * 60 * 1000),
+			contactCooldownUntil: new Date(Date.now() + 60 * 60 * 1000),
+		})
+
+		const clientDb = authedDb("client-a")
+
+		await assertFails(
+			setDoc(doc(clientDb, "reviews/rate-limited-review"), {
+				name: "Client A",
+				text: "This valid review should be blocked by cooldown.",
+				rating: 5,
+				source: "Website",
+				status: "pending",
+				featured: false,
+				adminReply: "",
+				reportsCount: 0,
+				uid: "client-a",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			}),
+		)
+
+		await assertFails(
+			setDoc(doc(clientDb, "contactMessages/rate-limited-contact"), {
+				name: "Client A",
+				email: "client-a@example.com",
+				subject: "Cooldown check",
+				message: "This valid message should be blocked by cooldown.",
+				status: "new",
+				uid: "client-a",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			}),
+		)
+	})
+
 	it("allows users to create only their own profile document", async () => {
 		const clientDb = authedDb("client-a")
 		const validProfile = {
@@ -193,6 +239,98 @@ describe("Firestore security rules", () => {
 		)
 	})
 
+	it("allows owners to cancel active bookings but blocks invalid owner status changes", async () => {
+		await seedDoc("bookings/active-booking", {
+			uid: "client-a",
+			email: "client-a@example.com",
+			status: "confirmed",
+			date: "2099-05-01",
+			time: "10:00 AM",
+			slotId: "2099-05-01__fatima__1000AM",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		})
+		await seedDoc("bookings/completed-booking", {
+			uid: "client-a",
+			email: "client-a@example.com",
+			status: "completed",
+			date: "2099-05-02",
+			time: "11:00 AM",
+			slotId: "2099-05-02__fatima__1100AM",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		})
+
+		const ownerDb = authedDb("client-a")
+		const otherClientDb = authedDb("client-b")
+
+		await assertSucceeds(
+			updateDoc(doc(ownerDb, "bookings/active-booking"), {
+				status: "cancelled",
+				uid: "client-a",
+				updatedAt: new Date(),
+			}),
+		)
+		await assertFails(
+			updateDoc(doc(ownerDb, "bookings/completed-booking"), {
+				status: "cancelled",
+				uid: "client-a",
+				updatedAt: new Date(),
+			}),
+		)
+		await assertFails(
+			updateDoc(doc(otherClientDb, "bookings/completed-booking"), {
+				status: "cancelled",
+				uid: "client-b",
+				updatedAt: new Date(),
+			}),
+		)
+	})
+
+	it("allows booking admins to perform valid booking transitions only", async () => {
+		await seedDoc("adminUsers/bookings-admin", {
+			active: true,
+			role: "admin",
+			permissions: { canManageBookings: true },
+		})
+		await seedDoc("adminUsers/content-admin", {
+			active: true,
+			role: "admin",
+			permissions: { canManageContent: true },
+		})
+		await seedDoc("bookings/admin-transition-booking", {
+			uid: "client-a",
+			email: "client-a@example.com",
+			status: "pending",
+			date: "2099-05-03",
+			time: "12:00 PM",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		})
+
+		const bookingsAdminDb = authedDb("bookings-admin")
+		const contentAdminDb = authedDb("content-admin")
+
+		await assertSucceeds(
+			updateDoc(doc(bookingsAdminDb, "bookings/admin-transition-booking"), {
+				status: "confirmed",
+				updatedAt: new Date(),
+			}),
+		)
+		await assertFails(
+			updateDoc(doc(bookingsAdminDb, "bookings/admin-transition-booking"), {
+				status: "pending",
+				updatedAt: new Date(),
+			}),
+		)
+		await assertFails(
+			updateDoc(doc(contentAdminDb, "bookings/admin-transition-booking"), {
+				status: "completed",
+				updatedAt: new Date(),
+			}),
+		)
+	})
+
 	it("allows security admins, but not normal clients, to read security alerts", async () => {
 		await seedDoc("adminUsers/security-admin", {
 			active: true,
@@ -229,6 +367,37 @@ describe("Firestore security rules", () => {
 				status: "success",
 				createdAt: new Date(),
 			}),
+		)
+	})
+
+	it("keeps booking slots publicly readable while protecting slot ownership deletes", async () => {
+		await seedDoc("bookingSlots/slot-owner", {
+			taken: true,
+			date: "2099-05-04",
+			time: "9:00 AM",
+			stylistKey: "fatima",
+			bookingId: "booking-owner",
+			uid: "client-a",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		})
+		await seedDoc("bookingSlots/slot-other", {
+			taken: true,
+			date: "2099-05-04",
+			time: "10:00 AM",
+			stylistKey: "fatima",
+			bookingId: "booking-other",
+			uid: "client-b",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		})
+
+		await assertSucceeds(getDoc(doc(publicDb(), "bookingSlots/slot-owner")))
+		await assertFails(
+			deleteDoc(doc(authedDb("client-a"), "bookingSlots/slot-other")),
+		)
+		await assertSucceeds(
+			deleteDoc(doc(authedDb("client-a"), "bookingSlots/slot-owner")),
 		)
 	})
 
@@ -448,6 +617,94 @@ describe("Firestore security rules", () => {
 		await assertSucceeds(getDoc(doc(ownerDb, "users/client-a/favorites/fav-1")))
 		await assertFails(
 			getDoc(doc(authedDb("client-b"), "users/client-a/favorites/fav-1")),
+		)
+	})
+
+	it("allows content admins to manage public content and contact statuses", async () => {
+		await seedDoc("adminUsers/content-admin", {
+			active: true,
+			role: "admin",
+			permissions: { canManageContent: true },
+		})
+		await seedDoc("contactMessages/message-1", {
+			name: "Client A",
+			email: "client-a@example.com",
+			subject: "Question",
+			message: "Can I book tomorrow?",
+			status: "new",
+			uid: "client-a",
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		})
+
+		const contentAdminDb = authedDb("content-admin")
+		const clientDb = authedDb("client-a")
+
+		await assertSucceeds(
+			setDoc(doc(contentAdminDb, "galleryStyles/style-admin"), {
+				styleName: "Admin Style",
+				status: "published",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			}),
+		)
+		await assertSucceeds(
+			setDoc(doc(contentAdminDb, "blogs/blog-admin"), {
+				title: "Admin Blog",
+				excerpt: "Admin-managed content",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			}),
+		)
+		await assertSucceeds(
+			updateDoc(doc(contentAdminDb, "contactMessages/message-1"), {
+				status: "read",
+				updatedAt: new Date(),
+			}),
+		)
+		await assertFails(
+			setDoc(doc(clientDb, "galleryStyles/client-style"), {
+				styleName: "Client Style",
+			}),
+		)
+		await assertFails(getDoc(doc(clientDb, "contactMessages/message-1")))
+	})
+
+	it("enforces user session ownership and collection-group security visibility", async () => {
+		await seedDoc("adminUsers/security-admin", {
+			active: true,
+			role: "admin",
+			permissions: { canManageSecurity: true },
+		})
+
+		const ownerDb = authedDb("client-a")
+		const otherClientDb = authedDb("client-b")
+		const securityAdminDb = authedDb("security-admin")
+
+		await assertSucceeds(
+			setDoc(doc(ownerDb, "userSessions/client-a/sessions/session-1"), {
+				uid: "client-a",
+				status: "online",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			}),
+		)
+		await assertFails(
+			setDoc(doc(otherClientDb, "userSessions/client-a/sessions/session-2"), {
+				uid: "client-a",
+				status: "online",
+				createdAt: new Date(),
+				updatedAt: new Date(),
+			}),
+		)
+		await assertSucceeds(
+			getDoc(doc(ownerDb, "userSessions/client-a/sessions/session-1")),
+		)
+		await assertFails(
+			getDocs(collectionGroup(ownerDb, "sessions")),
+		)
+		await assertSucceeds(
+			getDocs(collectionGroup(securityAdminDb, "sessions")),
 		)
 	})
 

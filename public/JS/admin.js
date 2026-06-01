@@ -2269,6 +2269,13 @@ function normalizeSecurityDeviceType(deviceType = "") {
 	return "Unknown"
 }
 
+function getSecurityRiskLevelFromScore(riskScore = 0) {
+	const score = Math.max(0, Math.min(100, Number(riskScore || 0)))
+	if (score >= 60) return "high"
+	if (score >= 25) return "medium"
+	return "low"
+}
+
 function normalizeSecurityDoc(doc = {}) {
 	const status = normalizeSecurityStatus(doc.status)
 	const methodRaw = String(doc.method || "")
@@ -2297,12 +2304,12 @@ function normalizeSecurityDoc(doc = {}) {
 	const failedAttemptsIn5m = Math.max(0, Number(doc.failedAttemptsIn5m || 0))
 	const failedAttemptsIn15m = Math.max(0, Number(doc.failedAttemptsIn15m || 0))
 	const riskScore = Math.max(0, Math.min(100, Number(doc.riskScore || 0)))
-	const riskLevelRaw = String(doc.riskLevel || "low")
+	const riskLevelRaw = String(doc.riskLevel || "")
 		.trim()
 		.toLowerCase()
 	const riskLevel = ["low", "medium", "high"].includes(riskLevelRaw)
 		? riskLevelRaw
-		: "low"
+		: getSecurityRiskLevelFromScore(riskScore)
 	const riskReasons = Array.isArray(doc.riskReasons)
 		? doc.riskReasons.map((entry) => String(entry || "").trim()).filter(Boolean)
 		: []
@@ -2338,7 +2345,15 @@ function normalizeSecurityDoc(doc = {}) {
 		riskScore,
 		riskLevel,
 		riskReasons,
-		trustScore: Math.max(0, Math.min(100, Number(doc.trustScore || 0))),
+		trustScore: Math.max(
+			0,
+			Math.min(
+				100,
+				doc.trustScore === undefined || doc.trustScore === null
+					? 100 - riskScore
+					: Number(doc.trustScore || 0),
+			),
+		),
 		isSuspicious,
 		suspiciousFlags,
 		createdAt: doc.createdAt || null,
@@ -2992,6 +3007,13 @@ function renderAdminSecurityActivities(docs = []) {
 					.map((item) => {
 						const userLabel =
 							item.displayName || item.email || item.uid || "Unknown user"
+						const userEmail = String(
+							item.email || item.attemptedEmail || "",
+						).trim()
+						const userEmailHtml =
+							userEmail && userEmail !== userLabel
+								? `<div class="admin-booking-id">${escapeHtml(userEmail)}</div>`
+								: ""
 						const statusClass =
 							item.status === "success"
 								? "admin-status-completed"
@@ -3029,7 +3051,7 @@ function renderAdminSecurityActivities(docs = []) {
 
 						return `
 							<tr class="admin-security-row-main">
-								<td>${escapeHtml(userLabel)}</td>
+								<td><div>${escapeHtml(userLabel)}</div>${userEmailHtml}</td>
 								<td>${escapeHtml(item.method)}</td>
 								<td>${escapeHtml(`${item.deviceType} ${item.browser}`)}</td>
 								<td>${escapeHtml(item.locationLabel)}</td>

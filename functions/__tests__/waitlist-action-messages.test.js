@@ -26,4 +26,26 @@ describe("waitlist action messages", () => {
 			waitlistBookingId: "waitlisted-1",
 		})
 	})
+
+	it("normalizes missing waitlist slot detail values", () => {
+		expect(buildWaitlistSlotOccupiedDetails()).toEqual({
+			reason: WAITLIST_SLOT_OCCUPIED_REASON,
+			slotId: "",
+			currentBookingId: "",
+			waitlistBookingId: "",
+		})
+
+		expect(
+			buildWaitlistSlotOccupiedDetails({
+				slotId: null,
+				currentBookingId: 42,
+				waitlistBookingId: undefined,
+			}),
+		).toMatchObject({
+			reason: WAITLIST_SLOT_OCCUPIED_REASON,
+			slotId: "",
+			currentBookingId: "42",
+			waitlistBookingId: "",
+		})
+	})
 })

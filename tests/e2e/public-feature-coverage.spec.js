@@ -11,6 +11,27 @@ async function openPublicPageWithFirebaseMock(page, mockOptions = {}) {
 	return pageErrors
 }
 
+async function signUpPublicUser(
+	page,
+	{
+		name = "E2E Customer",
+		email = "public.user@example.com",
+		password = "StrongPass123",
+	} = {},
+) {
+	await page.locator("#openAuthModalBtn").click()
+	await expect(page.locator("#authModal")).toHaveClass(/active/)
+	await page.locator("#switchToSignupBtn").click()
+	await expect(page.locator("#authNameGroup")).toBeVisible()
+	await page.locator("#authName").fill(name)
+	await page.locator("#authEmail").fill(email)
+	await page.locator("#authPassword").fill(password)
+	await page.locator("#emailAuthSubmit").click()
+
+	await expect(page.locator("#clientDashboard")).not.toHaveClass(/hidden/)
+	await expect(page.locator("#dashboardProfileEmail")).toHaveText(email)
+}
+
 test.describe("public feature coverage", () => {
 	test("dark mode toggle persists selection across reload", async ({ page }) => {
 		const pageErrors = await openPublicPageWithFirebaseMock(page)
@@ -68,6 +89,112 @@ test.describe("public feature coverage", () => {
 		await page.locator("#viewLessBlogsBtn").click()
 		await expect(page.locator("#viewLessBlogsBtn")).toHaveClass(/hidden/)
 
+		expect(pageErrors).toEqual([])
+	})
+
+	test("email signup unlocks dashboard and authenticated review submission", async ({
+		page,
+	}) => {
+		const pageErrors = await openPublicPageWithFirebaseMock(page, {
+			emailPasswordUid: "review-client-uid",
+			emailPasswordDisplayName: "Review Client",
+		})
+
+		await signUpPublicUser(page, {
+			name: "Review Client",
+			email: "review.client@example.com",
+		})
+
+		await expect(page.locator("#reviewSubmitAuthGate")).toHaveClass(/hidden/)
+		await expect(page.locator("#reviewSubmitWrap")).not.toHaveClass(/hidden/)
+
+		await page.locator('a[href="#testimonials"]').first().click()
+		await page.locator("#reviewName").fill("Review Client")
+		await page.locator("#reviewRating").selectOption("5")
+		await page.locator("#reviewService").selectOption("Knotless Braids")
+		await page
+			.locator("#reviewText")
+			.fill("This public E2E review verifies authenticated submissions.")
+		await page.locator("#submitReviewBtn").click()
+
+		await expect(page.locator("#reviewMessage")).toContainText(
+			/pending approval/i,
+		)
+
+		const state = await page.evaluate(() => window.__firebaseMockState)
+		const reviews = Object.values(state.collections.reviews || {})
+		const users = Object.values(state.collections.users || {})
+
+		expect(state.auth.createUserCalls).toHaveLength(1)
+		expect(users).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					displayName: "Review Client",
+					email: "review.client@example.com",
+				}),
+			]),
+		)
+		expect(reviews).toHaveLength(1)
+		expect(reviews[0]).toMatchObject({
+			name: "Review Client",
+			rating: 5,
+			service: "Knotless Braids",
+			status: "pending",
+			featured: false,
+			uid: "review-client-uid",
+		})
+		expect(pageErrors).toEqual([])
+	})
+
+	test("gallery favorites require login and save to the signed-in dashboard", async ({
+		page,
+	}) => {
+		const pageErrors = await openPublicPageWithFirebaseMock(page, {
+			emailPasswordUid: "favorite-client-uid",
+			emailPasswordDisplayName: "Favorite Client",
+		})
+
+		await expect
+			.poll(async () => page.locator("#galleryGrid .gallery-save-favorite-btn").count())
+			.toBeGreaterThan(0)
+
+		await page.locator("#galleryGrid .gallery-save-favorite-btn").first().click()
+		await expect(page.locator("#authModal")).toHaveClass(/active/)
+		await expect(page.locator("#authMessage")).toContainText(
+			/Log in to save/i,
+		)
+
+		await page.locator("#switchToSignupBtn").click()
+		await page.locator("#authName").fill("Favorite Client")
+		await page.locator("#authEmail").fill("favorite.client@example.com")
+		await page.locator("#authPassword").fill("StrongPass123")
+		await page.locator("#emailAuthSubmit").click()
+		await expect(page.locator("#clientDashboard")).not.toHaveClass(/hidden/)
+		if (await page.locator("#lightbox").evaluate((el) => el.classList.contains("active"))) {
+			await page.locator("#lightboxClose").click()
+			await expect(page.locator("#lightbox")).not.toHaveClass(/active/)
+		}
+
+		const favoriteButton = page
+			.locator("#galleryGrid .gallery-save-favorite-btn")
+			.first()
+		await favoriteButton.click()
+		await expect(page.locator("#favoritesToast")).toContainText(/Saved/i)
+
+		const favorites = await page.evaluate(() =>
+			Object.values(
+				window.__firebaseMockState.collections[
+					"users/favorite-client-uid/favorites"
+				] || {},
+			),
+		)
+
+		expect(favorites).toHaveLength(1)
+		expect(favorites[0]).toMatchObject({
+			styleName: expect.any(String),
+			styleType: expect.any(String),
+			imageUrl: expect.any(String),
+		})
 		expect(pageErrors).toEqual([])
 	})
 })

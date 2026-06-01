@@ -39,4 +39,28 @@ describe("client-config.js", () => {
 		expect(Array.isArray(services)).toBe(true)
 		expect(services.length).toBeGreaterThan(0)
 	})
+
+	it("keeps service catalog references internally consistent", () => {
+		const window = loadClientConfig()
+		const { serviceCategories, services, stylists } = window.CLIENT_CONFIG.catalog
+		const categoryKeys = new Set(serviceCategories.map((item) => item.key))
+		const stylistKeys = new Set(stylists.map((item) => item.key))
+
+		expect(categoryKeys.size).toBe(serviceCategories.length)
+		expect(stylistKeys.size).toBe(stylists.length)
+		for (const service of services) {
+			expect(categoryKeys.has(service.category)).toBe(true)
+			expect(service.name.trim()).not.toBe("")
+		}
+	})
+
+	it("exposes public contact and media configuration safely", () => {
+		const window = loadClientConfig()
+		const { contact, media, social } = window.CLIENT_CONFIG
+
+		expect(contact.phonePrimaryHref).toMatch(/^tel:\+?\d+/)
+		expect(social.whatsapp).toMatch(/^https:\/\/wa\.me\//)
+		expect(contact.emailPrimary).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
+		expect(media.galleryFolder).toMatch(/^[a-z0-9-]+\/gallery$/)
+	})
 })
