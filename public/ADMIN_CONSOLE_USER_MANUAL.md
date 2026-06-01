@@ -207,7 +207,10 @@ At the top of the tab, the dashboard shows counters:
 Filter buttons allow you to change which bookings appear in the list:
 
 - **All Bookings** - shows all loaded bookings
+- **Pending** - shows bookings awaiting admin action
 - **Confirmed** - shows only confirmed bookings
+- **Completed** - shows finished appointment records
+- **Cancelled** - shows cancelled appointment records
 - **Waitlisted Only** - shows active waitlisted bookings separately from confirmed bookings
 
 Use **Waitlisted Only** when you want to focus on clients who are waiting for an unavailable slot.
@@ -927,7 +930,7 @@ Counters show:
 
 Use **Sort Messages**:
 
-- **Newely Added** - newest/most recently updated first
+- **Newely Added** - newest/most recently updated first. This is the current UI label and should be read as "Newly Added".
 - **Old** - oldest first
 - **New Status First** - `new`, then `read`, then `resolved`
 - **Unresolved First** - unresolved messages before resolved messages
@@ -1142,6 +1145,15 @@ Common examples:
 5. Click **Update Admin**.
 6. Click **Cancel Edit** to leave edit mode.
 
+Existing admin record cards can show:
+
+- Display name, email, and UID
+- Active/inactive status badge
+- Role badge
+- Permission summary for admin, booking, content, and security access
+- **Edit** action
+- **Enabled** / **Disabled** account access toggle, when the current Super Admin is allowed to change it
+
 ### 12.6 Searching and Filtering Admins
 
 Use:
@@ -1158,6 +1170,7 @@ Rules:
 
 - Only Super Admins can enable/disable admin accounts.
 - A Super Admin cannot disable their own account from the toggle.
+- Toggles that cannot be changed are disabled and may show a tooltip explaining why.
 - Disabling an admin prevents that account from accessing the panel.
 - There is no ordinary delete button; disable access instead of deleting records.
 
@@ -1307,6 +1320,8 @@ Search by:
 - UID
 - Log ID / booking-related ID if present in the log metadata
 
+Note: the visible search placeholder is **Email, Username, or Booking ID**, but the runtime search also checks UID and log/activity IDs where those values are present.
+
 #### Clear All Filters
 
 Resets all filters to defaults and refreshes the visible table.
@@ -1343,6 +1358,7 @@ Exports include columns such as:
 Important:
 
 - Export respects the current filters.
+- Export uses the currently visible login activity rows after sort, risk, provider, date, device, user, country, status, and search filters are applied.
 - If no rows are visible, the console shows an error instead of downloading a file.
 
 ### 13.7 Login Activity Table
@@ -1380,6 +1396,8 @@ Suspicious flags can include repeated failures, rapid login patterns, or other b
 ### 13.8 Per-User Security Actions
 
 Security actions appear only when a login activity row is linked to a known user UID.
+
+Rows without a linked UID show a no-linked-account message instead of incident-response buttons.
 
 #### Temp Block
 
@@ -1816,4 +1834,4 @@ Ask the affected admin to:
 
 ---
 
-**Manual status:** This guide reflects the Admin Console implemented in `public/admin.html` and `public/JS/admin.js` at the time of writing.
+**Manual status:** This guide was reviewed against the current Admin Console structure and behavior implemented in `public/admin.html` and `public/JS/admin.js`.
