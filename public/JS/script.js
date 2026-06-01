@@ -4638,7 +4638,7 @@ function getFavoriteLoginPrompt(style = {}) {
 		.toLowerCase()
 		.replace(/s$/, "")
 
-	return `🔐 Log in to save favorite ${categoryText || "gallery"} styles.`
+	return `🔐 Log in to save this ${categoryText || "gallery"} style.`
 }
 
 async function toggleFavoriteStyle(style = {}, sourceButton = null) {
