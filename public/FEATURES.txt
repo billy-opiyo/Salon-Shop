@@ -13,6 +13,15 @@ Project Overview
 Public Website Features
 -----------------------
 - Responsive Royal Braids homepage.
+- Branded public splash screen before the main website reveal.
+- Splash screen hero-image background with Royal Braids welcome copy.
+- Splash screen handwriting-style Royal Braids title animation.
+- Splash loading progress bar with percent text and ARIA progressbar semantics.
+- Splash duration configuration through data-splash-duration or window.ROYAL_BRAIDS_SPLASH_DURATION_MS.
+- Reduced-motion splash duration fallback for users who prefer reduced motion.
+- Splash completion event support through royalBraids:splashComplete.
+- Runtime splash controls through window.royalBraidsSplash.complete() and window.royalBraidsSplash.reveal().
+- Scroll-to-top reset while the splash is active on non-hash page loads.
 - Premium salon branding with hero section, rotating logo, calls to action, and salon contact/location details.
 - Dark mode toggle.
 - Mobile navigation menu.
@@ -384,6 +393,10 @@ Admin Messages Features
 - Messages/contact inbox tab.
 - Realtime contact messages list.
 - Message counters for total, new, read, and resolved.
+- Message status filter controls for New, Read, and Resolved.
+- Message filter active state uses aria-pressed for accessible state reporting.
+- Clicking the active status filter toggles back to all messages.
+- Filtered empty-state copy explains when no messages match the selected status.
 - Message sorting controls:
   - Newest
   - Oldest
@@ -604,9 +617,9 @@ Deployment and QA Features
 - Hosting deployment support.
 - Public and admin pages can be tested locally/static or through Firebase Hosting.
 - README includes manual end-to-end QA guide.
-- QA scenarios cover public site, auth/dashboard, booking/slot locking, waitlist, reviews/moderation, contact/messages, admin content, backend automation, security tab, service-category visibility, login-history, and admin delegation.
+- QA scenarios cover public splash/site, auth/dashboard, booking/slot locking, waitlist, reviews/moderation, contact/message filters, admin content, backend automation, security tab, service-category visibility, login-history, and admin delegation.
 - QA guide includes very-small-screen chip/badge visual regression checks at 490px, 390px, and 360px widths.
-- functions/package.json currently has placeholder test script, so manual QA is the active test approach.
+- Automated coverage includes JavaScript syntax checks, Vitest unit tests, Firestore Rules emulator tests, Playwright E2E tests, and Functions Jest tests.
 
 Project Documentation Features
 ------------------------------

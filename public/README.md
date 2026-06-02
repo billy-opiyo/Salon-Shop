@@ -2,9 +2,9 @@
 
 Production-ready Firebase salon platform for **Royal Braids** with:
 
-- Public website (`public/index.html`) for services, gallery, booking, reviews, blog, and contact
+- Public website (`public/index.html`) with branded splash screen, services, gallery, booking, reviews, blog, and contact
 - Client authentication + personal dashboard (appointments, reviews, favorites, account settings)
-- Admin console (`public/admin.html`) for bookings, schedule view, waitlist, gallery, blogs, reviews, messages, service visibility, security monitoring, and admin-user delegation
+- Admin console (`public/admin.html`) for bookings, schedule view, waitlist, gallery, blogs, reviews, filtered messages, service visibility, security monitoring, and admin-user delegation
 - Firestore realtime data pipelines
 - Cloud Functions automation for email + WhatsApp booking notifications and waitlist alerts
 
@@ -45,6 +45,9 @@ This project is built to:
 
 ## 2. Latest Project Changes (Current State)
 
+- Added **branded public splash screen**:
+  - 10-second Royal Braids welcome overlay with hero imagery, handwriting title animation, loading copy, and accessible progressbar semantics
+  - Reduced-motion duration fallback, scroll-to-top reset on fresh visits, completion event dispatch, and `window.royalBraidsSplash` runtime controls for safe testing/manual completion
 - Added/expanded **Client Dashboard self-service**:
   - Client-side booking reschedule flow with slot re-locking
   - Client-side booking cancellation flow
@@ -70,6 +73,7 @@ This project is built to:
   - `Complete + Release Slot` and `Cancel + Release Slot` now use protected backend callable slot-release handling
   - Waitlisted bookings must be moved to confirmed first, or cancelled from Waitlist, so linked waitlist records remain synchronized
   - Admin realtime listeners now start only for sections covered by the signed-in admin's permissions
+  - Messages tab now has status filter chips for New, Read, and Resolved messages with active-state and empty-result feedback
   - Existing CRUD/moderation modules maintained for gallery, blogs, reviews, and messages
 - Added **Service Category Visibility Management**:
   - New **Services** tab in admin console for category ON/OFF controls
@@ -102,6 +106,7 @@ This project is built to:
 
 - HTML + CSS + Vanilla JavaScript
 - Public script: `public/JS/script.js`
+- Splash controller: `public/JS/splash.js`
 - Admin script: `public/JS/admin.js`
 
 ### Firebase
@@ -137,6 +142,7 @@ This project is built to:
     ├── admin.html
     ├── README.md
     ├── CSS/style.css
+    ├── JS/splash.js
     ├── JS/script.js
     ├── JS/admin.js
     └── IMG/
@@ -148,10 +154,11 @@ This project is built to:
 
 ### Public App (`index.html` + `script.js`)
 
-1. Initializes Firebase/Auth/Firestore/App Check.
-2. Renders fallback datasets first.
-3. Starts realtime listeners for gallery/blog/reviews and slot availability.
-4. Handles booking, waitlist fallback, reviews, favorites, contact, and account workflows.
+1. Runs the `splash.js` branded welcome overlay before revealing the main site shell.
+2. Initializes Firebase/Auth/Firestore/App Check.
+3. Renders fallback datasets first.
+4. Starts realtime listeners for gallery/blog/reviews and slot availability.
+5. Handles booking, waitlist fallback, reviews, favorites, contact, and account workflows.
 
 ### Client Dashboard Runtime
 
@@ -178,6 +185,14 @@ This project is built to:
 ---
 
 ## 6. Public-Site Features
+
+### Splash / Welcome Experience
+
+- Branded Royal Braids splash overlay with hero image background and handwriting-style title animation
+- Accessible loading status/progressbar (`role="status"` + `role="progressbar"`) with percent text/fill updates
+- Configurable duration through `data-splash-duration` or `window.ROYAL_BRAIDS_SPLASH_DURATION_MS`
+- Reduced-motion fallback duration for users who prefer reduced animation
+- Completion API/event (`window.royalBraidsSplash.complete()` and `royalBraids:splashComplete`) for testing and controlled reveal behavior
 
 ### Services
 
@@ -300,6 +315,7 @@ This project is built to:
 ### Messages
 
 - Realtime inbox + status stats
+- Status filter chips for New, Read, and Resolved messages with accessible pressed states and all-message toggle behavior
 - Sort modes (newest/oldest/status/name)
 - Status transitions: `new`, `read`, `resolved`
 
@@ -515,7 +531,7 @@ Deploy specific components:
 
 Use this section as the project QA checklist for releases, Firebase deployments, and feature regressions.
 
-> **Current status:** this project currently relies on manual end-to-end QA, Firebase Console checks, browser-console review, and Cloud Functions logs. The `functions/package.json` `npm test` script is still a placeholder, so do **not** treat `npm test` as an automated test suite until real tests are added.
+> **Current status:** this project includes automated JavaScript syntax checks, Vitest unit tests, Firestore Rules emulator tests, Playwright E2E coverage, and Functions Jest tests. Manual Firebase Console checks, browser-console review, and Cloud Functions logs are still recommended for production integrations such as real email/WhatsApp delivery.
 
 ### Testing environments
 
@@ -555,6 +571,7 @@ Use the following scenarios to confirm all major features are working.
 ### A) Public website smoke test
 
 1. Open `index.html` (or deployed site) and verify:
+   - The Royal Braids splash screen appears, progresses, then reveals the main website without leaving the page scrolled away from the top.
    - Hero, Services, Gallery, Reviews, Blog, and Contact sections render.
    - Dark mode toggle works.
    - At <=490px viewport width, service tabs, gallery filter chips, feature pills, waitlist badges, review/auth badges, and dashboard count badges stay compact/readable without clipping.
@@ -637,6 +654,7 @@ Use this to verify the current **Admin → Waitlist** queue after creating at le
 1. Submit contact form.
 2. Verify document created in `contactMessages` with `status: "new"`.
 3. In admin panel → **Messages**:
+   - Use New, Read, and Resolved status filter chips and confirm the list shows only matching messages.
    - Sort list.
    - Move status new → read → resolved.
    - Delete one message.

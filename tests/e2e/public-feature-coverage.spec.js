@@ -5,6 +5,9 @@ const { watchForUnexpectedPageErrors } = require("./helpers/page-errors")
 
 async function openPublicPageWithFirebaseMock(page, mockOptions = {}) {
 	await installFirebaseMock(page, mockOptions)
+	await page.addInitScript((durationMs) => {
+		window.ROYAL_BRAIDS_SPLASH_DURATION_MS = durationMs
+	}, mockOptions.splashDurationMs ?? 0)
 	await blockExternalNetwork(page)
 	const pageErrors = watchForUnexpectedPageErrors(page)
 	await page.goto("/", { waitUntil: "domcontentloaded" })
@@ -33,6 +36,55 @@ async function signUpPublicUser(
 }
 
 test.describe("public feature coverage", () => {
+	test("splash screen exposes progress semantics and completes cleanly", async ({
+		page,
+	}) => {
+		const pageErrors = await openPublicPageWithFirebaseMock(page, {
+			splashDurationMs: 100000,
+		})
+
+		const splash = page.locator("#siteSplash")
+		const progress = page.locator(".splash-progress")
+
+		await expect(splash).toBeVisible()
+		await expect(splash).toHaveAttribute("role", "status")
+		await expect(splash).toHaveAttribute(
+			"aria-label",
+			"Royal Braids website loading",
+		)
+		await expect(progress).toHaveAttribute("role", "progressbar")
+		await expect(progress).toHaveAttribute("aria-valuemin", "1")
+		await expect(progress).toHaveAttribute("aria-valuemax", "100")
+		await expect(page.locator("body")).toHaveClass(/splash-active/)
+
+		await expect
+			.poll(() =>
+				page.evaluate(() => typeof window.royalBraidsSplash?.complete),
+			)
+			.toBe("function")
+
+		const completionDetail = await page.evaluate(
+			() =>
+				new Promise((resolve) => {
+					document.addEventListener(
+						"royalBraids:splashComplete",
+						(event) => resolve(event.detail),
+						{ once: true },
+					)
+					window.royalBraidsSplash.complete()
+				}),
+		)
+
+		expect(completionDetail).toMatchObject({ duration: 100000 })
+		await expect(page.locator("#splashProgressPercent")).toHaveText("100%")
+		await expect(progress).toHaveAttribute("aria-valuenow", "100")
+		await expect(splash).toBeHidden()
+		await expect(splash).toHaveAttribute("aria-hidden", "true")
+		await expect(page.locator("body")).toHaveClass(/splash-complete/)
+		await expect(page.locator("body")).not.toHaveClass(/splash-active/)
+		expect(pageErrors).toEqual([])
+	})
+
 	test("dark mode toggle persists selection across reload", async ({ page }) => {
 		const pageErrors = await openPublicPageWithFirebaseMock(page)
 

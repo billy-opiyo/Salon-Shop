@@ -936,7 +936,19 @@ Use **Sort Messages**:
 - **Unresolved First** - unresolved messages before resolved messages
 - **Name (A-Z)** - alphabetical by sender name
 
-### 10.3 Message Statuses
+### 10.3 Message Status Filters
+
+The Messages tab includes status filter buttons for:
+
+- **New**
+- **Read**
+- **Resolved**
+
+Use these filters when you want to focus on one part of the contact inbox. The selected filter is highlighted and marked with `aria-pressed="true"` for accessibility. Clicking the active filter again clears the filter and returns to all messages.
+
+If no messages match the selected status, the list shows an empty-state message such as `No Resolved messages match this filter right now.`
+
+### 10.4 Message Statuses
 
 Messages use these statuses:
 
@@ -944,7 +956,7 @@ Messages use these statuses:
 - `read`
 - `resolved`
 
-### 10.4 Message Card Information
+### 10.5 Message Card Information
 
 Each message can show:
 
@@ -957,7 +969,7 @@ Each message can show:
 - Updated timestamp
 - Message content
 
-### 10.5 Message Actions
+### 10.6 Message Actions
 
 #### Mark New
 
@@ -981,15 +993,17 @@ Use this after the client issue or request has been handled.
 
 Permanently deletes the contact message after confirmation.
 
-### 10.6 Recommended Message Workflow
+### 10.7 Recommended Message Workflow
 
 1. Open **Messages**.
-2. Sort by **New Status First** or **Unresolved First**.
+2. Use the **New** filter or sort by **New Status First** / **Unresolved First**.
 3. Read new messages.
 4. Contact the client using the email link if needed.
 5. Mark as **Read** while in progress.
-6. Mark as **Resolved** after handling.
-7. Delete only spam or messages that no longer need to be retained.
+6. Use the **Read** filter for messages currently being handled.
+7. Mark as **Resolved** after handling.
+8. Use the **Resolved** filter to audit recently completed messages.
+9. Delete only spam or messages that no longer need to be retained.
 
 ---
 

@@ -157,6 +157,100 @@ test.describe("admin feature coverage", () => {
 		expect(pageErrors).toEqual([])
 	})
 
+	test("message status filters show matching contact messages and toggle back to all", async ({
+		page,
+	}) => {
+		const pageErrors = await openAdminPageAndLogin(page, {
+			initialCollections: {
+				adminUsers: {
+					"admin-uid": FULL_ADMIN,
+				},
+				contactMessages: {
+					"message-new": {
+						name: "New Filter Client",
+						email: "new.filter@example.com",
+						subject: "New request",
+						message: "Please help me book a new braid appointment.",
+						status: "new",
+						createdAt: "2099-05-01T09:00:00.000Z",
+						updatedAt: "2099-05-01T09:00:00.000Z",
+					},
+					"message-read": {
+						name: "Read Filter Client",
+						email: "read.filter@example.com",
+						subject: "Read request",
+						message: "This message has already been reviewed by staff.",
+						status: "read",
+						createdAt: "2099-05-02T09:00:00.000Z",
+						updatedAt: "2099-05-02T09:00:00.000Z",
+					},
+					"message-resolved": {
+						name: "Resolved Filter Client",
+						email: "resolved.filter@example.com",
+						subject: "Resolved request",
+						message: "This client issue has already been handled.",
+						status: "resolved",
+						createdAt: "2099-05-03T09:00:00.000Z",
+						updatedAt: "2099-05-03T09:00:00.000Z",
+					},
+				},
+			},
+		})
+
+		await page.getByRole("tab", { name: "Messages" }).click()
+
+		const list = page.locator("#adminContactList")
+		const controls = page.locator("#adminContactStatusFilterControls")
+		const newFilter = page.locator('[data-contact-status-filter="new"]')
+		const readFilter = page.locator('[data-contact-status-filter="read"]')
+		const resolvedFilter = page.locator(
+			'[data-contact-status-filter="resolved"]',
+		)
+
+		await expect(page.locator("#adminMessagesTotalCount")).toHaveText("3")
+		await expect(page.locator("#adminMessagesNewCount")).toHaveText("1")
+		await expect(page.locator("#adminMessagesReadCount")).toHaveText("1")
+		await expect(page.locator("#adminMessagesResolvedCount")).toHaveText("1")
+		await expect(controls).toHaveAttribute("data-active-status-filter", "all")
+		await expect(list).toContainText("New Filter Client")
+		await expect(list).toContainText("Read Filter Client")
+		await expect(list).toContainText("Resolved Filter Client")
+
+		await newFilter.click()
+		await expect(controls).toHaveAttribute("data-active-status-filter", "new")
+		await expect(newFilter).toHaveAttribute("aria-pressed", "true")
+		await expect(readFilter).toHaveAttribute("aria-pressed", "false")
+		await expect(list).toContainText("New Filter Client")
+		await expect(list).not.toContainText("Read Filter Client")
+		await expect(list).not.toContainText("Resolved Filter Client")
+
+		await readFilter.click()
+		await expect(controls).toHaveAttribute("data-active-status-filter", "read")
+		await expect(newFilter).toHaveAttribute("aria-pressed", "false")
+		await expect(readFilter).toHaveAttribute("aria-pressed", "true")
+		await expect(list).not.toContainText("New Filter Client")
+		await expect(list).toContainText("Read Filter Client")
+		await expect(list).not.toContainText("Resolved Filter Client")
+
+		await resolvedFilter.click()
+		await expect(controls).toHaveAttribute(
+			"data-active-status-filter",
+			"resolved",
+		)
+		await expect(resolvedFilter).toHaveAttribute("aria-pressed", "true")
+		await expect(list).not.toContainText("New Filter Client")
+		await expect(list).not.toContainText("Read Filter Client")
+		await expect(list).toContainText("Resolved Filter Client")
+
+		await resolvedFilter.click()
+		await expect(controls).toHaveAttribute("data-active-status-filter", "all")
+		await expect(resolvedFilter).toHaveAttribute("aria-pressed", "false")
+		await expect(list).toContainText("New Filter Client")
+		await expect(list).toContainText("Read Filter Client")
+		await expect(list).toContainText("Resolved Filter Client")
+		expect(pageErrors).toEqual([])
+	})
+
 	test("security-only admins see security telemetry while restricted tabs stay hidden", async ({
 		page,
 	}) => {
