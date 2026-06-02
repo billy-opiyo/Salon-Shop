@@ -9155,8 +9155,10 @@ const lightboxBookNow = document.getElementById("lightboxBookNow")
 function openLightbox(index) {
 	const visible = getVisibleGalleryData()
 	if (!visible.length || !lightbox) return
+	const numericIndex = Number(index)
+	if (!Number.isFinite(numericIndex)) return
 
-	currentLightboxIndex = index
+	currentLightboxIndex = Math.trunc(numericIndex)
 	updateLightbox()
 	lightbox.classList.add("active")
 	document.body.style.overflow = "hidden"

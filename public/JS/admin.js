@@ -31,6 +31,8 @@ let adminContactDocs = []
 let adminWaitlistDocs = []
 let adminBookingDocs = []
 let adminBookingStatusFilter = "all"
+let adminReviewStatusFilter = "all"
+let adminContactStatusFilter = "all"
 let adminReviewsSortMode = "featured"
 let adminMessagesSortMode = "newest"
 let adminWaitlistSortMode = "newest"
@@ -2161,6 +2163,37 @@ function normalizeContactStatus(status) {
 	return "new"
 }
 
+function normalizeAdminContactStatusFilter(filter = "all") {
+	const raw = String(filter || "all")
+		.trim()
+		.toLowerCase()
+	if (raw === "all") return "all"
+	if (["new", "read", "resolved"].includes(raw)) return raw
+	return "all"
+}
+
+function getAdminStatusFilterLabel(status = "") {
+	return String(status || "")
+		.replace(/[-_]/g, " ")
+		.trim()
+		.replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function updateAdminContactStatusFilterControls() {
+	const activeFilter = normalizeAdminContactStatusFilter(adminContactStatusFilter)
+	const controls = document.getElementById("adminContactStatusFilterControls")
+	if (controls) controls.dataset.activeStatusFilter = activeFilter
+
+	document.querySelectorAll("[data-contact-status-filter]").forEach((button) => {
+		const buttonFilter = normalizeAdminContactStatusFilter(
+			button.dataset.contactStatusFilter,
+		)
+		const isActive = activeFilter !== "all" && buttonFilter === activeFilter
+		button.classList.toggle("active", isActive)
+		button.setAttribute("aria-pressed", isActive ? "true" : "false")
+	})
+}
+
 function getContactStatusClass(status) {
 	switch (normalizeContactStatus(status)) {
 		case "resolved":
@@ -3785,9 +3818,14 @@ function renderAdminContactMessages(docs) {
 	const list = document.getElementById("adminContactList")
 	if (!list) return
 
-	const normalizedItems = docs.map(normalizeContactDoc)
+	const sourceDocs = Array.isArray(docs) ? docs : []
+	const normalizedItems = sourceDocs.map(normalizeContactDoc)
 	adminContactDocs = normalizedItems
 	const items = sortAdminContactMessages(normalizedItems)
+	adminContactStatusFilter = normalizeAdminContactStatusFilter(
+		adminContactStatusFilter,
+	)
+	updateAdminContactStatusFilterControls()
 
 	const total = items.length
 	const newCount = items.filter((m) => m.status === "new").length
@@ -3810,7 +3848,18 @@ function renderAdminContactMessages(docs) {
 		return
 	}
 
-	list.innerHTML = items
+	const visibleItems =
+		adminContactStatusFilter === "all"
+			? items
+			: items.filter((item) => item.status === adminContactStatusFilter)
+
+	if (!visibleItems.length) {
+		const filterLabel = getAdminStatusFilterLabel(adminContactStatusFilter)
+		list.innerHTML = `<div class="admin-empty-state">No ${escapeHtml(filterLabel)} messages match this filter right now.</div>`
+		return
+	}
+
+	list.innerHTML = visibleItems
 		.map(
 			(item) => `
       <article class="admin-review-item">
@@ -4551,6 +4600,30 @@ function normalizeReviewStatus(status) {
 	return "pending"
 }
 
+function normalizeAdminReviewStatusFilter(filter = "all") {
+	const raw = String(filter || "all")
+		.trim()
+		.toLowerCase()
+	if (raw === "all") return "all"
+	if (["pending", "approved", "rejected"].includes(raw)) return raw
+	return "all"
+}
+
+function updateAdminReviewStatusFilterControls() {
+	const activeFilter = normalizeAdminReviewStatusFilter(adminReviewStatusFilter)
+	const controls = document.getElementById("adminReviewStatusFilterControls")
+	if (controls) controls.dataset.activeStatusFilter = activeFilter
+
+	document.querySelectorAll("[data-review-status-filter]").forEach((button) => {
+		const buttonFilter = normalizeAdminReviewStatusFilter(
+			button.dataset.reviewStatusFilter,
+		)
+		const isActive = activeFilter !== "all" && buttonFilter === activeFilter
+		button.classList.toggle("active", isActive)
+		button.setAttribute("aria-pressed", isActive ? "true" : "false")
+	})
+}
+
 function extractReviewStatus(review = {}) {
 	return review.status ?? review.reviewStatus ?? "pending"
 }
@@ -4671,10 +4744,15 @@ function renderAdminReviews(docs) {
 	const list = document.getElementById("adminReviewsList")
 	if (!list) return
 
-	adminReviewRawDocs = Array.isArray(docs) ? [...docs] : []
-	const items = sortAdminReviewsList(docs.map(normalizeReviewDoc))
+	const sourceDocs = Array.isArray(docs) ? docs : []
+	adminReviewRawDocs = [...sourceDocs]
+	const items = sortAdminReviewsList(sourceDocs.map(normalizeReviewDoc))
 
 	adminReviewDocs = items
+	adminReviewStatusFilter = normalizeAdminReviewStatusFilter(
+		adminReviewStatusFilter,
+	)
+	updateAdminReviewStatusFilterControls()
 
 	const total = items.length
 	const pending = items.filter((r) => r.status === "pending").length
@@ -4697,7 +4775,18 @@ function renderAdminReviews(docs) {
 		return
 	}
 
-	list.innerHTML = items
+	const visibleItems =
+		adminReviewStatusFilter === "all"
+			? items
+			: items.filter((item) => item.status === adminReviewStatusFilter)
+
+	if (!visibleItems.length) {
+		const filterLabel = getAdminStatusFilterLabel(adminReviewStatusFilter)
+		list.innerHTML = `<div class="admin-empty-state">No ${escapeHtml(filterLabel)} reviews match this filter right now.</div>`
+		return
+	}
+
+	list.innerHTML = visibleItems
 		.map((item) => {
 			const stars = "★".repeat(item.rating) + "☆".repeat(5 - item.rating)
 			const isNegative = item.rating <= 3
@@ -6792,7 +6881,13 @@ function initializeAdminPanel() {
 	const galleryForm = document.getElementById("adminGalleryForm")
 	const galleryList = document.getElementById("adminGalleryList")
 	const reviewsList = document.getElementById("adminReviewsList")
+	const reviewStatusFilterControls = document.getElementById(
+		"adminReviewStatusFilterControls",
+	)
 	const contactList = document.getElementById("adminContactList")
+	const contactStatusFilterControls = document.getElementById(
+		"adminContactStatusFilterControls",
+	)
 	const waitlistList = document.getElementById("adminWaitlistList")
 	const securityList = document.getElementById("adminSecurityActivityList")
 	const adminUsersForm = document.getElementById("adminAdminsForm")
@@ -7047,6 +7142,34 @@ function initializeAdminPanel() {
 				button.dataset.bookingStatusFilter,
 			)
 			renderAdminBookings(adminBookingDocs)
+		})
+	}
+
+	if (reviewStatusFilterControls) {
+		reviewStatusFilterControls.addEventListener("click", (event) => {
+			const button = event.target.closest("[data-review-status-filter]")
+			if (!button) return
+
+			const nextFilter = normalizeAdminReviewStatusFilter(
+				button.dataset.reviewStatusFilter,
+			)
+			adminReviewStatusFilter =
+				adminReviewStatusFilter === nextFilter ? "all" : nextFilter
+			renderAdminReviews(adminReviewRawDocs)
+		})
+	}
+
+	if (contactStatusFilterControls) {
+		contactStatusFilterControls.addEventListener("click", (event) => {
+			const button = event.target.closest("[data-contact-status-filter]")
+			if (!button) return
+
+			const nextFilter = normalizeAdminContactStatusFilter(
+				button.dataset.contactStatusFilter,
+			)
+			adminContactStatusFilter =
+				adminContactStatusFilter === nextFilter ? "all" : nextFilter
+			renderAdminContactMessages(adminContactDocs)
 		})
 	}
 
