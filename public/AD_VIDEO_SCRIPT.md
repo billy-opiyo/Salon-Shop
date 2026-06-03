@@ -276,12 +276,13 @@ Before recording, prepare the website so the video looks clean and professional.
 ### Scene 19 — Closing Call to Action
 
 **Time:** 6:05–6:25  
-**Visuals:** Return to homepage hero, gallery, booking CTA, then final brand/logo screen.  
-**Text Overlay:** `Royal Braids — Beauty meets smart digital operations.`
+**Visuals:** Return to homepage hero, gallery, booking CTA, then final brand/logo screen. Add a clear CTA button-style overlay such as `View Live Website` with the public website URL.  
+**Text Overlay:** `Royal Braids — Beauty meets smart digital operations.`  
+**CTA Button Overlay:** `View Live Website → https://royal-braids-billydev.web.app`
 
 **Voice-Over:**
 
-> Royal Braids is not just a salon website. It is a complete digital salon solution — built for beautiful client experiences, efficient staff workflows, realtime operations, secure management, and business growth. Book, manage, connect, and grow — all in one platform.
+> Royal Braids is not just a salon website. It is a complete digital salon solution — built for beautiful client experiences, efficient staff workflows, realtime operations, secure management, and business growth. Book, manage, connect, and grow — all in one platform. Click the link to view the live website.
 
 ---
 
@@ -325,7 +326,7 @@ Use this section if you want to copy the narration directly into an AI voice gen
 >
 > The platform is powered by Firebase Authentication, Cloud Firestore realtime data, Firebase Hosting, Cloud Functions, Cloudinary media uploads, email confirmations, WhatsApp automation, and secure Firestore rules.
 >
-> Royal Braids is not just a salon website. It is a complete digital salon solution — built for beautiful client experiences, efficient staff workflows, realtime operations, secure management, and business growth. Book, manage, connect, and grow — all in one platform.
+> Royal Braids is not just a salon website. It is a complete digital salon solution — built for beautiful client experiences, efficient staff workflows, realtime operations, secure management, and business growth. Book, manage, connect, and grow — all in one platform. Click the link to view the live website.
 
 ---
 
@@ -355,7 +356,7 @@ Use this section if you want to copy the narration directly into an AI voice gen
 >
 > With Firebase realtime data, Cloud Functions, Cloudinary uploads, email confirmations, and WhatsApp reminders, Royal Braids is more than a website — it is a complete digital salon management solution.
 >
-> Royal Braids — where beauty meets smart technology.
+> Royal Braids — where beauty meets smart technology. Tap the link to view the live website.
 
 ---
 
@@ -369,7 +370,7 @@ Use this section if you want to copy the narration directly into an AI voice gen
 >
 > Admins can manage bookings, schedules, content, reviews, messages, services, users, and security from one private console.
 >
-> Built with Firebase, realtime data, secure authentication, Cloud Functions, and media uploads — Royal Braids turns a salon website into a complete digital business system.
+> Built with Firebase, realtime data, secure authentication, Cloud Functions, and media uploads — Royal Braids turns a salon website into a complete digital business system. View the live website using the link on screen.
 
 ---
 
@@ -398,6 +399,9 @@ Use these short captions throughout the video.
 - `Firebase + Cloud Functions`
 - `Email and WhatsApp Automation`
 - `Beauty Meets Smart Technology`
+- `View Live Website`
+- `Tap to Explore the Project`
+- `Live Demo Available Now`
 
 ---
 
@@ -446,7 +450,92 @@ Use this checklist while recording clips.
 
 ---
 
-## 10. Final End-Screen Copy
+## 10. Call-to-Action Button and Viewing Links
+
+Use these links in the video end screen, YouTube description, LinkedIn post, portfolio page, or social media caption.
+
+### Primary CTA Button
+
+```txt
+View Live Website
+https://royal-braids-billydev.web.app
+```
+
+### Secondary CTA Link
+
+```txt
+Explore Admin Console
+https://royal-braids-billydev.web.app/admin.html
+```
+
+> Note: The admin console is protected, so viewers may see the login screen unless you provide demo credentials or record the logged-in admin experience in the video.
+
+### Button Text Options
+
+- `View Live Website`
+- `Explore the Live Demo`
+- `See Royal Braids Online`
+- `Open the Project`
+- `Watch the Full Demo`
+- `Book Your Look Online`
+
+### On-Screen CTA Layout
+
+```txt
+[ View Live Website ]
+royal-braids-billydev.web.app
+
+Built by Billy Dev
+Premium Salon Website + Admin Management System
+```
+
+### Clickable Markdown CTA
+
+Use this in GitHub, README files, LinkedIn posts, or portfolio descriptions:
+
+```md
+[▶ View Live Website](https://royal-braids-billydev.web.app)
+
+[Admin Console Preview](https://royal-braids-billydev.web.app/admin.html)
+```
+
+### HTML CTA Button Snippet
+
+Use this if you want to place a button on a portfolio page or project showcase page:
+
+```html
+<a
+	href="https://royal-braids-billydev.web.app"
+	target="_blank"
+	rel="noopener noreferrer"
+	style="
+		display: inline-block;
+		padding: 14px 22px;
+		border-radius: 999px;
+		background: linear-gradient(135deg, #c8963e, #f8e5b4);
+		color: #15110a;
+		font-weight: 700;
+		text-decoration: none;
+		box-shadow: 0 12px 30px rgba(200, 150, 62, 0.35);
+	"
+>
+	View Live Website
+</a>
+```
+
+### Video Description CTA Copy
+
+```txt
+View the live Royal Braids project here:
+https://royal-braids-billydev.web.app
+
+Admin console preview:
+https://royal-braids-billydev.web.app/admin.html
+```
+
+---
+
+## 11. Final End-Screen Copy
 
 Choose one of these for the final screen.
 
@@ -456,6 +545,9 @@ Choose one of these for the final screen.
 Royal Braids
 Premium Salon Website + Admin Management System
 Beauty Meets Smart Technology
+
+View Live Website:
+royal-braids-billydev.web.app
 ```
 
 ### Option B
@@ -463,6 +555,9 @@ Beauty Meets Smart Technology
 ```txt
 Book. Manage. Connect. Grow.
 Royal Braids Digital Salon Platform
+
+[ View Live Website ]
+royal-braids-billydev.web.app
 ```
 
 ### Option C
@@ -470,11 +565,14 @@ Royal Braids Digital Salon Platform
 ```txt
 From online booking to admin security,
 Royal Braids brings salon operations into one smart platform.
+
+Explore it live:
+royal-braids-billydev.web.app
 ```
 
 ---
 
-## 11. Optional Portfolio Description
+## 12. Optional Portfolio Description
 
 Use this when posting the video online.
 
@@ -484,4 +582,7 @@ Royal Braids is a full-featured salon web platform built with HTML, CSS, JavaScr
 The public website includes services, gallery filters, online booking, waitlist support, reviews, blog content, contact forms, client authentication, and a personal dashboard.
 
 The admin console includes booking management, waitlist workflows, schedule views, gallery/blog content management, review moderation, message inbox, service visibility controls, admin delegation, and security monitoring.
+
+View the live project:
+https://royal-braids-billydev.web.app
 ```
