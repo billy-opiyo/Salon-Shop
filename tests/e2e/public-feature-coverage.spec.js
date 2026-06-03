@@ -4,13 +4,15 @@ const { blockExternalNetwork } = require("./helpers/network")
 const { watchForUnexpectedPageErrors } = require("./helpers/page-errors")
 
 async function openPublicPageWithFirebaseMock(page, mockOptions = {}) {
-	await installFirebaseMock(page, mockOptions)
+	const { pagePath = "/", splashDurationMs = 0, ...firebaseMockOptions } =
+		mockOptions
+	await installFirebaseMock(page, firebaseMockOptions)
 	await page.addInitScript((durationMs) => {
 		window.ROYAL_BRAIDS_SPLASH_DURATION_MS = durationMs
-	}, mockOptions.splashDurationMs ?? 0)
+	}, splashDurationMs)
 	await blockExternalNetwork(page)
 	const pageErrors = watchForUnexpectedPageErrors(page)
-	await page.goto("/", { waitUntil: "domcontentloaded" })
+	await page.goto(pagePath, { waitUntil: "domcontentloaded" })
 	return pageErrors
 }
 
@@ -95,6 +97,46 @@ test.describe("public feature coverage", () => {
 		await page.reload({ waitUntil: "domcontentloaded" })
 		await expect(page.locator("body")).toHaveClass(/light-mode/)
 
+		expect(pageErrors).toEqual([])
+	})
+
+	test("theme preset preview is opt-in and controls the page preset", async ({
+		page,
+	}) => {
+		const pageErrors = await openPublicPageWithFirebaseMock(page)
+
+		await expect(page.locator(".theme-preset-preview")).toHaveCount(0)
+
+		await page.goto("/?themePreview=1", { waitUntil: "domcontentloaded" })
+
+		const preview = page.locator(".theme-preset-preview")
+		await expect(preview).toBeVisible()
+		await expect(page.locator("html")).toHaveAttribute(
+			"data-theme-preset",
+			"gold",
+		)
+
+		await preview.getByRole("button", { name: /^Rose Gold$/ }).click()
+		await expect(page.locator("html")).toHaveAttribute(
+			"data-theme-preset",
+			"rose-gold",
+		)
+		await expect(preview.locator("[data-preview-current]")).toHaveText(
+			"Rose Gold",
+		)
+
+		await preview.getByRole("button", { name: /^Reset to config$/ }).click()
+		await expect(page.locator("html")).toHaveAttribute(
+			"data-theme-preset",
+			"gold",
+		)
+
+		await preview.getByRole("button", { name: /^Disable$/ }).click()
+		await expect(page.locator(".theme-preset-preview")).toHaveCount(0)
+		await expect(page.locator("html")).toHaveAttribute(
+			"data-theme-preset",
+			"gold",
+		)
 		expect(pageErrors).toEqual([])
 	})
 

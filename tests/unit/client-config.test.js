@@ -2,6 +2,19 @@ const fs = require("node:fs")
 const path = require("node:path")
 const vm = require("node:vm")
 
+const SUPPORTED_THEME_PRESETS = new Set([
+	"gold",
+	"champagne",
+	"rose-gold",
+	"emerald",
+	"plum-gold",
+	"terracotta",
+	"teal",
+	"blush",
+	"lavender",
+])
+const SUPPORTED_COLOR_MODES = new Set(["dark", "light"])
+
 function loadClientConfig() {
 	const code = fs.readFileSync(
 		path.resolve(__dirname, "..", "..", "public", "client-config.js"),
@@ -62,5 +75,28 @@ describe("client-config.js", () => {
 		expect(social.whatsapp).toMatch(/^https:\/\/wa\.me\//)
 		expect(contact.emailPrimary).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
 		expect(media.galleryFolder).toMatch(/^[a-z0-9-]+\/gallery$/)
+	})
+
+	it("exposes appearance defaults and theme preset config safely", () => {
+		const window = loadClientConfig()
+		const { appearance, theme, themePreset } = window.CLIENT_CONFIG
+
+		expect(appearance).toEqual(
+			expect.objectContaining({
+				mode: expect.any(String),
+				preset: expect.any(String),
+			}),
+		)
+		expect(SUPPORTED_COLOR_MODES.has(appearance.mode)).toBe(true)
+		expect(SUPPORTED_THEME_PRESETS.has(appearance.preset)).toBe(true)
+		expect(themePreset).toBe(appearance.preset)
+		expect(theme).toBeTruthy()
+		expect(typeof theme).toBe("object")
+		expect(Array.isArray(theme)).toBe(false)
+
+		for (const value of Object.values(theme)) {
+			expect(typeof value).toBe("string")
+			expect(value.trim()).not.toBe("")
+		}
 	})
 })

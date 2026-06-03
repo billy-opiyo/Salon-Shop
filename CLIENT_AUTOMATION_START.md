@@ -5,7 +5,7 @@ Use this project as a reusable salon/business template. The goal is to sell the 
 ## Main files you edit per client
 
 ```txt
-public/client-config.js       # Public website/admin branding, contacts, theme, Firebase web config
+public/client-config.js       # Public website/admin branding, contacts, appearance/theme, Firebase web config
 functions/client-config.js    # Backend business name, timezone, Cloudinary upload folder
 ```
 
@@ -118,7 +118,38 @@ const formSubmitEmail = "billyopiyo597@gmail.com"
 const cloudinaryGalleryFolder = `${businessSlug}/gallery`
 ```
 
-### 4) Complete config sections inside `window.CLIENT_CONFIG`
+### 4) Appearance + theme presets
+
+Use `appearance` for the normal client-level color setup:
+
+```js
+const appearance = {
+	// Client default only. A visitor's saved localStorage theme still wins.
+	mode: "dark",
+	// Available presets: gold, champagne, rose-gold, emerald,
+	// plum-gold, terracotta, teal, blush, lavender.
+	preset: "gold",
+}
+```
+
+- `appearance.mode` accepts `"dark"` or `"light"` and only sets the default before a visitor saves their own preference.
+- `appearance.preset` chooses the salon brand palette independently from light/dark mode.
+- To preview presets during setup, open the public site or admin page with `?themePreview=1`, for example `/index.html?themePreview=1` or `/admin.html?themePreview=1`.
+
+Use `themeOverrides` only when a client needs exact custom color values beyond the built-in presets:
+
+```js
+const themeOverrides = {
+	// Leave empty to use the selected appearance.preset palette.
+	// primary: "#C8963E",
+	// primaryDark: "#A6792D",
+	// primaryLight: "#E8C27A",
+	// accentPurple: "#6B2E7A",
+	// accentPink: "#B84E7A",
+}
+```
+
+### 5) Complete config sections inside `window.CLIENT_CONFIG`
 
 `public/client-config.js` contains these sections:
 
@@ -127,7 +158,9 @@ const cloudinaryGalleryFolder = `${businessSlug}/gallery`
 - `seo` — page title, meta description, keywords, Open Graph title/image.
 - `contact` — phones, emails, contact form target, location, map, opening hours.
 - `social` — Instagram, Facebook, X/Twitter, TikTok, WhatsApp.
-- `theme` — brand colors applied by `public/JS/apply-client-config.js`.
+- `appearance` — default light/dark mode and selected brand preset.
+- `themePreset` — compatibility copy of `appearance.preset` for older scripts.
+- `theme` — optional exact brand color overrides applied by `public/JS/apply-client-config.js`.
 - `media` — reusable logo/favicon/hero/gallery folder references.
 - `integrations` — Firebase web config, Cloudinary folder, WhatsApp public URL, Firebase secret names.
 - `features` — feature flags for booking/reviews/blog/gallery/waitlist/notifications.
@@ -213,7 +246,8 @@ firebase functions:secrets:list
    - contact/location/map/hours
    - SEO text
    - social links
-   - theme colors
+   - appearance mode/theme preset
+   - optional theme color overrides
 3. Update `functions/client-config.js` if needed:
    - timezone
    - UTC offset
@@ -241,6 +275,7 @@ node --check functions/client-config.js
 node --check scripts/new-client.js
 node --check functions/index.js
 node --check public/JS/apply-client-config.js
+node --check public/JS/theme-preset-preview.js
 node --check public/JS/admin.js
 ```
 

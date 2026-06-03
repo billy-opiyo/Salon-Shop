@@ -71,23 +71,93 @@
 		})
 	}
 
+	function normalizeThemeToken(value, fallback) {
+		const token = String(value || "")
+			.trim()
+			.toLowerCase()
+
+		return /^[a-z0-9-]+$/.test(token) ? token : fallback
+	}
+
+	function getSavedColorMode() {
+		try {
+			return localStorage.getItem("theme")
+		} catch (error) {
+			return null
+		}
+	}
+
+	function applyColorMode(config, root) {
+		const appearance = config.appearance || {}
+		const configuredMode = normalizeThemeToken(appearance.mode, "dark")
+		const savedMode = normalizeThemeToken(getSavedColorMode(), "")
+		const mode = savedMode || configuredMode
+		const isLight = mode === "light"
+
+		root.classList.toggle("light-mode", isLight)
+		root.dataset.colorMode = isLight ? "light" : "dark"
+		root.style.colorScheme = isLight ? "light" : "dark"
+
+		if (document.body) {
+			document.body.classList.toggle("light-mode", isLight)
+			document.body.dataset.colorMode = isLight ? "light" : "dark"
+		}
+	}
+
 	function applyTheme(config) {
-		const theme = config.theme || {}
 		const root = document.documentElement
+		const appearance = config.appearance || {}
+		const preset = normalizeThemeToken(
+			appearance.preset || config.themePreset,
+			"gold",
+		)
+		const theme = config.theme || {}
+
+		root.dataset.themePreset = preset
+		if (document.body) document.body.dataset.themePreset = preset
+		applyColorMode(config, root)
+
 		const themeMap = {
 			"--primary": theme.primary,
 			"--primary-dark": theme.primaryDark,
 			"--primary-light": theme.primaryLight,
 			"--focus-gold": theme.primary,
+			"--focus-gold-soft": theme.focusGoldSoft || theme.primarySoft,
 			"--accent-purple": theme.accentPurple,
 			"--accent-pink": theme.accentPink,
+			"--bg-primary": theme.bgPrimary,
+			"--bg-secondary": theme.bgSecondary,
+			"--bg-card": theme.bgCard,
+			"--bg-card-hover": theme.bgCardHover,
+			"--text-primary": theme.textPrimary,
+			"--text-secondary": theme.textSecondary,
+			"--text-muted": theme.textMuted,
+			"--border": theme.border,
+			"--shadow": theme.shadow,
+			"--overlay": theme.overlay,
+			"--accent-brown": theme.accentBrown,
+			"--primary-contrast": theme.primaryContrast,
+			"--primary-soft": theme.primarySoft,
+			"--primary-soft-strong": theme.primarySoftStrong,
+			"--primary-border": theme.primaryBorder,
+			"--primary-border-strong": theme.primaryBorderStrong,
+			"--scrollbar-thumb": theme.scrollbarThumb,
+			"--scrollbar-track": theme.scrollbarTrack,
 		}
 
 		Object.entries(themeMap).forEach(([cssVariable, value]) => {
 			if (value) root.style.setProperty(cssVariable, value)
 		})
 
-		if (theme.primary && theme.primaryLight) {
+		if (theme.gradientGold) {
+			root.style.setProperty("--gradient-gold", theme.gradientGold)
+		}
+
+		if (theme.gradientDark) {
+			root.style.setProperty("--gradient-dark", theme.gradientDark)
+		}
+
+		if (!theme.gradientGold && theme.primary && theme.primaryLight) {
 			root.style.setProperty(
 				"--gradient-gold",
 				`linear-gradient(135deg, ${theme.primary}, ${theme.primaryLight}, ${theme.primary})`,

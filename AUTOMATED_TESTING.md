@@ -79,7 +79,7 @@ The Firestore emulator is configured on port `18080` to avoid common local confl
 - Public booking form flow that confirms an appointment and verifies booking + slot writes through a Firebase browser mock.
 - Public services/category rendering and “Book This Service” prefill behavior.
 - Public contact links and contact form submission flow through a Firebase browser mock.
-- Public feature coverage for theme persistence, review login gating, review sorting, and blog carousel/expand controls.
+- Public feature coverage for theme persistence, theme preset preview controls, review login gating, review sorting, and blog carousel/expand controls.
 - Public account feature coverage for email signup, dashboard unlock, authenticated review submission, and gallery favorite login/save behavior.
 - Public mobile/tablet responsive checks across important customer-facing sections.
 - Admin login page smoke test.
@@ -90,8 +90,7 @@ The Firestore emulator is configured on port `18080` to avoid common local confl
 - Firestore rules tests for client booking writes, booking slot locks, and contact message writes in the Firebase emulator.
 - Firestore rules tests for waitlist ownership/admin boundaries, review visibility/submission constraints, and per-user gallery favorites.
 - Firestore rules tests for cooldown enforcement, owner/admin booking status transitions, booking-slot deletes, content-admin writes, contact inbox protection, and user-session collection-group visibility.
-- Client config unit tests.
-- Client catalog consistency and public contact/media config unit tests.
+- Client config unit tests for white-label identity, appearance/theme preset config, catalog consistency, and public contact/media values.
 - Functions config and waitlist action-message Jest tests.
 
 These are intentionally safe starter tests. They do not submit real bookings or write to production Firebase.
@@ -107,7 +106,7 @@ The Playwright smoke tests block external network requests so they do not depend
 
 Use this checklist when adding new features so automated coverage stays balanced:
 
-- **Public E2E:** splash/reveal behavior, customer navigation, booking/waitlist, auth/dashboard, reviews, favorites, contact, blog/gallery/service rendering, and responsive layout.
+- **Public E2E:** splash/reveal behavior, customer navigation, theme persistence/theme preset preview, booking/waitlist, auth/dashboard, reviews, favorites, contact, blog/gallery/service rendering, and responsive layout.
 - **Admin E2E:** admin auth/permissions, booking lifecycle, schedule, content management, review moderation, contact inbox sorting/filtering, waitlist queue actions, services settings, admin delegation, and security dashboards.
 - **Firestore rules:** public read boundaries, authenticated owner CRUD, admin permission boundaries, rate limits, server-managed collections, status transitions, and collection-group reads.
-- **Unit/Functions:** white-label config integrity, reusable pure helpers, message builders, and Cloud Function-adjacent pure modules that can be tested without network or production Firebase access.
+- **Unit/Functions:** white-label config integrity, appearance/theme preset config, reusable pure helpers, message builders, and Cloud Function-adjacent pure modules that can be tested without network or production Firebase access.

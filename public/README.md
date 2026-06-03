@@ -48,6 +48,10 @@ This project is built to:
 - Added **branded public splash screen**:
   - 10-second Royal Braids welcome overlay with hero imagery, handwriting title animation, loading copy, and accessible progressbar semantics
   - Reduced-motion duration fallback, scroll-to-top reset on fresh visits, completion event dispatch, and `window.royalBraidsSplash` runtime controls for safe testing/manual completion
+- Added **client theme presets + setup preview**:
+  - `public/client-config.js` now separates `appearance.mode` from `appearance.preset`, so client brand palettes can change independently from visitor light/dark preference
+  - Built-in presets include `gold`, `champagne`, `rose-gold`, `emerald`, `plum-gold`, `terracotta`, `teal`, `blush`, and `lavender`, with optional exact `theme` overrides for custom brand colors
+  - `public/JS/theme-preset-preview.js` adds an opt-in developer panel when opening public/admin pages with `?themePreview=1`
 - Added/expanded **Client Dashboard self-service**:
   - Client-side booking reschedule flow with slot re-locking
   - Client-side booking cancellation flow
@@ -107,6 +111,7 @@ This project is built to:
 - HTML + CSS + Vanilla JavaScript
 - Public script: `public/JS/script.js`
 - Splash controller: `public/JS/splash.js`
+- Client config/theming scripts: `public/client-config.js`, `public/JS/apply-client-config.js`, `public/JS/theme-preset-preview.js`
 - Admin script: `public/JS/admin.js`
 
 ### Firebase
@@ -139,9 +144,12 @@ This project is built to:
 │   └── package.json
 └── public/
     ├── index.html
+    ├── client-config.js
     ├── admin.html
     ├── README.md
     ├── CSS/style.css
+    ├── JS/apply-client-config.js
+    ├── JS/theme-preset-preview.js
     ├── JS/splash.js
     ├── JS/script.js
     ├── JS/admin.js
@@ -155,10 +163,11 @@ This project is built to:
 ### Public App (`index.html` + `script.js`)
 
 1. Runs the `splash.js` branded welcome overlay before revealing the main site shell.
-2. Initializes Firebase/Auth/Firestore/App Check.
-3. Renders fallback datasets first.
-4. Starts realtime listeners for gallery/blog/reviews and slot availability.
-5. Handles booking, waitlist fallback, reviews, favorites, contact, and account workflows.
+2. Loads `client-config.js`, applies `appearance`/theme CSS variables, and optionally enables the `?themePreview=1` developer preset panel.
+3. Initializes Firebase/Auth/Firestore/App Check.
+4. Renders fallback datasets first.
+5. Starts realtime listeners for gallery/blog/reviews and slot availability.
+6. Handles booking, waitlist fallback, reviews, favorites, contact, and account workflows.
 
 ### Client Dashboard Runtime
 
@@ -172,8 +181,9 @@ This project is built to:
 ### Admin App (`admin.html` + `admin.js`)
 
 1. Email/password admin login gated by `adminUsers/{uid}` role, active state, and permissions.
-2. Permission-scoped realtime listeners for bookings, waitlist, gallery, blogs, reviews, contact messages, services, admin users, and security data.
-3. Calendar-like schedule board (day/week), waitlist queue, and lifecycle-safe operational booking management.
+2. Loads the same client config/theming layer as the public app, including opt-in `?themePreview=1` preset preview for setup checks.
+3. Permission-scoped realtime listeners for bookings, waitlist, gallery, blogs, reviews, contact messages, services, admin users, and security data.
+4. Calendar-like schedule board (day/week), waitlist queue, and lifecycle-safe operational booking management.
 
 ### Backend Automation
 
@@ -193,6 +203,14 @@ This project is built to:
 - Configurable duration through `data-splash-duration` or `window.ROYAL_BRAIDS_SPLASH_DURATION_MS`
 - Reduced-motion fallback duration for users who prefer reduced animation
 - Completion API/event (`window.royalBraidsSplash.complete()` and `royalBraids:splashComplete`) for testing and controlled reveal behavior
+
+### Theme Presets / Brand Appearance
+
+- `public/client-config.js` exposes `appearance.mode` for the default light/dark mode and `appearance.preset` for the client brand palette
+- Supported presets: `gold`, `champagne`, `rose-gold`, `emerald`, `plum-gold`, `terracotta`, `teal`, `blush`, and `lavender`
+- Visitor-saved light/dark preference in `localStorage.theme` overrides only the mode, not the selected brand preset
+- Optional `theme` overrides can set exact CSS values for clients with custom color requirements
+- Developer-only preview panel: open `index.html?themePreview=1` or `admin.html?themePreview=1` to switch presets visually, reset to config, or disable preview for the tab
 
 ### Services
 
@@ -550,6 +568,7 @@ Use this section as the project QA checklist for releases, Firebase deployments,
 - [ ] Test accounts are available for guest, client, admin, and super-admin flows.
 - [ ] Browser DevTools and Cloud Functions logs are available for troubleshooting.
 - [ ] Responsive QA viewports are ready in DevTools, especially 490px, 390px, and 360px widths.
+- [ ] Theme preset preview URLs are ready for visual checks: `index.html?themePreview=1` and `admin.html?themePreview=1`.
 
 Deploy rules/functions before full QA:
 
@@ -574,11 +593,26 @@ Use the following scenarios to confirm all major features are working.
    - The Royal Braids splash screen appears, progresses, then reveals the main website without leaving the page scrolled away from the top.
    - Hero, Services, Gallery, Reviews, Blog, and Contact sections render.
    - Dark mode toggle works.
+   - The configured `data-theme-preset` is applied and the preset preview panel is hidden unless `?themePreview=1` is present.
    - At <=490px viewport width, service tabs, gallery filter chips, feature pills, waitlist badges, review/auth badges, and dashboard count badges stay compact/readable without clipping.
 2. In **Gallery**:
    - Change filters/sort options.
    - Open a style in lightbox; test next/prev and close.
    - Expected: list updates correctly and lightbox navigation works.
+
+### A2) Theme preset / preview QA
+
+Use this after changing `public/client-config.js`, `public/CSS/style.css`, or the theme preview script.
+
+1. Open `index.html` normally and verify the preview panel is not visible.
+2. Open `index.html?themePreview=1` and verify the **Theme presets** panel appears.
+3. Select several presets, including `rose-gold`, `emerald`, and `lavender`.
+4. Expected:
+   - `document.documentElement.dataset.themePreset` changes to the selected preset key.
+   - Primary buttons, highlights, service dropdown styling, scrollbar accents, and light/dark mode surfaces use the selected palette.
+5. Click **Reset to config** and verify the page returns to `appearance.preset` from `client-config.js`.
+6. Click **Disable** and verify the panel disappears and the URL no longer contains `themePreview`.
+7. Repeat a quick check on `admin.html?themePreview=1` to confirm the shared preview script loads on the admin shell without login-page errors.
 
 ### B) Auth + dashboard test
 

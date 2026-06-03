@@ -9,6 +9,7 @@
     --focus-gold-soft: rgba(200, 150, 62, 0.28);
     --accent-purple: #6B2E7A;
     --accent-pink: #B84E7A;
+    --accent-brown: #5C3D1E;
     --bg-primary: #0A0A0A;
     --bg-secondary: #111111;
     --bg-card: #1A1A1A;
@@ -19,6 +20,13 @@
     --border: #2A2520;
     --shadow: rgba(200, 150, 62, 0.15);
     --overlay: rgba(10, 10, 10, 0.7);
+    --primary-contrast: #0A0A0A;
+    --primary-soft: rgba(200, 150, 62, 0.12);
+    --primary-soft-strong: rgba(200, 150, 62, 0.22);
+    --primary-border: rgba(200, 150, 62, 0.32);
+    --primary-border-strong: rgba(200, 150, 62, 0.55);
+    --scrollbar-thumb: #e0ac4f;
+    --scrollbar-track: #1b1712;
     --gradient-gold: linear-gradient(135deg, #C8963E, #E8C27A, #C8963E);
     --gradient-dark: linear-gradient(180deg, #0A0A0A, #111111);
     --transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -43,6 +51,280 @@
     --popup-max-block-size: calc(100vh - var(--popup-safe-top) - var(--popup-safe-bottom));
 }
 
+/* ============ CLIENT THEME PRESETS ============
+   Theme presets change the salon brand colors independently from light/dark
+   mode. Set a preset in public/client-config.js with:
+
+   appearance: { mode: "dark", preset: "rose-gold" }
+
+   Available presets: gold, champagne, rose-gold, emerald, plum-gold,
+   terracotta, teal, blush, lavender.
+*/
+:root[data-theme-preset] {
+    --focus-gold: var(--primary);
+}
+
+:root[data-theme-preset="gold"] {
+    --primary: #C8963E;
+    --primary-dark: #A6792D;
+    --primary-light: #E8C27A;
+    --focus-gold-soft: rgba(200, 150, 62, 0.28);
+    --accent-purple: #6B2E7A;
+    --accent-pink: #B84E7A;
+    --accent-brown: #5C3D1E;
+    --bg-primary: #0A0A0A;
+    --bg-secondary: #111111;
+    --bg-card: #1A1A1A;
+    --bg-card-hover: #222222;
+    --text-primary: #F5F0EB;
+    --text-secondary: #A09888;
+    --text-muted: #6B6560;
+    --border: #2A2520;
+    --shadow: rgba(200, 150, 62, 0.15);
+    --overlay: rgba(10, 10, 10, 0.7);
+    --primary-contrast: #0A0A0A;
+    --primary-soft: rgba(200, 150, 62, 0.12);
+    --primary-soft-strong: rgba(200, 150, 62, 0.22);
+    --primary-border: rgba(200, 150, 62, 0.32);
+    --primary-border-strong: rgba(200, 150, 62, 0.55);
+    --scrollbar-thumb: #e0ac4f;
+    --scrollbar-track: #1b1712;
+    --gradient-gold: linear-gradient(135deg, #C8963E, #E8C27A, #C8963E);
+    --gradient-dark: linear-gradient(180deg, #0A0A0A, #111111);
+}
+
+:root[data-theme-preset="champagne"] {
+    --primary: #D6B16A;
+    --primary-dark: #A88445;
+    --primary-light: #F0D89A;
+    --focus-gold-soft: rgba(214, 177, 106, 0.28);
+    --accent-purple: #8C734A;
+    --accent-pink: #BFA76F;
+    --accent-brown: #5B4424;
+    --bg-primary: #050505;
+    --bg-secondary: #0D0D0D;
+    --bg-card: #171717;
+    --bg-card-hover: #222222;
+    --text-primary: #F7F2E8;
+    --text-secondary: #A99F8D;
+    --text-muted: #7D735F;
+    --border: #2D261B;
+    --shadow: rgba(214, 177, 106, 0.18);
+    --overlay: rgba(5, 5, 5, 0.72);
+    --primary-contrast: #080604;
+    --primary-soft: rgba(214, 177, 106, 0.12);
+    --primary-soft-strong: rgba(214, 177, 106, 0.22);
+    --primary-border: rgba(214, 177, 106, 0.32);
+    --primary-border-strong: rgba(214, 177, 106, 0.56);
+    --scrollbar-thumb: #e6c984;
+    --scrollbar-track: #17130d;
+    --gradient-gold: linear-gradient(135deg, #D6B16A, #F0D89A, #D6B16A);
+    --gradient-dark: linear-gradient(180deg, #050505, #0D0D0D);
+}
+
+:root[data-theme-preset="rose-gold"] {
+    --primary: #B76E79;
+    --primary-dark: #8F4F59;
+    --primary-light: #E6B7BE;
+    --focus-gold-soft: rgba(183, 110, 121, 0.3);
+    --accent-purple: #6D3A5F;
+    --accent-pink: #D98FA3;
+    --accent-brown: #6D3A5F;
+    --bg-primary: #120A0D;
+    --bg-secondary: #1B1014;
+    --bg-card: #24161B;
+    --bg-card-hover: #2C1C22;
+    --text-primary: #FFF4F6;
+    --text-secondary: #C8A7AD;
+    --text-muted: #8E6F76;
+    --border: #3A242B;
+    --shadow: rgba(183, 110, 121, 0.18);
+    --overlay: rgba(18, 10, 13, 0.72);
+    --primary-contrast: #17080C;
+    --primary-soft: rgba(183, 110, 121, 0.12);
+    --primary-soft-strong: rgba(183, 110, 121, 0.22);
+    --primary-border: rgba(183, 110, 121, 0.34);
+    --primary-border-strong: rgba(183, 110, 121, 0.58);
+    --scrollbar-thumb: #d98fa3;
+    --scrollbar-track: #211016;
+    --gradient-gold: linear-gradient(135deg, #B76E79, #E6B7BE, #D98FA3);
+    --gradient-dark: linear-gradient(180deg, #120A0D, #1B1014);
+}
+
+:root[data-theme-preset="emerald"] {
+    --primary: #2F9B7E;
+    --primary-dark: #1F6F5B;
+    --primary-light: #B7E1C7;
+    --focus-gold-soft: rgba(47, 155, 126, 0.3);
+    --accent-purple: #C9A45C;
+    --accent-pink: #7FBFA6;
+    --accent-brown: #1F6F5B;
+    --bg-primary: #06130F;
+    --bg-secondary: #0B1F18;
+    --bg-card: #102A21;
+    --bg-card-hover: #17382C;
+    --text-primary: #F4EFE3;
+    --text-secondary: #B8AA91;
+    --text-muted: #7F8F82;
+    --border: #1F4035;
+    --shadow: rgba(47, 155, 126, 0.2);
+    --overlay: rgba(6, 19, 15, 0.72);
+    --primary-contrast: #03100C;
+    --primary-soft: rgba(47, 155, 126, 0.12);
+    --primary-soft-strong: rgba(47, 155, 126, 0.24);
+    --primary-border: rgba(47, 155, 126, 0.34);
+    --primary-border-strong: rgba(47, 155, 126, 0.58);
+    --scrollbar-thumb: #7fbfa6;
+    --scrollbar-track: #0a2119;
+    --gradient-gold: linear-gradient(135deg, #1F6F5B, #C9A45C, #7FBFA6);
+    --gradient-dark: linear-gradient(180deg, #06130F, #0B1F18);
+}
+
+:root[data-theme-preset="plum-gold"] {
+    --primary: #D4A94F;
+    --primary-dark: #9F7932;
+    --primary-light: #F0CF7A;
+    --focus-gold-soft: rgba(212, 169, 79, 0.3);
+    --accent-purple: #4B164C;
+    --accent-pink: #A64D79;
+    --accent-brown: #4B164C;
+    --bg-primary: #100713;
+    --bg-secondary: #180D1C;
+    --bg-card: #231129;
+    --bg-card-hover: #2E1835;
+    --text-primary: #FFF4E6;
+    --text-secondary: #BFA9B9;
+    --text-muted: #8B7186;
+    --border: #38203F;
+    --shadow: rgba(212, 169, 79, 0.18);
+    --overlay: rgba(16, 7, 19, 0.72);
+    --primary-contrast: #12080A;
+    --primary-soft: rgba(212, 169, 79, 0.12);
+    --primary-soft-strong: rgba(212, 169, 79, 0.22);
+    --primary-border: rgba(212, 169, 79, 0.34);
+    --primary-border-strong: rgba(212, 169, 79, 0.58);
+    --scrollbar-thumb: #d4a94f;
+    --scrollbar-track: #241028;
+    --gradient-gold: linear-gradient(135deg, #4B164C, #D4A94F, #A64D79);
+    --gradient-dark: linear-gradient(180deg, #100713, #180D1C);
+}
+
+:root[data-theme-preset="terracotta"] {
+    --primary: #C76B45;
+    --primary-dark: #91462B;
+    --primary-light: #E8A37F;
+    --focus-gold-soft: rgba(199, 107, 69, 0.3);
+    --accent-purple: #70412D;
+    --accent-pink: #D98C6C;
+    --accent-brown: #70412D;
+    --bg-primary: #1A0F0A;
+    --bg-secondary: #24150F;
+    --bg-card: #2F1B13;
+    --bg-card-hover: #3A2117;
+    --text-primary: #FFF1E8;
+    --text-secondary: #C7A292;
+    --text-muted: #927365;
+    --border: #4A2B1F;
+    --shadow: rgba(199, 107, 69, 0.18);
+    --overlay: rgba(26, 15, 10, 0.72);
+    --primary-contrast: #160904;
+    --primary-soft: rgba(199, 107, 69, 0.12);
+    --primary-soft-strong: rgba(199, 107, 69, 0.22);
+    --primary-border: rgba(199, 107, 69, 0.34);
+    --primary-border-strong: rgba(199, 107, 69, 0.58);
+    --scrollbar-thumb: #e8a37f;
+    --scrollbar-track: #28150d;
+    --gradient-gold: linear-gradient(135deg, #91462B, #E8A37F, #C76B45);
+    --gradient-dark: linear-gradient(180deg, #1A0F0A, #24150F);
+}
+
+:root[data-theme-preset="teal"] {
+    --primary: #2BB3A3;
+    --primary-dark: #168174;
+    --primary-light: #8FE3DA;
+    --focus-gold-soft: rgba(43, 179, 163, 0.3);
+    --accent-purple: #315A72;
+    --accent-pink: #7DCBC3;
+    --accent-brown: #315A72;
+    --bg-primary: #061112;
+    --bg-secondary: #0B1D1F;
+    --bg-card: #10292C;
+    --bg-card-hover: #17363A;
+    --text-primary: #F1FFFF;
+    --text-secondary: #A7C7C9;
+    --text-muted: #769598;
+    --border: #1E3E42;
+    --shadow: rgba(43, 179, 163, 0.18);
+    --overlay: rgba(6, 17, 18, 0.72);
+    --primary-contrast: #031011;
+    --primary-soft: rgba(43, 179, 163, 0.12);
+    --primary-soft-strong: rgba(43, 179, 163, 0.22);
+    --primary-border: rgba(43, 179, 163, 0.34);
+    --primary-border-strong: rgba(43, 179, 163, 0.58);
+    --scrollbar-thumb: #8fe3da;
+    --scrollbar-track: #0c2427;
+    --gradient-gold: linear-gradient(135deg, #168174, #8FE3DA, #2BB3A3);
+    --gradient-dark: linear-gradient(180deg, #061112, #0B1D1F);
+}
+
+:root[data-theme-preset="blush"] {
+    --primary: #E8A7B6;
+    --primary-dark: #C9788B;
+    --primary-light: #F7D7DE;
+    --focus-gold-soft: rgba(232, 167, 182, 0.3);
+    --accent-purple: #A86D89;
+    --accent-pink: #FFB6C8;
+    --accent-brown: #7A4156;
+    --bg-primary: #160B10;
+    --bg-secondary: #211017;
+    --bg-card: #2B1720;
+    --bg-card-hover: #361D28;
+    --text-primary: #FFF7FA;
+    --text-secondary: #DAB7C2;
+    --text-muted: #A27E8A;
+    --border: #422632;
+    --shadow: rgba(232, 167, 182, 0.18);
+    --overlay: rgba(22, 11, 16, 0.72);
+    --primary-contrast: #19070D;
+    --primary-soft: rgba(232, 167, 182, 0.12);
+    --primary-soft-strong: rgba(232, 167, 182, 0.22);
+    --primary-border: rgba(232, 167, 182, 0.34);
+    --primary-border-strong: rgba(232, 167, 182, 0.58);
+    --scrollbar-thumb: #ffb6c8;
+    --scrollbar-track: #27111a;
+    --gradient-gold: linear-gradient(135deg, #C9788B, #F7D7DE, #E8A7B6);
+    --gradient-dark: linear-gradient(180deg, #160B10, #211017);
+}
+
+:root[data-theme-preset="lavender"] {
+    --primary: #A78BFA;
+    --primary-dark: #7C5FD6;
+    --primary-light: #D8CCFF;
+    --focus-gold-soft: rgba(167, 139, 250, 0.3);
+    --accent-purple: #6D4C8D;
+    --accent-pink: #E8A8D8;
+    --accent-brown: #5D4380;
+    --bg-primary: #0F0B18;
+    --bg-secondary: #171124;
+    --bg-card: #211832;
+    --bg-card-hover: #2C2140;
+    --text-primary: #FAF7FF;
+    --text-secondary: #C8BCE0;
+    --text-muted: #9484AD;
+    --border: #37294C;
+    --shadow: rgba(167, 139, 250, 0.2);
+    --overlay: rgba(15, 11, 24, 0.72);
+    --primary-contrast: #100A19;
+    --primary-soft: rgba(167, 139, 250, 0.12);
+    --primary-soft-strong: rgba(167, 139, 250, 0.22);
+    --primary-border: rgba(167, 139, 250, 0.34);
+    --primary-border-strong: rgba(167, 139, 250, 0.58);
+    --scrollbar-thumb: #d8ccff;
+    --scrollbar-track: #1b1228;
+    --gradient-gold: linear-gradient(135deg, #7C5FD6, #D8CCFF, #E8A8D8);
+    --gradient-dark: linear-gradient(180deg, #0F0B18, #171124);
+}
+
 @supports (height: 100dvh) {
     :root {
         --popup-max-block-size: calc(100dvh - var(--popup-safe-top) - var(--popup-safe-bottom));
@@ -61,7 +343,7 @@ html {
     scroll-padding-top: var(--scroll-offset);
     font-size: 16px;
     scrollbar-width: thin;
-    scrollbar-color: #e0ac4f #1b1712;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 section[id] {
@@ -88,7 +370,7 @@ body {
     overflow-x: hidden;
     transition: var(--transition);
     scrollbar-width: thin;
-    scrollbar-color: #e0ac4f #1b1712;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 body.splash-active {
@@ -127,6 +409,8 @@ body.splash-complete .site-shell {
 .splash-screen {
     --splash-inline-gutter: clamp(20px, 6vw, 72px);
     --splash-block-gutter: clamp(24px, 6vw, 72px);
+    --splash-aura-primary: var(--primary-soft-strong);
+    --splash-aura-secondary: color-mix(in srgb, var(--primary-dark) 24%, transparent);
     position: fixed;
     inset: 0;
     z-index: 99999;
@@ -138,7 +422,7 @@ body.splash-complete .site-shell {
     min-height: 100dvh;
     padding: var(--splash-block-gutter) var(--splash-inline-gutter);
     overflow: hidden;
-    background: #050403;
+    background: var(--bg-primary);
     color: var(--text-primary);
     isolation: isolate;
     transition: opacity 0.85s ease, transform 0.95s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.85s ease;
@@ -158,7 +442,7 @@ body.splash-complete .site-shell {
     height: clamp(260px, 42vw, 680px);
     top: -16%;
     right: -12%;
-    background: radial-gradient(circle, rgba(200, 150, 62, 0.22), transparent 64%);
+    background: radial-gradient(circle, var(--splash-aura-primary), transparent 64%);
     filter: blur(8px);
     animation: splashAuraFloat 10s ease-in-out both;
 }
@@ -168,7 +452,7 @@ body.splash-complete .site-shell {
     height: clamp(220px, 34vw, 520px);
     left: -12%;
     bottom: -12%;
-    background: radial-gradient(circle, rgba(107, 46, 122, 0.2), transparent 66%);
+    background: radial-gradient(circle, var(--splash-aura-secondary), transparent 66%);
     filter: blur(10px);
     animation: splashAuraFloat 10s ease-in-out reverse both;
 }
@@ -191,8 +475,8 @@ body.splash-complete .site-shell {
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(135deg, rgba(5, 4, 3, 0.9) 0%, rgba(5, 4, 3, 0.72) 46%, rgba(5, 4, 3, 0.92) 100%),
-        radial-gradient(circle at 50% 42%, rgba(200, 150, 62, 0.18), transparent 45%);
+        linear-gradient(135deg, color-mix(in srgb, var(--bg-primary) 92%, transparent) 0%, color-mix(in srgb, var(--bg-primary) 74%, transparent) 46%, color-mix(in srgb, var(--bg-primary) 94%, transparent) 100%),
+        radial-gradient(circle at 50% 42%, var(--primary-soft-strong), transparent 45%);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
 }
@@ -214,13 +498,13 @@ body.splash-complete .site-shell {
     margin-inline: auto;
     padding: clamp(30px, 5vw, 56px);
     text-align: center;
-    border: 1px solid rgba(232, 194, 122, 0.22);
+    border: 1px solid var(--primary-border);
     border-radius: clamp(22px, 4vw, 38px);
-    background: linear-gradient(180deg, rgba(10, 10, 10, 0.5), rgba(10, 10, 10, 0.24));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 70%, transparent), color-mix(in srgb, var(--bg-secondary) 38%, transparent));
     box-shadow:
         0 34px 90px rgba(0, 0, 0, 0.42),
         0 1px 0 rgba(255, 255, 255, 0.08) inset,
-        0 0 42px rgba(200, 150, 62, 0.08);
+        0 0 42px var(--primary-soft);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     animation: splashContentIn 0.8s ease both;
@@ -244,7 +528,7 @@ body.splash-complete .site-shell {
     margin: 0 auto clamp(24px, 3.8vw, 42px);
     line-height: 1;
     color: var(--primary-light);
-    text-shadow: 0 0 28px rgba(232, 194, 122, 0.28), 0 8px 34px rgba(0, 0, 0, 0.58);
+    text-shadow: 0 0 28px var(--primary-soft-strong), 0 8px 34px rgba(0, 0, 0, 0.58);
     overflow: visible;
 }
 
@@ -255,7 +539,23 @@ body.splash-complete .site-shell {
     height: auto;
     min-height: clamp(116px, 22vw, 188px);
     overflow: visible;
-    filter: drop-shadow(0 0 22px rgba(232, 194, 122, 0.22)) drop-shadow(0 12px 28px rgba(0, 0, 0, 0.5));
+    filter: drop-shadow(0 0 22px var(--primary-soft-strong)) drop-shadow(0 12px 28px rgba(0, 0, 0, 0.5));
+}
+
+#splashTitleGradient stop:nth-child(1) {
+    stop-color: var(--primary-light);
+}
+
+#splashTitleGradient stop:nth-child(2) {
+    stop-color: var(--primary);
+}
+
+#splashTitleGradient stop:nth-child(3) {
+    stop-color: var(--primary-dark);
+}
+
+#splashTitleGradient stop:nth-child(4) {
+    stop-color: var(--primary-light);
 }
 
 .splash-handwriting text {
@@ -268,7 +568,7 @@ body.splash-complete .site-shell {
 
 .splash-handwriting-shadow {
     fill: none;
-    stroke: rgba(245, 240, 235, 0.18);
+    stroke: color-mix(in srgb, var(--text-primary) 24%, transparent);
     stroke-width: 10;
     stroke-linecap: round;
     stroke-linejoin: round;
@@ -277,7 +577,7 @@ body.splash-complete .site-shell {
 
 .splash-handwriting-fill {
     fill: url(#splashTitleGradient);
-    stroke: rgba(255, 243, 207, 0.32);
+    stroke: var(--primary-border-strong);
     stroke-width: 0.8;
     opacity: 0;
     animation: splashHandwritingFill var(--splash-handwriting-fill-duration, 1.25s) ease var(--splash-handwriting-fill-delay, 8.75s) forwards;
@@ -364,7 +664,7 @@ body.splash-complete .site-shell {
     justify-content: space-between;
     gap: 16px;
     margin-bottom: 8px;
-    color: rgba(245, 240, 235, 0.84);
+    color: var(--text-secondary);
     font-size: clamp(0.78rem, 1.8vw, 0.92rem);
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -382,10 +682,10 @@ body.splash-complete .site-shell {
     width: 100%;
     height: 12px;
     overflow: hidden;
-    border: 1px solid rgba(232, 194, 122, 0.28);
+    border: 1px solid var(--primary-border);
     border-radius: var(--radius-full);
-    background: linear-gradient(180deg, rgba(245, 240, 235, 0.16), rgba(245, 240, 235, 0.06));
-    box-shadow: 0 0 0 1px rgba(10, 10, 10, 0.22) inset, 0 10px 24px rgba(0, 0, 0, 0.32);
+    background: linear-gradient(180deg, var(--primary-soft), color-mix(in srgb, var(--bg-card) 54%, transparent));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg-primary) 42%, transparent) inset, 0 10px 24px rgba(0, 0, 0, 0.32);
 }
 
 .splash-progress-fill {
@@ -395,8 +695,8 @@ body.splash-complete .site-shell {
     min-width: 8px;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, var(--primary), var(--primary-light), #fff3cf);
-    box-shadow: 0 0 16px rgba(232, 194, 122, 0.58), 0 0 30px rgba(200, 150, 62, 0.34);
+    background: linear-gradient(90deg, var(--primary-dark), var(--primary), var(--primary-light));
+    box-shadow: 0 0 16px var(--primary-border-strong), 0 0 30px var(--primary-soft-strong);
     transition: width 0.12s linear;
 }
 
@@ -412,7 +712,7 @@ body.splash-complete .site-shell {
 
 .splash-loading-text {
     margin-top: 12px;
-    color: rgba(245, 240, 235, 0.78);
+    color: var(--text-secondary);
     font-size: clamp(0.85rem, 2vw, 1rem);
     letter-spacing: 0.04em;
     animation: fadeInUp 0.9s ease 0.35s both;
@@ -683,20 +983,28 @@ textarea {
 }
 
 select {
+    --select-arrow-color: var(--primary);
+    --select-arrow-left-position: calc(100% - 21px);
+    --select-arrow-right-position: calc(100% - 15px);
+    --select-arrow-y-position: 50%;
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
     cursor: pointer;
     padding-right: 46px;
     background-color: var(--bg-card);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%23C8963E' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--select-arrow-color) 50%),
+        linear-gradient(135deg, var(--select-arrow-color) 50%, transparent 50%);
     background-repeat: no-repeat;
-    background-position: right 16px center;
-    background-size: 14px;
+    background-position:
+        var(--select-arrow-left-position) var(--select-arrow-y-position),
+        var(--select-arrow-right-position) var(--select-arrow-y-position);
+    background-size: 7px 7px, 7px 7px;
 }
 
 select:hover:not(:disabled) {
-    border-color: rgba(200, 150, 62, 0.72);
+    border-color: var(--primary-border-strong);
 }
 
 select:disabled {
@@ -7377,8 +7685,15 @@ body.light-mode {
     --text-muted: #705845;
     --border: #d9c8b7;
     --overlay: rgba(250, 247, 242, 0.7);
-    --shadow: rgba(125, 84, 35, 0.2);
-    --accent-brown: #5C3D1E;
+    --shadow: color-mix(in srgb, var(--primary) 20%, transparent);
+    --focus-gold: var(--primary);
+    --focus-gold-soft: color-mix(in srgb, var(--primary) 26%, transparent);
+    --primary-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+    --primary-soft-strong: color-mix(in srgb, var(--primary) 22%, transparent);
+    --primary-border: color-mix(in srgb, var(--primary) 34%, #d9c8b7);
+    --primary-border-strong: color-mix(in srgb, var(--primary) 58%, #d9c8b7);
+    --scrollbar-thumb: var(--primary);
+    --scrollbar-track: color-mix(in srgb, var(--primary) 8%, var(--bg-secondary));
 }
 
 /* Light mode readability + visibility improvements */
@@ -7410,29 +7725,29 @@ body.light-mode .contact-item-text a,
 body.light-mode .footer-links a:hover,
 body.light-mode .auth-profile-dropdown a:hover,
 body.light-mode .auth-links button:hover {
-    color: #8a5a20;
+    color: var(--primary-dark);
 }
 
 body.light-mode .book-btn,
 body.light-mode .btn-primary,
 body.light-mode .submit-booking,
 body.light-mode .auth-provider-btn:hover {
-    background: #b97e34;
-    color: #ffffff;
+    background: var(--primary);
+    color: var(--primary-contrast);
 }
 
 body.light-mode .btn-primary::before,
 body.light-mode .submit-booking::before {
-    background: #8f5d23;
+    background: var(--primary-dark);
 }
 
 body.light-mode .btn-outline,
 body.light-mode .auth-btn,
 body.light-mode .gallery-filter-chip,
 body.light-mode .services-tab {
-    border-color: #b58852;
-    color: #5a3a1d;
-    background: #fff8ef;
+    border-color: var(--primary-border-strong);
+    color: var(--primary-dark);
+    background: color-mix(in srgb, var(--primary) 7%, #fff8ef);
 }
 
 body.light-mode .btn-outline:hover,
@@ -7440,9 +7755,9 @@ body.light-mode .gallery-filter-chip.active,
 body.light-mode .services-tab.active,
 body.light-mode .services-tab:hover,
 body.light-mode .auth-btn:hover {
-    background: #b97e34;
-    color: #fff;
-    border-color: #9b6b2e;
+    background: var(--primary);
+    color: var(--primary-contrast);
+    border-color: var(--primary-dark);
 }
 
 body.light-mode .hero-stats,
@@ -7463,7 +7778,7 @@ body.light-mode #dashboardRescheduleModal .auth-modal-dialog,
 body.light-mode .auth-profile-dropdown {
     background: var(--bg-card);
     border-color: var(--border);
-    box-shadow: 0 10px 28px rgba(83, 56, 27, 0.12);
+    box-shadow: 0 10px 28px color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
 body.light-mode .gallery,
@@ -7478,30 +7793,27 @@ body.light-mode .footer {
 
 body.light-mode .main-section-heading,
 body.light-mode .admin-console-heading {
-    background: linear-gradient(180deg, rgba(255, 253, 249, 0.97), rgba(239, 230, 218, 0.92));
-    border-color: rgba(181, 136, 82, 0.36);
-    box-shadow: 0 16px 34px rgba(83, 56, 27, 0.14), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+    background: linear-gradient(180deg, rgba(255, 253, 249, 0.97), color-mix(in srgb, var(--primary) 7%, rgba(239, 230, 218, 0.92)));
+    border-color: var(--primary-border);
+    box-shadow: 0 16px 34px color-mix(in srgb, var(--primary) 14%, transparent), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
 }
 
 body.light-mode .main-section-heading::before,
 body.light-mode .admin-console-heading::before {
-    background: linear-gradient(90deg, rgba(200, 150, 62, 0.18), transparent 30%, transparent 70%, rgba(185, 126, 52, 0.12));
+    background: linear-gradient(90deg, var(--primary-soft-strong), transparent 30%, transparent 70%, var(--primary-soft));
 }
 
 body.light-mode input,
 body.light-mode select,
 body.light-mode textarea {
     background: #fffdf9;
-    border-color: #ccb8a4;
+    border-color: var(--border);
     color: var(--text-primary);
 }
 
 body.light-mode select {
+    --select-arrow-color: var(--primary-dark);
     background-color: #fffdf9;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5 7.5L10 12.5L15 7.5' stroke='%239b6b2e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 16px center;
-    background-size: 14px;
 }
 
 body.light-mode input::placeholder,
@@ -7511,26 +7823,26 @@ body.light-mode textarea::placeholder {
 
 body.light-mode input:focus,
 body.light-mode textarea:focus {
-    border-color: #a06a2a;
-    box-shadow: 0 0 0 4px rgba(185, 126, 52, 0.22);
+    border-color: var(--primary-dark);
+    box-shadow: 0 0 0 4px var(--focus-gold-soft);
 }
 
 body.light-mode select:focus,
 body.light-mode select:focus-visible {
-    border-color: #b67f34;
-    box-shadow: 0 0 0 4px rgba(182, 127, 52, 0.24);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--focus-gold-soft);
 }
 
 body.light-mode .form-group label,
 body.light-mode .contact-form-grid .form-group label,
 body.light-mode .reviews-sort-label,
 body.light-mode .gallery-sort-label {
-    color: #4c3827;
+    color: var(--accent-brown);
     font-weight: 700;
 }
 
 body.light-mode .hero-text p {
-    color: #3f2f22;
+    color: var(--text-secondary);
 }
 
 body.light-mode .blog-card h3,
@@ -7538,12 +7850,12 @@ body.light-mode .service-card h3,
 body.light-mode .testimonial-card h4,
 body.light-mode .contact-item-text h4,
 body.light-mode .dashboard-card h3 {
-    color: #2f1f12;
+    color: var(--text-primary);
 }
 
 body.light-mode .logo-icon {
-    box-shadow: 0 8px 20px rgba(92, 61, 30, 0.2),
-        0 0 0 1px rgba(92, 61, 30, 0.25) inset;
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-brown) 20%, transparent),
+        0 0 0 1px color-mix(in srgb, var(--accent-brown) 25%, transparent) inset;
 }
 
 body.light-mode .hero-bg::after {
@@ -8162,7 +8474,7 @@ body.light-mode select option {
 /* Booking service select scrollbar theming */
 #serviceSelect {
     scrollbar-width: thin;
-    scrollbar-color: #e0ac4f #1b1712;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 #serviceSelect::-webkit-scrollbar {
@@ -8170,15 +8482,15 @@ body.light-mode select option {
 }
 
 #serviceSelect::-webkit-scrollbar-track {
-    background: linear-gradient(180deg, rgba(200, 150, 62, 0.2), rgba(200, 150, 62, 0.08));
+    background: linear-gradient(180deg, var(--primary-soft-strong), var(--primary-soft));
     border-radius: var(--radius-full);
-    border: 1px solid rgba(200, 150, 62, 0.3);
+    border: 1px solid var(--primary-border);
 }
 
 #serviceSelect::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, var(--primary-light), var(--primary));
     border-radius: var(--radius-full);
-    border: 1px solid rgba(200, 150, 62, 0.35);
+    border: 1px solid var(--primary-border);
 }
 
 #serviceSelect::-webkit-scrollbar-thumb:hover {
@@ -8186,29 +8498,29 @@ body.light-mode select option {
 }
 
 body.light-mode #serviceSelect {
-    scrollbar-color: #c8963e #eadfce;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 body.light-mode #serviceSelect::-webkit-scrollbar-track {
-    background: linear-gradient(180deg, #efe4d4, #e6d9c6);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, var(--bg-card)), var(--scrollbar-track));
 }
 
 body.light-mode #serviceSelect::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #e8c27a, #c8963e);
-    border-color: rgba(166, 121, 45, 0.28);
+    background: linear-gradient(180deg, var(--primary-light), var(--primary));
+    border-color: var(--primary-border);
 }
 
 /* Booking service list option highlighting */
 #serviceSelect option:checked,
 #serviceSelect option:hover,
 #serviceSelect option:focus {
-    background: linear-gradient(180deg, #e8c27a, #c8963e) !important;
-    color: #0a0a0a !important;
+    background: linear-gradient(180deg, var(--primary-light), var(--primary)) !important;
+    color: var(--primary-contrast) !important;
 }
 
 /* Service category headers inside booking dropdown */
 #serviceSelect option[data-category-header="true"] {
-    background: linear-gradient(180deg, rgba(200, 150, 62, 0.3), rgba(200, 150, 62, 0.16)) !important;
+    background: linear-gradient(180deg, var(--primary-soft-strong), var(--primary-soft)) !important;
     color: var(--primary-light) !important;
     font-weight: 800;
     text-transform: uppercase;
@@ -8217,8 +8529,8 @@ body.light-mode #serviceSelect::-webkit-scrollbar-thumb {
 }
 
 #serviceSelect option[data-custom-category-header="true"] {
-    background: linear-gradient(180deg, rgba(200, 150, 62, 0.34), rgba(200, 150, 62, 0.2)) !important;
-    color: #ffe3ae !important;
+    background: linear-gradient(180deg, var(--primary-border), var(--primary-soft-strong)) !important;
+    color: var(--primary-light) !important;
     font-weight: 800;
     text-transform: uppercase;
     font-size: 0.78rem;
@@ -8226,13 +8538,13 @@ body.light-mode #serviceSelect::-webkit-scrollbar-thumb {
 }
 
 body.light-mode #serviceSelect option[data-category-header="true"] {
-    background: linear-gradient(180deg, #f1dfbe, #e8cf9f) !important;
-    color: #5f431d !important;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 18%, #fff8ef), color-mix(in srgb, var(--primary) 12%, #efe6da)) !important;
+    color: var(--accent-brown) !important;
 }
 
 body.light-mode #serviceSelect option[data-custom-category-header="true"] {
-    background: linear-gradient(180deg, #f2e2c5, #e5cfa6) !important;
-    color: #5f431d !important;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 22%, #fff8ef), color-mix(in srgb, var(--primary) 15%, #efe6da)) !important;
+    color: var(--accent-brown) !important;
 }
 
 /* ============ UTILITY ============ */

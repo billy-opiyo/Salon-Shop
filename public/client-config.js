@@ -46,6 +46,23 @@
 		"IMG/logo 5.png",
 		"IMG/logo 6.jpg",
 	]
+	const appearance = {
+		// `mode` is only the client default. A visitor's saved light/dark choice
+		// in localStorage still wins when present.
+		mode: "dark",
+		// Available presets in CSS: gold, champagne, rose-gold, emerald,
+		// plum-gold, terracotta, teal, blush, lavender.
+		preset: "gold",
+	}
+	const themeOverrides = {
+		// Optional exact brand overrides for clients with specific color values.
+		// Leave empty to use the selected `appearance.preset` palette.
+		// primary: "#C8963E",
+		// primaryDark: "#A6792D",
+		// primaryLight: "#E8C27A",
+		// accentPurple: "#6B2E7A",
+		// accentPink: "#B84E7A",
+	}
 
 	// Client-editable service catalog.
 	// Update these arrays for each salon instead of editing HTML or app JS.
@@ -1765,13 +1782,9 @@
 			whatsapp: whatsappUrl,
 		},
 
-		theme: {
-			primary: "#C8963E",
-			primaryDark: "#A6792D",
-			primaryLight: "#E8C27A",
-			accentPurple: "#6B2E7A",
-			accentPink: "#B84E7A",
-		},
+		appearance,
+		themePreset: appearance.preset,
+		theme: themeOverrides,
 
 		media: {
 			logoSrc: brandLogoImages[0],
