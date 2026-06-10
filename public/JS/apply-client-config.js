@@ -207,7 +207,9 @@
 		const config = window.CLIENT_CONFIG || {}
 		if (!Object.keys(config).length) return
 
-		applyHead(config)
+		if (!document.documentElement.hasAttribute("data-client-config-preserve-head")) {
+			applyHead(config)
+		}
 		applyTheme(config)
 		applyTextBindings(config)
 		applyAttributeBindings(config)
